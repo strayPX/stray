@@ -1,15 +1,18 @@
 ## Interface: 16001
 ## Title: stray
-## Notes: Komfort-Optionen per /stray – Beute, Händler, Taschen, Quests, Filmsequenzen, Flugzeit.
+## Notes: Komfort-Optionen per /stray – Beute, Händler, Taschen, Chat, Quests, Filmsequenzen, Kamera, Interface, Sozial.
 ## Author: stray
-## Version: 0.3.0-alpha
+## Version: 0.4.0-alpha
 ## SavedVariables: strayDB
 
 stray.lua
 loot.lua
 merchant.lua
 bags.lua
+chat.lua
 quests.lua
 cinematics.lua
-flight.lua
+camera.lua
+interface.lua
+social.lua
 ui.lua

@@ -14,9 +14,19 @@ ns.defaults = {
     questTurnIn = false,
     cinematicFast = false,
     cinematicAlways = false,
-    flightTimer = false,
-    flightTimes = {}, -- gemessene Flugzeiten: ["Start > Ziel"] = Sekunden
+    chatLinks = false,
+    cameraMax = false,
+    minimapWheel = false,
+    hideErrors = false,
+    durability = false,
+    declineDuels = false,
+    acceptRes = false,
+    acceptSummon = false,
+    positions = {}, -- verschobene Anzeigen: [Schlüssel] = { Punkt, relPunkt, x, y }
 }
+
+-- Einstellungen, die es nicht mehr gibt (Flugzeit, entfernt in 0.4.0-alpha)
+local REMOVED_KEYS = { "flightTimer", "flightTimes" }
 
 ns.GOLD = { 1, 0.82, 0 }
 ns.GOLD_DARK = { 0.79, 0.64, 0.29 }
@@ -50,6 +60,9 @@ ns.On("ADDON_LOADED", function(name)
         if strayDB[key] == nil then
             strayDB[key] = (type(value) == "table") and {} or value
         end
+    end
+    for _, key in ipairs(REMOVED_KEYS) do
+        strayDB[key] = nil
     end
     ns.db = strayDB
     if ns.OnLoaded then ns.OnLoaded() end
@@ -87,11 +100,6 @@ function ns.Print(msg)
     DEFAULT_CHAT_FRAME:AddMessage("|cffffd100stray|r: " .. msg)
 end
 
-function ns.FormatTime(seconds)
-    seconds = math.max(0, math.floor(seconds + 0.5))
-    return ("%d:%02d"):format(math.floor(seconds / 60), seconds % 60)
-end
-
 -- Gold-Betrag hübsch formatieren (mit Münzsymbolen, falls verfügbar)
 function ns.FormatMoney(copper)
     if GetCoinTextureString then return GetCoinTextureString(copper) end
@@ -99,11 +107,65 @@ function ns.FormatMoney(copper)
 end
 
 ---------------------------------------------------------------------------
+-- Kleine Anzeigen am Bildschirm (Haltbarkeit, Bedrohung):
+-- einheitlicher Rahmen, mit Shift + linker Maustaste verschiebbar
+---------------------------------------------------------------------------
+
+ns.BACKDROP_TEMPLATE = BackdropTemplateMixin and "BackdropTemplate" or nil
+
+function ns.ApplyBackdrop(frame)
+    if not frame.SetBackdrop then return end
+    frame:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    frame:SetBackdropColor(0, 0, 0, 0.75)
+    frame:SetBackdropBorderColor(ns.GOLD_DARK[1], ns.GOLD_DARK[2], ns.GOLD_DARK[3], 0.9)
+end
+
+function ns.MakeMovable(frame, key, defaultPoint)
+    frame.strayKey = key
+    frame.strayDefault = defaultPoint
+    frame:SetMovable(true)
+    frame:SetClampedToScreen(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", function(self)
+        if IsShiftKeyDown() then self:StartMoving() end
+    end)
+    frame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        local point, _, relPoint, x, y = self:GetPoint()
+        ns.db.positions[key] = { point, relPoint, x, y }
+    end)
+end
+
+function ns.RestorePosition(frame)
+    local pos = (ns.db and ns.db.positions[frame.strayKey]) or frame.strayDefault
+    frame:ClearAllPoints()
+    frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+end
+
+-- Ist das stray-Fenster offen? (Anzeigen zeigen dann Beispielwerte zum Verschieben)
+function ns.IsConfigOpen()
+    return strayFrame and strayFrame:IsShown() or false
+end
+
+ns.configCallbacks = {}
+
+-- fn(open) wird aufgerufen, wenn das stray-Fenster auf- oder zugeht
+function ns.OnConfig(fn)
+    table.insert(ns.configCallbacks, fn)
+end
+
+---------------------------------------------------------------------------
 -- Optionsregister: Funktionsmodule melden hier ihre Checkboxen an,
 -- ui.lua baut daraus das Fenster (Spalte → Abschnitte → Optionen).
 ---------------------------------------------------------------------------
 
-ns.columns = { {}, {} }
+ns.columns = { {}, {}, {} }
 
 function ns.AddOption(column, sectionName, option)
     local sections = ns.columns[column]

@@ -1,4 +1,4 @@
--- stray – Fenster: zwei Spalten, Abschnitte und Checkboxen aus dem Optionsregister
+-- stray – Fenster: Spalten, Abschnitte und Checkboxen aus dem Optionsregister
 
 local _, ns = ...
 
@@ -16,7 +16,7 @@ local GOLD, GOLD_DARK, GREY = ns.GOLD, ns.GOLD_DARK, ns.GREY
 ---------------------------------------------------------------------------
 
 local frame = CreateFrame("Frame", "strayFrame", UIParent, "BasicFrameTemplateWithInset")
-frame:SetWidth(PAD * 2 + COL_WIDTH * 2)
+frame:SetWidth(PAD * 2 + COL_WIDTH * #ns.columns)
 frame:SetPoint("CENTER")
 frame:SetFrameStrata("DIALOG")
 frame:SetClampedToScreen(true)
@@ -147,12 +147,21 @@ function Refresh()
     end
 end
 
+-- Module können reagieren, wenn das Fenster auf- oder zugeht (z. B. Beispielanzeigen)
+ns.configCallbacks = ns.configCallbacks or {}
+
+local function NotifyConfig(open)
+    for _, fn in ipairs(ns.configCallbacks) do fn(open) end
+end
+
 frame:SetScript("OnShow", function()
     ns.Sound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
     Refresh()
+    NotifyConfig(true)
 end)
 frame:SetScript("OnHide", function()
     ns.Sound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+    NotifyConfig(false)
 end)
 
 -- Falls Einstellungen woanders geändert werden (z. B. Blizzard-Optionen)
