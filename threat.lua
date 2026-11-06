@@ -8,6 +8,33 @@ local NO_API = "Diese Spielversion liefert keine Bedrohungswerte."
 
 local function ApiAvailable() return HAS_API end
 
+-- WoW Forever liefert Bedrohungswerte im Kampf als „geheime Werte“ (secret values).
+-- Addons dürfen sie nicht vergleichen oder damit rechnen, sonst bricht WoW mit einem Fehler ab.
+-- Deshalb vor jeder Auswertung prüfen und versiegelte Werte in Ruhe lassen.
+local function IsSecret(value)
+    if not issecretvalue then return false end
+    local ok, secret = pcall(issecretvalue, value)
+    return ok and secret == true
+end
+
+local function AnySecret(...)
+    for i = 1, select("#", ...) do
+        if IsSecret((select(i, ...))) then return true end
+    end
+    return false
+end
+
+local lockedNoticeShown = false
+
+local function NoticeLocked()
+    if lockedNoticeShown then return end
+    lockedNoticeShown = true
+    ns.Print("WoW Forever gibt Bedrohungswerte im Kampf nicht an Addons weiter. Die Bedrohungsanzeigen pausieren deshalb.")
+end
+
+local WARNINGS_POSSIBLE = false -- Tank- und Aggro-Warnung brauchen Vergleiche, in Forever gesperrt
+local NO_WARNINGS = "In WoW Forever nicht möglich: Das Spiel gibt Bedrohungswerte im Kampf nur versiegelt an Addons weiter, und diese Warnung müsste sie vergleichen."
+
 local function PlaySoundMaster(kit)
     if kit then PlaySound(kit, "Master") end
 end
@@ -104,10 +131,12 @@ local function CollectThreat(mob)
     for _, unit in ipairs(GroupUnits()) do
         if UnitExists(unit) then
             local isTanking, status, scaled = UnitDetailedThreatSituation(unit, mob)
-            if status then -- nil = steht nicht auf der Bedrohungsliste
+            if AnySecret(isTanking, status, scaled) then
+                NoticeLocked()
+            elseif status then -- nil = steht nicht auf der Bedrohungsliste
                 entries[#entries + 1] = {
                     unit = unit,
-                    name = UnitName(unit),
+                    name = ns.Public(UnitName(unit)),
                     tanking = isTanking and true or false,
                     pct = isTanking and 100 or math.min(scaled or 0, 100),
                 }
@@ -139,7 +168,7 @@ local function UpdateList()
     local entries, title
     if IsEnemy("target") then
         entries = CollectThreat("target")
-        title = UnitName("target")
+        title = ns.Public(UnitName("target"))
     end
     if not entries or #entries == 0 then
         if not ns.IsConfigOpen() then
@@ -261,8 +290,12 @@ local function UpdatePlate(plate, unit)
     local status, pct
     if (showBorder or showText) and unit and UnitCanAttack("player", unit) then
         local isTanking, detailStatus, scaled = UnitDetailedThreatSituation("player", unit)
-        status = detailStatus
-        if status then pct = isTanking and 100 or math.min(scaled or 0, 100) end
+        if AnySecret(isTanking, detailStatus, scaled) then
+            NoticeLocked()
+        else
+            status = detailStatus
+            if status then pct = isTanking and 100 or math.min(scaled or 0, 100) end
+        end
     end
     local color = status and PLATE_COLORS[status]
 
@@ -309,13 +342,14 @@ local function CheckLost(unit)
 end
 
 local function UpdateEnemies()
-    local doPlates, doTank = ns.db.threatPlates or ns.db.threatPercent, ns.db.threatTankWarn
+    local doPlates = ns.db.threatPlates or ns.db.threatPercent
+    local doTank = WARNINGS_POSSIBLE and ns.db.threatTankWarn
     if not doPlates and not doTank then return end
     local seen = {}
     if C_NamePlate and C_NamePlate.GetNamePlates then
         for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
             local unit = PlateUnit(plate)
-            if doPlates then UpdatePlate(plate, unit) end
+            if doPlates then pcall(UpdatePlate, plate, unit) end
             if unit and doTank then
                 local guid = UnitGUID(unit)
                 if guid and not seen[guid] then
@@ -333,7 +367,7 @@ end
 ns.On("NAME_PLATE_UNIT_ADDED", function(unit)
     if not ns.db or not HAS_API or not (ns.db.threatPlates or ns.db.threatPercent) then return end
     local plate = C_NamePlate.GetNamePlateForUnit(unit)
-    if plate then UpdatePlate(plate, unit) end
+    if plate then pcall(UpdatePlate, plate, unit) end
 end)
 
 ns.On("NAME_PLATE_UNIT_REMOVED", function(unit)
@@ -352,7 +386,7 @@ end)
 local armed = true
 
 local function CheckAggro()
-    if not ns.db.threatAggroWarn then return end
+    if not WARNINGS_POSSIBLE or not ns.db.threatAggroWarn then return end
     if not IsEnemy("target") then
         armed = true
         return
@@ -388,12 +422,13 @@ driver:SetScript("OnUpdate", function(_, delta)
     if elapsed < 0.2 then return end
     elapsed = 0
     if not HAS_API or not ns.db then return end
-    UpdateList()
-    UpdateEnemies()
-    CheckAggro()
+    -- pcall: Ein unerwarteter versiegelter Wert darf nicht fünfmal pro Sekunde Fehler auslösen
+    pcall(UpdateList)
+    pcall(UpdateEnemies)
+    pcall(CheckAggro)
 end)
 
-ns.OnConfig(function() UpdateList() end)
+ns.OnConfig(function() pcall(UpdateList) end)
 
 ns.On("PLAYER_LOGIN", function()
     ns.RestorePosition(list)
@@ -447,8 +482,8 @@ ns.AddOption(2, "Bedrohung", {
     preview = "threat_tankwarn",
     label = "Tank-Warnung",
     tooltip = "Verlierst du bei einem Gegner die Aggro, steht groß in der Bildschirmmitte, wen er jetzt angreift – mit Warnton.\n\nPrüft dein Ziel und alle Gegner mit sichtbarer Namensplakette (Taste V).",
-    isEnabled = ApiAvailable,
-    disabledHint = NO_API,
+    isEnabled = function() return HAS_API and WARNINGS_POSSIBLE end,
+    disabledHint = NO_WARNINGS,
 })
 
 ns.AddOption(2, "Bedrohung", {
@@ -456,6 +491,6 @@ ns.AddOption(2, "Bedrohung", {
     preview = "threat_aggrowarn",
     label = "Aggro-Warnung ab 90 %",
     tooltip = "Für Schaden und Heiler: Erreichst du 90 % der Bedrohung, die zum Aggroziehen nötig ist, erscheint „Gleich ziehst du Aggro!“ – Zeit, langsamer zu machen. Wer die Aggro schon hat, bekommt keine Warnung.",
-    isEnabled = ApiAvailable,
-    disabledHint = NO_API,
+    isEnabled = function() return HAS_API and WARNINGS_POSSIBLE end,
+    disabledHint = NO_WARNINGS,
 })

@@ -31,8 +31,9 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` öffnet ein 
 - **Bedrohungsliste:** Balken pro Gruppenmitglied für dein Ziel, wer hat Aggro, wer ist kurz davor. Bei offenem stray-Fenster mit Beispielwerten zum Verschieben. Alle Bedrohungsoptionen zeigen im Tooltip ein Beispielbild.
 - **Rahmen an Namensplaketten:** rot = du hast Aggro, gelb = Aggro wechselt gleich, grün = keine Aggro.
 - **Prozent an Namensplaketten:** deine Bedrohung neben dem Lebensbalken, 0 % = keine, 100 % = Aggro.
-- **Tank-Warnung:** Verlierst du die Aggro, steht mittig, wen der Gegner jetzt angreift.
-- **Aggro-Warnung ab 90 %:** für Schaden und Heiler, bevor sie Aggro ziehen.
+- **Tank-Warnung** und **Aggro-Warnung ab 90 %:** in WoW Forever derzeit nicht möglich und deshalb ausgegraut.
+
+Hinweis: WoW Forever gibt Bedrohungswerte im Kampf nur versiegelt an Addons weiter. Die Bedrohungsanzeigen pausieren dann (Hinweis im Chat).
 
 Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplaketten (Taste V).
 
@@ -65,6 +66,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.7.1-alpha – Notfix: Forever versiegelt Bedrohungswerte im Kampf (Fehlerflut behoben); Tank- und Aggro-Warnung deaktiviert; weitere Absicherungen gegen versiegelte Werte
 - 0.7.0-alpha – Beispielbilder im Tooltip der Bedrohungsoptionen
 - 0.6.0-alpha – Prozentanzeige an Namensplaketten
 - 0.5.1-alpha – Korrekturen nach Code-Review: Kamera-Maximum, Minimap-Zoom, Begleittiere bei der Bedrohung, Chat-Links in Klammern, Kopierfeld

@@ -32,6 +32,7 @@ end
 
 ns.On("DUEL_REQUESTED", function(name)
     if not ns.db or not ns.db.declineDuels then return end
+    name = ns.Public(name)
     CancelDuel()
     HidePopups("DUEL_REQUESTED")
     C_Timer.After(0, function() HidePopups("DUEL_REQUESTED") end)
@@ -43,9 +44,11 @@ end)
 ---------------------------------------------------------------------------
 
 local function InCombat(name)
-    if not name then return false end
+    if not name then return true end -- Name unbekannt (z. B. versiegelt) = nicht automatisch annehmen
     local ok, combat = pcall(UnitAffectingCombat, name)
-    return ok and combat
+    -- Unklar (Fehler oder versiegelt) = sicherheitshalber „im Kampf“
+    if not ok or ns.IsSecret(combat) then return true end
+    return combat and true or false
 end
 
 local function AcceptRes(name)
@@ -61,6 +64,7 @@ end
 
 ns.On("RESURRECT_REQUEST", function(name)
     if not ns.db or not ns.db.acceptRes then return end
+    name = ns.Public(name)
     -- Gibt es noch eine Wartezeit, erst danach annehmen
     local delay = GetCorpseRecoveryDelay and GetCorpseRecoveryDelay() or 0
     C_Timer.After(math.max(delay, 0) + 0.5, function() AcceptRes(name) end)
@@ -96,6 +100,7 @@ ns.On("CONFIRM_SUMMON", function()
     C_Timer.After(0.5, function()
         if UnitAffectingCombat("player") then return end
         local summoner, area = SummonInfo()
+        summoner, area = ns.Public(summoner), ns.Public(area)
         ConfirmSummonNow()
         HidePopups("CONFIRM_SUMMON", "CONFIRM_SUMMON_SCENARIO", "CONFIRM_SUMMON_STARTING_AREA")
         ns.Print(("Beschwörung von %s nach %s angenommen."):format(summoner or "?", area or "?"))

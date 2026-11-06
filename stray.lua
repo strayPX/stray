@@ -77,6 +77,20 @@ end)
 -- Hilfsfunktionen
 ---------------------------------------------------------------------------
 
+-- WoW Forever kann Werte versiegeln („secret values“, z. B. im Kampf).
+-- Damit darf ein Addon nicht vergleichen oder rechnen – vorher prüfen.
+function ns.IsSecret(value)
+    if not issecretvalue then return false end
+    local ok, secret = pcall(issecretvalue, value)
+    return ok and secret == true
+end
+
+-- Gibt den Wert zurück, oder nil, wenn er versiegelt ist
+function ns.Public(value)
+    if ns.IsSecret(value) then return nil end
+    return value
+end
+
 function ns.GetCVarOn(name)
     if C_CVar and C_CVar.GetCVarBool then
         return C_CVar.GetCVarBool(name)

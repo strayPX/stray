@@ -31,7 +31,7 @@ local function ConvertWord(word)
 end
 
 local function Filter(_, _, msg, ...)
-    if not ns.db or not ns.db.chatLinks or type(msg) ~= "string" then return false end
+    if not ns.db or not ns.db.chatLinks or ns.IsSecret(msg) or type(msg) ~= "string" then return false end
     local changed = false
     local newMsg = msg:gsub("%S+", function(word)
         local link = ConvertWord(word)
@@ -112,7 +112,7 @@ local function WrapTooltip(method)
     if not ItemRefTooltip or not ItemRefTooltip[method] then return end
     local original = ItemRefTooltip[method]
     ItemRefTooltip[method] = function(self, link, ...)
-        if type(link) == "string" and link:sub(1, 4) == "url:" then
+        if not ns.IsSecret(link) and type(link) == "string" and link:sub(1, 4) == "url:" then
             ShowCopy(link:sub(5))
             return
         end

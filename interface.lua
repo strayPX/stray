@@ -24,6 +24,7 @@ end
 -- Solange die Option an ist, empfängt nur stray die Fehler und reicht die wichtigen weiter
 ns.On("UI_ERROR_MESSAGE", function(arg1, arg2)
     if not ns.db or not ns.db.hideErrors then return end
+    if ns.IsSecret(arg1) or ns.IsSecret(arg2) then return end
     local message = (type(arg2) == "string") and arg2 or arg1
     if type(message) == "string" and KEEP[message] then
         UIErrorsFrame:AddMessage(message, 1, 0.1, 0.1, 1)

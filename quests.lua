@@ -17,6 +17,17 @@ ns.AddOption(2, "Quests", {
 -- Quests, bei denen wir bewusst angehalten haben (Auswahl/Gold) – nicht erneut automatisch öffnen
 local skipped = {}
 
+-- Questtitel können in Forever versiegelt sein; dann nicht als Schlüssel verwenden
+local function IsSkipped(title)
+    title = ns.Public(title)
+    return title ~= nil and skipped[title] == true
+end
+
+local function MarkSkipped(title)
+    title = ns.Public(title)
+    if title then skipped[title] = true end
+end
+
 local function Active(key)
     return ns.db and ns.db[key] and not IsShiftKeyDown()
 end
@@ -36,7 +47,7 @@ ns.On("GOSSIP_SHOW", function()
 
     if Active("questTurnIn") then
         for _, quest in ipairs(C_GossipInfo.GetActiveQuests() or {}) do
-            if quest.isComplete and not skipped[quest.title] then
+            if not ns.IsSecret(quest.isComplete) and quest.isComplete and not IsSkipped(quest.title) then
                 C_GossipInfo.SelectActiveQuest(quest.questID)
                 return
             end
@@ -45,7 +56,7 @@ ns.On("GOSSIP_SHOW", function()
 
     if Active("questAccept") then
         for _, quest in ipairs(C_GossipInfo.GetAvailableQuests() or {}) do
-            if not quest.isTrivial then
+            if not ns.IsSecret(quest.isTrivial) and not quest.isTrivial then
                 C_GossipInfo.SelectAvailableQuest(quest.questID)
                 return
             end
@@ -58,7 +69,7 @@ ns.On("QUEST_GREETING", function()
     if Active("questTurnIn") then
         for i = 1, GetNumActiveQuests() do
             local title, isComplete = GetActiveTitle(i)
-            if isComplete and not skipped[title] then
+            if not ns.IsSecret(isComplete) and isComplete and not IsSkipped(title) then
                 SelectActiveQuest(i)
                 return
             end
@@ -90,7 +101,7 @@ ns.On("QUEST_PROGRESS", function()
     if not Active("questTurnIn") then return end
     if not IsQuestCompletable() then return end
     if GetQuestMoneyToGet and GetQuestMoneyToGet() > 0 then
-        skipped[GetTitleText()] = true
+        MarkSkipped(GetTitleText())
         return
     end
     CompleteQuest()
@@ -101,7 +112,7 @@ ns.On("QUEST_COMPLETE", function()
     if not Active("questTurnIn") then return end
     local choices = GetNumQuestChoices()
     if choices > 1 then
-        skipped[GetTitleText()] = true
+        MarkSkipped(GetTitleText())
         return
     end
     GetQuestReward(choices)
