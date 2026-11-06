@@ -10,6 +10,11 @@ local defaults = {
 
 local db
 
+-- Farben (Blizzard-Gold)
+local GOLD = { 1, 0.82, 0 }
+local GOLD_DARK = { 0.79, 0.64, 0.29 }
+local GREY = { 0.5, 0.5, 0.5 }
+
 -- WoW-Einstellungen lesen/schreiben (C_CVar, falls vorhanden, sonst die alten Funktionen)
 local function GetCVarOn(name)
     if C_CVar and C_CVar.GetCVarBool then
@@ -26,8 +31,17 @@ local function SetCVarValue(name, value)
     end
 end
 
+local function GetVersion()
+    local getMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+    return getMeta and getMeta(ADDON_NAME, "Version") or ""
+end
+
+local function Sound(kit)
+    if SOUNDKIT and kit then PlaySound(kit) end
+end
+
 local function Print(msg)
-    DEFAULT_CHAT_FRAME:AddMessage("|cffff4040stray|r: " .. msg)
+    DEFAULT_CHAT_FRAME:AddMessage("|cffffd100stray|r: " .. msg)
 end
 
 ---------------------------------------------------------------------------
@@ -58,7 +72,7 @@ end
 ---------------------------------------------------------------------------
 
 local frame = CreateFrame("Frame", "strayFrame", UIParent, "BasicFrameTemplateWithInset")
-frame:SetSize(260, 130)
+frame:SetSize(270, 150)
 frame:SetPoint("CENTER")
 frame:SetFrameStrata("DIALOG")
 frame:SetClampedToScreen(true)
@@ -68,9 +82,28 @@ frame:RegisterForDrag("LeftButton")
 frame:Hide()
 tinsert(UISpecialFrames, "strayFrame") -- Esc schließt das Fenster
 
-frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+-- Kopfzeile: Symbol, Name, Version
+local icon = frame:CreateTexture(nil, "OVERLAY")
+icon:SetSize(18, 18)
+icon:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -3)
+icon:SetTexture("Interface\\Icons\\INV_Misc_Bag_10")
+local masked = pcall(icon.SetMask, icon, "Interface\\CharacterFrame\\TempPortraitAlphaMask")
+if not masked then
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+end
+
+local iconRing = frame:CreateTexture(nil, "OVERLAY", nil, 1)
+iconRing:SetSize(32, 32)
+iconRing:SetPoint("CENTER", icon, "CENTER", 0, 0)
+iconRing:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
+iconRing:SetTexCoord(0, 0.6, 0, 0.6)
+
+frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 frame.title:SetPoint("TOP", frame, "TOP", 0, -5)
 frame.title:SetText("stray")
+
+local version = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+version:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -30, -7)
 
 frame:SetScript("OnDragStart", frame.StartMoving)
 frame:SetScript("OnDragStop", function(self)
@@ -79,22 +112,64 @@ frame:SetScript("OnDragStop", function(self)
     db.point = { point, relPoint, x, y }
 end)
 
-local function CreateCheckbox(label, anchor, offsetY)
+-- Abschnittsüberschrift mit Trennlinie
+local function CreateSection(text, offsetY)
+    local header = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    header:SetPoint("TOPLEFT", frame, "TOPLEFT", 18, offsetY)
+    header:SetText(text)
+    header:SetTextColor(unpack(GOLD_DARK))
+
+    local line = frame:CreateTexture(nil, "ARTWORK")
+    line:SetHeight(1)
+    line:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -4)
+    line:SetPoint("RIGHT", frame, "RIGHT", -18, 0)
+    line:SetColorTexture(GOLD_DARK[1], GOLD_DARK[2], GOLD_DARK[3], 0.35)
+
+    return line
+end
+
+-- Checkbox mit Beschriftung und Tooltip
+local function CreateCheckbox(label, tooltip, anchor, offsetY)
     local cb = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
     cb:SetSize(26, 26)
-    cb:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, offsetY)
+    cb:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", -4, offsetY)
     cb.label = cb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    cb.label:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+    cb.label:SetPoint("LEFT", cb, "RIGHT", 4, 1)
     cb.label:SetText(label)
+    cb.tooltip = tooltip
+
+    -- Die Beschriftung soll auch klickbar sein
+    cb:SetHitRectInsets(0, -cb.label:GetStringWidth() - 6, 0, 0)
+
+    if cb.SetMotionScriptsWhileDisabled then
+        cb:SetMotionScriptsWhileDisabled(true)
+    end
+    cb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(label, 1, 1, 1)
+        GameTooltip:AddLine(self.tooltip, GOLD[1], GOLD[2], GOLD[3], true)
+        if not self:IsEnabled() and self.disabledHint then
+            GameTooltip:AddLine(self.disabledHint, 1, 0.3, 0.3, true)
+        end
+        GameTooltip:Show()
+    end)
+    cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     return cb
 end
 
-local anchor = CreateFrame("Frame", nil, frame)
-anchor:SetSize(1, 1)
-anchor:SetPoint("TOPLEFT", frame, "TOPLEFT", 16, -36)
+local lootLine = CreateSection("Beute", -36)
 
-local autoLootCB = CreateCheckbox("Automatisch plündern", anchor, 0)
-local fastLootCB = CreateCheckbox("Schnell plündern", anchor, -32)
+local autoLootCB = CreateCheckbox(
+    "Automatisch plündern",
+    "Ein Klick auf eine Leiche nimmt die ganze Beute. Mit gedrückter Shift-Taste plünderst du wie gewohnt manuell.",
+    lootLine, -6)
+
+local fastLootCB = CreateCheckbox(
+    "Schnell plündern",
+    "Nimmt die Beute sofort, ohne auf das Beutefenster zu warten. Gegenstände mit Bestätigung fragt WoW weiterhin ab.",
+    lootLine, -36)
+fastLootCB.disabledHint = "Erst „Automatisch plündern“ aktivieren."
 
 local function Refresh()
     local autoOn = GetCVarOn("autoLootDefault")
@@ -102,23 +177,35 @@ local function Refresh()
     fastLootCB:SetChecked(db.fastLoot)
     fastLootCB:SetEnabled(autoOn)
     if autoOn then
-        fastLootCB.label:SetTextColor(1, 0.82, 0)
+        fastLootCB.label:SetTextColor(unpack(GOLD))
     else
-        fastLootCB.label:SetTextColor(0.5, 0.5, 0.5)
+        fastLootCB.label:SetTextColor(unpack(GREY))
     end
 end
 
+local function CheckboxSound(checked)
+    Sound(checked and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
+end
+
 autoLootCB:SetScript("OnClick", function(self)
+    CheckboxSound(self:GetChecked())
     SetCVarValue("autoLootDefault", self:GetChecked() and "1" or "0")
     Refresh()
 end)
 
 fastLootCB:SetScript("OnClick", function(self)
+    CheckboxSound(self:GetChecked())
     db.fastLoot = self:GetChecked() and true or false
     Refresh()
 end)
 
-frame:SetScript("OnShow", Refresh)
+frame:SetScript("OnShow", function()
+    Sound(SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_OPEN)
+    Refresh()
+end)
+frame:SetScript("OnHide", function()
+    Sound(SOUNDKIT and SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+end)
 
 ---------------------------------------------------------------------------
 -- Events
@@ -136,6 +223,7 @@ events:SetScript("OnEvent", function(_, event, arg1)
             if strayDB[key] == nil then strayDB[key] = value end
         end
         db = strayDB
+        version:SetText(GetVersion())
         if db.point then
             frame:ClearAllPoints()
             frame:SetPoint(db.point[1], UIParent, db.point[2], db.point[3], db.point[4])

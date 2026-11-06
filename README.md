@@ -16,4 +16,5 @@ Den Ordner `stray` nach `World of Warcraft\_forever_\Interface\AddOns\` kopieren
 
 ## Version
 
-0.1.0 – erste Testversion
+- 0.2.0 – Fenster im klassischen Stil: Symbol, Version, Abschnitt „Beute“, Tooltips, Klick-Sounds
+- 0.1.0 – erste Testversion
