@@ -21,10 +21,13 @@ end
 
 local function ApplyCamera(turnedOff)
     if ns.db.cameraMax then
+        -- Der Client lehnt zu hohe Werte ab oder kürzt sie auf sein Maximum.
+        -- Sobald der Wert über dem Standard liegt, ist das Maximum erreicht.
+        local default = tonumber(GetDefault(ZOOM_CVAR)) or 1
         for _, value in ipairs(ZOOM_TRY) do
             pcall(ns.SetCVarValue, ZOOM_CVAR, tostring(value))
             local now = GetNumber(ZOOM_CVAR)
-            if now and math.abs(now - value) < 0.01 then break end
+            if now and now > default + 0.01 then break end
         end
     elseif turnedOff then
         -- Nur beim Ausschalten zurücksetzen, sonst bleibt eine eigene Einstellung erhalten
@@ -49,6 +52,15 @@ ns.AddOption(3, "Kamera & Karte", {
 
 local zoomButtons = { MinimapZoomIn, MinimapZoomOut }
 
+-- Hat der Client schon selbst einen Mausrad-Zoom, nicht doppelt zoomen
+local nativeWheel = Minimap:GetScript("OnMouseWheel") ~= nil
+
+local function SyncButtons()
+    local zoom, top = Minimap:GetZoom(), Minimap:GetZoomLevels() - 1
+    if MinimapZoomIn then MinimapZoomIn:SetEnabled(zoom < top) end
+    if MinimapZoomOut then MinimapZoomOut:SetEnabled(zoom > 0) end
+end
+
 local function OnMinimapWheel(self, delta)
     if not ns.db or not ns.db.minimapWheel then return end
     local zoom = self:GetZoom()
@@ -63,13 +75,20 @@ local function ApplyMinimap(toggled)
     local on = ns.db.minimapWheel
     -- Ist die Option aus, beim Einloggen nichts anfassen (andere Addons nicht stören)
     if not on and not toggled then return end
-    Minimap:EnableMouseWheel(on)
+    if on then
+        Minimap:EnableMouseWheel(true)
+    elseif not nativeWheel then
+        Minimap:EnableMouseWheel(false)
+    end
     for _, button in pairs(zoomButtons) do
         if on then button:Hide() else button:Show() end
     end
+    if not on then SyncButtons() end
 end
 
-Minimap:HookScript("OnMouseWheel", OnMinimapWheel)
+if not nativeWheel then
+    Minimap:SetScript("OnMouseWheel", OnMinimapWheel)
+end
 for _, button in pairs(zoomButtons) do
     -- Falls Blizzard die Knöpfe wieder einblendet
     button:HookScript("OnShow", function(self)

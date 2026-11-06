@@ -23,10 +23,11 @@ end
 -- Ein Wort prüfen; vorhandene WoW-Links und Farbcodes (enthalten „|“) bleiben unangetastet
 local function ConvertWord(word)
     if word:find("|", 1, true) then return nil end
-    local trail = word:match("[%.,;:!%?%)]+$") or ""
-    local core = word:sub(1, #word - #trail)
+    local lead = word:match("^[%(%[\"']+") or ""
+    local trail = word:match("[%.,;:!%?%)%]\"']+$") or ""
+    local core = word:sub(#lead + 1, #word - #trail)
     if core == "" or not LooksLikeUrl(core) then return nil end
-    return MakeLink(core) .. trail
+    return lead .. MakeLink(core) .. trail
 end
 
 local function Filter(_, _, msg, ...)
@@ -92,7 +93,17 @@ StaticPopupDialogs["STRAY_COPY_URL"] = {
 
 local function ShowCopy(url)
     if ItemRefTooltip then ItemRefTooltip:Hide() end
-    StaticPopup_Show("STRAY_COPY_URL", nil, nil, url)
+    local popup = StaticPopup_Show("STRAY_COPY_URL", nil, nil, url)
+    -- Absicherung, falls der Client „data“ erst nach OnShow setzt
+    if popup then
+        popup.data = url
+        local box = GetEditBox(popup)
+        if box then
+            box:SetText(url)
+            box:HighlightText()
+            box:SetFocus()
+        end
+    end
 end
 
 -- Klicks auf „url:“-Links abfangen, bevor WoW sie als unbekannten Linktyp anzeigen will.

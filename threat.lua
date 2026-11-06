@@ -80,15 +80,18 @@ end
 local function GroupUnits()
     local units = {}
     if IsInRaid() then
-        for i = 1, GetNumGroupMembers() do units[#units + 1] = "raid" .. i end
+        for i = 1, GetNumGroupMembers() do
+            units[#units + 1] = "raid" .. i
+            if UnitExists("raidpet" .. i) then units[#units + 1] = "raidpet" .. i end
+        end
     else
         units[1] = "player"
+        if UnitExists("pet") then units[#units + 1] = "pet" end
         for i = 1, GetNumSubgroupMembers() do
             units[#units + 1] = "party" .. i
             if UnitExists("partypet" .. i) then units[#units + 1] = "partypet" .. i end
         end
     end
-    if UnitExists("pet") then units[#units + 1] = "pet" end
     return units
 end
 
@@ -323,6 +326,8 @@ local function CheckAggro()
         armed = true
         return
     end
+    -- Tankt das eigene Begleittier (Jäger, Hexenmeister), ist hohe Bedrohung gewollt
+    if UnitExists("pet") and UnitIsUnit("targettarget", "pet") then return end
     local isTanking, _, scaled = UnitDetailedThreatSituation("player", "target")
     if isTanking or not scaled then return end
     if scaled >= 90 and armed then
