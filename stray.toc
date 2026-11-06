@@ -1,0 +1,8 @@
+## Interface: 16001
+## Title: stray
+## Notes: Schnelle Einstellungen per /stray – Automatisch plündern und schnelles Plündern.
+## Author: stray
+## Version: 0.1.0
+## SavedVariables: strayDB
+
+stray.lua
