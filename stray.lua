@@ -22,6 +22,10 @@ ns.defaults = {
     declineDuels = false,
     acceptRes = false,
     acceptSummon = false,
+    threatList = false,
+    threatPlates = false,
+    threatTankWarn = false,
+    threatAggroWarn = false,
     positions = {}, -- verschobene Anzeigen: [Schlüssel] = { Punkt, relPunkt, x, y }
 }
 

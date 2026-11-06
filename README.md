@@ -27,6 +27,14 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` öffnet ein 
 - **Schnell überspringen:** Esc beendet sofort, ohne Rückfrage.
 - **Immer überspringen:** beendet Sequenzen und Videos automatisch.
 
+**Bedrohung**
+- **Bedrohungsliste:** Balken pro Gruppenmitglied für dein Ziel, wer hat Aggro, wer ist kurz davor. Bei offenem stray-Fenster mit Beispielwerten zum Verschieben.
+- **Rahmen an Namensplaketten:** rot = du hast Aggro, gelb = Aggro wechselt gleich, grün = keine Aggro.
+- **Tank-Warnung:** Verlierst du die Aggro, steht mittig, wen der Gegner jetzt angreift.
+- **Aggro-Warnung ab 90 %:** für Schaden und Heiler, bevor sie Aggro ziehen.
+
+Rahmen und Tank-Warnung brauchen eingeschaltete gegnerische Namensplaketten (Taste V).
+
 **Kamera & Karte**
 - **Maximale Kamera-Entfernung:** so weit herauszoomen, wie das Spiel erlaubt.
 - **Minimap mit Mausrad zoomen:** Mausrad zoomt die Minimap, die Plus-/Minus-Knöpfe verschwinden.
@@ -50,6 +58,7 @@ Den Ordner `stray` nach `World of Warcraft\_forever_\Interface\AddOns\` kopieren
 
 ## Version
 
+- 0.5.0-alpha – Bedrohung: Liste, Rahmen an Namensplaketten, Tank- und Aggro-Warnung
 - 0.4.0-alpha – Chat-Links, Kamera, Minimap-Zoom, Fehlermeldungen, Haltbarkeit, Duelle, Wiederbelebung, Beschwörung; Fenster dreispaltig; Flugzeit entfernt
 - 0.3.0-alpha – Händler, Taschen, Quests, Filmsequenzen und Flugzeit; Fenster zweispaltig, Symbol in der Titelleiste, Höhe passt sich an
 - 0.2.0 – Fenster im klassischen Stil: Symbol, Version, Abschnitt „Beute“, Tooltips, Klick-Sounds
