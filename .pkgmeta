@@ -1,0 +1,3 @@
+package-as: stray
+
+enable-nolib-creation: no

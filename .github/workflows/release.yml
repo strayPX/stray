@@ -1,0 +1,24 @@
+name: Release
+
+# Bei jedem Versions-Tag (z. B. 0.6.0-alpha) baut der BigWigs Packager die ZIP
+# samt release.json (für WowUp) und veröffentlicht sie als GitHub-Release.
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Code holen
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Paket bauen und veröffentlichen
+        uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
