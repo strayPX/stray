@@ -405,6 +405,7 @@ end)
 
 ns.AddOption(2, "Bedrohung", {
     key = "threatList",
+    preview = "threat_list",
     label = "Bedrohungsliste",
     tooltip = "Kleines Fenster mit einem Balken pro Gruppenmitglied für dein aktuelles Ziel: Wer hat Aggro, wer ist kurz davor? Außerhalb des Kampfes ist es ausgeblendet.\n\nSolange das stray-Fenster offen ist, zeigt die Liste Beispielwerte – dann kannst du sie mit Shift + linker Maustaste verschieben.",
     isEnabled = ApiAvailable,
@@ -417,6 +418,7 @@ ns.AddOption(2, "Bedrohung", {
 
 ns.AddOption(2, "Bedrohung", {
     key = "threatPlates",
+    preview = "threat_plates",
     label = "Rahmen an Namensplaketten",
     tooltip = "Rahmen um den Lebensbalken gegnerischer Namensplaketten: rot = du hast Aggro, gelb = die Aggro wechselt gleich, grün = du hast keine Aggro. Kein Rahmen = du stehst nicht auf seiner Bedrohungsliste.\n\nGegnerische Namensplaketten müssen eingeschaltet sein (Taste V).",
     isEnabled = ApiAvailable,
@@ -429,6 +431,7 @@ ns.AddOption(2, "Bedrohung", {
 
 ns.AddOption(2, "Bedrohung", {
     key = "threatPercent",
+    preview = "threat_percent",
     label = "Prozent an Namensplaketten",
     tooltip = "Zeigt rechts neben dem Lebensbalken gegnerischer Namensplaketten deine Bedrohung: 0 % = keine, 100 % = du hast die Aggro. Die Farbe passt zum Rahmen.\n\nGegnerische Namensplaketten müssen eingeschaltet sein (Taste V).",
     isEnabled = ApiAvailable,
@@ -441,6 +444,7 @@ ns.AddOption(2, "Bedrohung", {
 
 ns.AddOption(2, "Bedrohung", {
     key = "threatTankWarn",
+    preview = "threat_tankwarn",
     label = "Tank-Warnung",
     tooltip = "Verlierst du bei einem Gegner die Aggro, steht groß in der Bildschirmmitte, wen er jetzt angreift – mit Warnton.\n\nPrüft dein Ziel und alle Gegner mit sichtbarer Namensplakette (Taste V).",
     isEnabled = ApiAvailable,
@@ -449,6 +453,7 @@ ns.AddOption(2, "Bedrohung", {
 
 ns.AddOption(2, "Bedrohung", {
     key = "threatAggroWarn",
+    preview = "threat_aggrowarn",
     label = "Aggro-Warnung ab 90 %",
     tooltip = "Für Schaden und Heiler: Erreichst du 90 % der Bedrohung, die zum Aggroziehen nötig ist, erscheint „Gleich ziehst du Aggro!“ – Zeit, langsamer zu machen. Wer die Aggro schon hat, bekommt keine Warnung.",
     isEnabled = ApiAvailable,

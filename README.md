@@ -28,7 +28,7 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` öffnet ein 
 - **Immer überspringen:** beendet Sequenzen und Videos automatisch.
 
 **Bedrohung**
-- **Bedrohungsliste:** Balken pro Gruppenmitglied für dein Ziel, wer hat Aggro, wer ist kurz davor. Bei offenem stray-Fenster mit Beispielwerten zum Verschieben.
+- **Bedrohungsliste:** Balken pro Gruppenmitglied für dein Ziel, wer hat Aggro, wer ist kurz davor. Bei offenem stray-Fenster mit Beispielwerten zum Verschieben. Alle Bedrohungsoptionen zeigen im Tooltip ein Beispielbild.
 - **Rahmen an Namensplaketten:** rot = du hast Aggro, gelb = Aggro wechselt gleich, grün = keine Aggro.
 - **Prozent an Namensplaketten:** deine Bedrohung neben dem Lebensbalken, 0 % = keine, 100 % = Aggro.
 - **Tank-Warnung:** Verlierst du die Aggro, steht mittig, wen der Gegner jetzt angreift.
@@ -55,7 +55,7 @@ Hinweis: Hat ein anderes Addon (z. B. Leatrix Plus oder Questie) die gleiche Aut
 
 ## Installation
 
-**Mit WowUp:** „Addons holen“ → „Von URL installieren“ → `https://github.com/strayfling/stray` einfügen. Danach beim Addon den Release-Kanal auf **Alpha** stellen, sonst werden die `-alpha`-Versionen nicht angezeigt.
+**Mit WowUp:** „Addons holen“ → „Von URL installieren“ → `https://github.com/strayfling/stray` einfügen. Fertig – Updates zeigt WowUp danach automatisch an.
 
 **Von Hand:** Die ZIP aus den [Releases](https://github.com/strayfling/stray/releases) entpacken, den Ordner `stray` nach `World of Warcraft\_forever_\Interface\AddOns\` kopieren und das Spiel neu starten.
 
@@ -65,6 +65,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.7.0-alpha – Beispielbilder im Tooltip der Bedrohungsoptionen
 - 0.6.0-alpha – Prozentanzeige an Namensplaketten
 - 0.5.1-alpha – Korrekturen nach Code-Review: Kamera-Maximum, Minimap-Zoom, Begleittiere bei der Bedrohung, Chat-Links in Klammern, Kopierfeld
 - 0.5.0-alpha – Bedrohung: Liste, Rahmen an Namensplaketten, Tank- und Aggro-Warnung

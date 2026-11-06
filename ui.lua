@@ -101,6 +101,12 @@ local function CreateCheckbox(x, y, option)
         if not self:IsEnabled() and option.disabledHint then
             GameTooltip:AddLine(option.disabledHint, 1, 0.3, 0.3, true)
         end
+        if option.preview then
+            -- Beispielbild (256 × 128) aus dem Ordner media
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("|TInterface\\AddOns\\stray\\media\\" .. option.preview .. ":128:256|t")
+            GameTooltip:AddLine("Beispielbild", 0.5, 0.5, 0.5)
+        end
         GameTooltip:Show()
     end)
     cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
