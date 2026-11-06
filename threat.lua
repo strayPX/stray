@@ -219,13 +219,15 @@ local PLATE_COLORS = {
     [0] = { 0.25, 0.9, 0.25 },
 }
 
-local borders = setmetatable({}, { __mode = "k" }) -- Plakette → Rahmen
+-- Plakette → { border = Rahmen, text = Prozentzahl }
+local decorations = setmetatable({}, { __mode = "k" })
 
-local function GetBorder(plate)
-    if borders[plate] then return borders[plate] end
+local function GetDecoration(plate)
+    if decorations[plate] then return decorations[plate] end
     local unitFrame = plate.UnitFrame
     local health = unitFrame and (unitFrame.healthBar or unitFrame.HealthBar)
     if not health then return end
+
     local border = CreateFrame("Frame", nil, health, ns.BACKDROP_TEMPLATE)
     border:SetPoint("TOPLEFT", health, "TOPLEFT", -2, 2)
     border:SetPoint("BOTTOMRIGHT", health, "BOTTOMRIGHT", 2, -2)
@@ -233,8 +235,17 @@ local function GetBorder(plate)
         border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 2 })
     end
     border:Hide()
-    borders[plate] = border
-    return border
+
+    local holder = CreateFrame("Frame", nil, health)
+    holder:SetAllPoints(health)
+    local text = holder:CreateFontString(nil, "OVERLAY")
+    text:SetFont(STANDARD_TEXT_FONT, 10, "OUTLINE")
+    text:SetPoint("LEFT", health, "RIGHT", 5, 0)
+    text:Hide()
+
+    local deco = { border = border, text = text }
+    decorations[plate] = deco
+    return deco
 end
 
 local function PlateUnit(plate)
@@ -243,20 +254,36 @@ end
 
 local function UpdatePlate(plate, unit)
     if plate.IsForbidden and plate:IsForbidden() then return end
-    local border = GetBorder(plate)
-    if not border then return end
-    local status = ns.db.threatPlates and unit and UnitCanAttack("player", unit) and UnitThreatSituation("player", unit)
+    local deco = GetDecoration(plate)
+    if not deco then return end
+
+    local showBorder, showText = ns.db.threatPlates, ns.db.threatPercent
+    local status, pct
+    if (showBorder or showText) and unit and UnitCanAttack("player", unit) then
+        local isTanking, detailStatus, scaled = UnitDetailedThreatSituation("player", unit)
+        status = detailStatus
+        if status then pct = isTanking and 100 or math.min(scaled or 0, 100) end
+    end
     local color = status and PLATE_COLORS[status]
-    if color then
-        border:SetBackdropBorderColor(color[1], color[2], color[3], 1)
-        border:Show()
+
+    if showBorder and color then
+        deco.border:SetBackdropBorderColor(color[1], color[2], color[3], 1)
+        deco.border:Show()
     else
-        border:Hide()
+        deco.border:Hide()
+    end
+
+    if showText and color and pct then
+        deco.text:SetText(("%d %%"):format(math.floor(pct + 0.5)))
+        deco.text:SetTextColor(color[1], color[2], color[3])
+        deco.text:Show()
+    else
+        deco.text:Hide()
     end
 end
 
-local function HideAllBorders()
-    for _, border in pairs(borders) do border:Hide() end
+local function HideDecorations(part)
+    for _, deco in pairs(decorations) do deco[part]:Hide() end
 end
 
 local lastStatus, lastWarn = {}, {}
@@ -282,7 +309,7 @@ local function CheckLost(unit)
 end
 
 local function UpdateEnemies()
-    local doPlates, doTank = ns.db.threatPlates, ns.db.threatTankWarn
+    local doPlates, doTank = ns.db.threatPlates or ns.db.threatPercent, ns.db.threatTankWarn
     if not doPlates and not doTank then return end
     local seen = {}
     if C_NamePlate and C_NamePlate.GetNamePlates then
@@ -304,14 +331,18 @@ local function UpdateEnemies()
 end
 
 ns.On("NAME_PLATE_UNIT_ADDED", function(unit)
-    if not ns.db or not ns.db.threatPlates or not HAS_API then return end
+    if not ns.db or not HAS_API or not (ns.db.threatPlates or ns.db.threatPercent) then return end
     local plate = C_NamePlate.GetNamePlateForUnit(unit)
     if plate then UpdatePlate(plate, unit) end
 end)
 
 ns.On("NAME_PLATE_UNIT_REMOVED", function(unit)
     local plate = C_NamePlate.GetNamePlateForUnit(unit)
-    if plate and borders[plate] then borders[plate]:Hide() end
+    local deco = plate and decorations[plate]
+    if deco then
+        deco.border:Hide()
+        deco.text:Hide()
+    end
 end)
 
 ---------------------------------------------------------------------------
@@ -392,7 +423,19 @@ ns.AddOption(2, "Bedrohung", {
     disabledHint = NO_API,
     set = function(value)
         ns.db.threatPlates = value
-        if not value then HideAllBorders() end
+        if not value then HideDecorations("border") end
+    end,
+})
+
+ns.AddOption(2, "Bedrohung", {
+    key = "threatPercent",
+    label = "Prozent an Namensplaketten",
+    tooltip = "Zeigt rechts neben dem Lebensbalken gegnerischer Namensplaketten deine Bedrohung: 0 % = keine, 100 % = du hast die Aggro. Die Farbe passt zum Rahmen.\n\nGegnerische Namensplaketten müssen eingeschaltet sein (Taste V).",
+    isEnabled = ApiAvailable,
+    disabledHint = NO_API,
+    set = function(value)
+        ns.db.threatPercent = value
+        if not value then HideDecorations("text") end
     end,
 })
 

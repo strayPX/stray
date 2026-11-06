@@ -24,6 +24,7 @@ ns.defaults = {
     acceptSummon = false,
     threatList = false,
     threatPlates = false,
+    threatPercent = false,
     threatTankWarn = false,
     threatAggroWarn = false,
     positions = {}, -- verschobene Anzeigen: [Schlüssel] = { Punkt, relPunkt, x, y }
