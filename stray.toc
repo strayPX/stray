@@ -1,8 +1,15 @@
 ## Interface: 16001
 ## Title: stray
-## Notes: Schnelle Einstellungen per /stray – Automatisch plündern und schnelles Plündern.
+## Notes: Komfort-Optionen per /stray – Beute, Händler, Taschen, Quests, Filmsequenzen, Flugzeit.
 ## Author: stray
-## Version: 0.2.0
+## Version: alpha 0.3.0
 ## SavedVariables: strayDB
 
 stray.lua
+loot.lua
+merchant.lua
+bags.lua
+quests.lua
+cinematics.lua
+flight.lua
+ui.lua
