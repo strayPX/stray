@@ -2,7 +2,7 @@
 ## Title: stray
 ## Notes: Komfort-Optionen per /stray – Beute, Händler, Taschen, Quests, Filmsequenzen, Flugzeit.
 ## Author: stray
-## Version: alpha 0.3.0
+## Version: 0.3.0-alpha
 ## SavedVariables: strayDB
 
 stray.lua

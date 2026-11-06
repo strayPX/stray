@@ -37,6 +37,6 @@ Den Ordner `stray` nach `World of Warcraft\_forever_\Interface\AddOns\` kopieren
 
 ## Version
 
-- alpha 0.3.0 – Händler, Taschen, Quests, Filmsequenzen und Flugzeit; Fenster zweispaltig, Symbol in der Titelleiste, Höhe passt sich an
+- 0.3.0-alpha – Händler, Taschen, Quests, Filmsequenzen und Flugzeit; Fenster zweispaltig, Symbol in der Titelleiste, Höhe passt sich an
 - 0.2.0 – Fenster im klassischen Stil: Symbol, Version, Abschnitt „Beute“, Tooltips, Klick-Sounds
 - 0.1.0 – erste Testversion
