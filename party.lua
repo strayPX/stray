@@ -480,7 +480,7 @@ local function SampleEnter(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText("Gruppenrahmen – Beispiel", 1, 1, 1)
     GameTooltip:AddLine("Shift + ziehen zum Verschieben. Breite, Höhe und Abstand stellst du im stray-Fenster ein.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
-    GameTooltip:AddLine("Die Beispiele verschwinden, wenn du das Fenster schließt oder in einer Gruppe bist.", 0.7, 0.7, 0.7, true)
+    GameTooltip:AddLine("Die Testgruppe verschwindet, wenn du das stray-Fenster schließt (oder echte Gruppenrahmen in deiner Gruppe laufen).", 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
 end
 
@@ -536,10 +536,20 @@ local function EnsureSamples()
     LayoutSamples()
 end
 
+-- Testgruppe: Solange das stray-Fenster offen ist, erscheinen 5 Beispielspieler – auch wenn
+-- die Gruppenrahmen aus sind. Nur wenn echte Rahmen in einer Gruppe laufen, bleibt sie weg.
 local function UpdatePreview()
-    local show = Enabled() and ns.IsConfigOpen() and not IsInGroup()
+    local show = ns.IsConfigOpen() and not (Enabled() and IsInGroup())
     if show then EnsureSamples() end
     for _, f in ipairs(samples) do f:SetShown(show) end
+    -- Der Anker hält den sicheren Header: nur außerhalb des Kampfes ein-/ausblenden
+    if not InCombatLockdown() then
+        if show then
+            anchor:Show()
+        elseif not Enabled() then
+            anchor:Hide()
+        end
+    end
 end
 
 ---------------------------------------------------------------------------
@@ -734,7 +744,7 @@ end
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyFrames",
     label = "Gruppenrahmen anzeigen",
-    tooltip = "Eigene Gruppenrahmen für Heiler: du und deine 5er-Gruppe als senkrechte Spalte (nicht im Schlachtzug). Lebensbalken in Klassenfarbe, Leben in Prozent, Ressourcenbalken, „Tot“/„Geist“/„Offline“; wer außer Reichweite ist, wird blass. Hat jemand eine Schwächung, die du entfernen kannst, bekommt die Kachel einen farbigen Rahmen (Gift grün, Krankheit braun, Fluch lila, Magie blau) und ein kleines Symbol.\n\nLinksklick wählt das Mitglied als Ziel, Rechtsklick öffnet sein Menü. Mit eingeschaltetem „Mouseover-Zauber“ (Kampf → Zaubern) heilt deine normale Heiltaste das Mitglied unter der Maus.\n\nVerschieben mit Shift + Ziehen; solange das stray-Fenster offen ist und du in keiner Gruppe bist, zeigen Beispielkacheln die Größe. Änderungen wirken nur außerhalb des Kampfes.",
+    tooltip = "Eigene Gruppenrahmen für Heiler: du und deine 5er-Gruppe als senkrechte Spalte (nicht im Schlachtzug). Lebensbalken in Klassenfarbe, Leben in Prozent, Ressourcenbalken, „Tot“/„Geist“/„Offline“; wer außer Reichweite ist, wird blass. Hat jemand eine Schwächung, die du entfernen kannst, bekommt die Kachel einen farbigen Rahmen (Gift grün, Krankheit braun, Fluch lila, Magie blau) und ein kleines Symbol.\n\nLinksklick wählt das Mitglied als Ziel, Rechtsklick öffnet sein Menü. Mit eingeschaltetem „Mouseover-Zauber“ (Kampf → Zaubern) heilt deine normale Heiltaste das Mitglied unter der Maus.\n\nVerschieben mit Shift + Ziehen; solange das stray-Fenster offen ist, zeigt eine Testgruppe mit 5 Spielern Größe und Position – auch wenn die Gruppenrahmen noch aus sind. Änderungen wirken nur außerhalb des Kampfes.",
     set = function(value)
         ns.db.partyFrames = value
         CombatNote()
