@@ -17,6 +17,7 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Min
 - **„LÖSCHEN“ vorausfüllen:** Das Bestätigungswort steht beim Zerstören schon im Feld.
 - **Ohne Nachfrage zerstören:** Gegenstände werden ohne Abfrage zerstört, auch epische.
 - **Questgegenstände markieren:** Gegenstände, die eine Quest im Questlog braucht (z. B. „Leinenstoff: 3/10“), bekommen einen goldenen Rahmen mit „!“.
+- **Freie Taschenplätze:** Zahl auf dem Rucksack-Knopf, rot bei vollen Taschen.
 
 **Chat**
 - **Links kopierbar:** Webadressen im Chat werden anklickbar und öffnen ein Feld zum Kopieren.
@@ -24,6 +25,7 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Min
 **Quests**
 - **Automatisch annehmen:** ohne graue, geteilte und Begleitquests.
 - **Automatisch abgeben:** stoppt bei mehreren Belohnungen zur Auswahl und wenn die Abgabe Gold kostet.
+- **Gesprächsmenü überspringen:** Hat ein NPC nur eine Gesprächsoption und keine Quests, wählt stray sie automatisch.
 
 **Filmsequenzen**
 - **Schnell überspringen:** Esc beendet sofort, ohne Rückfrage.
@@ -39,6 +41,9 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Min
 Hinweis: WoW Forever versiegelt manche Bedrohungswerte. stray nutzt nur die lesbaren Abfragen; ist ein Wert doch versiegelt, wird er nur angezeigt oder ausgelassen (die Liste ist dann unsortiert), und ein Hinweis erscheint einmal im Chat.
 
 Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplaketten (Taste V).
+
+**Zaubern**
+- **Mouseover-Zauber:** schaltet Blizzards Einstellung um – Zauber gehen auf das Ziel unter der Maus.
 
 **Kamera & Karte**
 - **Maximale Kamera-Entfernung:** so weit herauszoomen, wie das Spiel erlaubt.
@@ -70,6 +75,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.12.0-alpha – Mouseover-Zauber, Gesprächsmenü überspringen, freie Taschenplätze
 - 0.11.0-alpha – Questgegenstände markieren und Warnung beim Verkauf mit Rückkauf
 - 0.10.1-alpha – runde Punkte und Schalter; „Neu laden“ hervorgehoben, nach Änderungen Empfehlung zum Neuladen beim Schließen
 - 0.10.0-alpha – Neues Einstellungsfenster (Seitenleiste, Suche, Schalter, Vorschau); Bedrohung neu: lesbare Abfragen, sortierte Liste, Tank- und Aggro-Warnung zurück, ereignisbasiert

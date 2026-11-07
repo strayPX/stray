@@ -41,7 +41,7 @@ local C = {
 -- Gruppen und Reihenfolge der Bereiche in der Seitenleiste
 local GROUPS = {
     { name = "Komfort", sections = { "Beute", "Händler", "Taschen", "Quests", "Filmsequenzen", "Chat" } },
-    { name = "Kampf", sections = { "Bedrohung" } },
+    { name = "Kampf", sections = { "Bedrohung", "Zaubern" } },
     { name = "Oberfläche", sections = { "Kamera & Karte", "Interface", "Sozial" } },
 }
 
@@ -53,6 +53,7 @@ local SUBTITLES = {
     ["Filmsequenzen"] = "Filmsequenzen und Videos überspringen.",
     ["Chat"] = "Kleine Helfer für den Chat.",
     ["Bedrohung"] = "Wer hat Aggro – für dich und deine Gruppe.",
+    ["Zaubern"] = "Zaubern ohne Umwege – z. B. per Mouseover.",
     ["Kamera & Karte"] = "Kamera, Minimap und der stray-Knopf.",
     ["Interface"] = "Weniger Meldungen, mehr Überblick.",
     ["Sozial"] = "Duelle, Wiederbelebung und Beschwörung.",
