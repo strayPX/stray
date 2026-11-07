@@ -87,6 +87,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.14.1-alpha – Gruppenrahmen: Helligkeit der Balken (Standard 60 %)
 - 0.14.0-alpha – Bearbeiten-Modus, Profile Import/Export, flache Gruppenrahmen, Testgruppe; enthält 0.13.0 (nie einzeln veröffentlicht)
 - 0.13.0-alpha – Schadensmesser mit Heilung, Heiler-Gruppenrahmen, Schieberegler im Fenster
 - 0.12.0-alpha – Mouseover-Zauber, Gesprächsmenü überspringen, freie Taschenplätze
