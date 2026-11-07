@@ -10,7 +10,7 @@ local _, ns = ...
 -- Maße und Farben
 ---------------------------------------------------------------------------
 
-local WIDTH, HEIGHT = 760, 600
+local WIDTH, HEIGHT = 760, 680
 local SIDE_W = 190
 local ROW_H = 48
 local MAX_ROWS = 7
@@ -41,21 +41,24 @@ local C = {
 -- Gruppen und Reihenfolge der Bereiche in der Seitenleiste
 local GROUPS = {
     { name = "Komfort", sections = { "Beute", "Händler", "Taschen", "Quests", "Filmsequenzen", "Chat" } },
-    { name = "Kampf", sections = { "Bedrohung", "DMG-Meter", "Zaubern" } },
+    { name = "Kampf", sections = { "Bedrohung", "DMG-Meter", "Zaubern", "Aktionsleisten", "Abklingzeiten" } },
     { name = "Gruppe", sections = { "Gruppenrahmen" } },
-    { name = "Oberfläche", sections = { "Kamera & Karte", "Interface", "Sozial" } },
+    { name = "Oberfläche", sections = { "Kamera & Karte", "Leisten & Minimap", "Interface", "Sozial" } },
     { name = "System", sections = { "Bearbeiten", "Profile" } },
 }
 
 local SUBTITLES = {
     ["Beute"] = "Schneller plündern, ohne Klickerei.",
     ["Händler"] = "Verkaufen und reparieren beim Händler.",
-    ["Taschen"] = "Gegenstände zerstören ohne Tipparbeit.",
+    ["Taschen"] = "Zerstören, Questgegenstände, freie Plätze und das Taschenfenster.",
     ["Quests"] = "Quests annehmen und abgeben ohne Klicks.",
     ["Filmsequenzen"] = "Filmsequenzen und Videos überspringen.",
     ["Chat"] = "Kleine Helfer für den Chat.",
     ["Bedrohung"] = "Wer hat Aggro – für dich und deine Gruppe.",
     ["Zaubern"] = "Zaubern ohne Umwege – z. B. per Mouseover.",
+    ["Aktionsleisten"] = "Eigene Aktionsleisten ohne Blizzard-Schnickschnack.",
+    ["Abklingzeiten"] = "Fähigkeiten auf Abklingzeit über den Leisten.",
+    ["Leisten & Minimap"] = "Minimap-Knöpfe, Uhrzeit, Erfahrungsleiste, Menü und Taschen.",
     ["DMG-Meter"] = "Schaden und Heilung – gesamt und je Kampf.",
     ["Gruppenrahmen"] = "Deine 5er-Gruppe als Heiler-Rahmen.",
     ["Bearbeiten"] = "Alle stray-Anzeigen auf einmal verschieben.",

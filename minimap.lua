@@ -34,7 +34,11 @@ border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
 -- Position am Rand (rund oder eckig, z. B. mit Leatrix „Square minimap“)
 ---------------------------------------------------------------------------
 
+-- Angedockt (z. B. in der Knopfspalte aus hud.lua)? Dann nicht am Rand platzieren.
+local dockParent = nil
+
 local function UpdatePosition()
+    if dockParent then return end
     local angle = math.rad(ns.db.minimapAngle or 225)
     local x, y = math.cos(angle), math.sin(angle)
     local w = Minimap:GetWidth() / 2 + 5
@@ -62,6 +66,7 @@ local function FollowCursor()
 end
 
 button:SetScript("OnDragStart", function(self)
+    if dockParent then return end
     self.isMoving = true
     self:LockHighlight()
     self:SetScript("OnUpdate", FollowCursor)
@@ -87,7 +92,9 @@ button:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddDoubleLine("stray", ns.GetVersion(), 1, 1, 1, 0.5, 0.5, 0.5)
     GameTooltip:AddLine("Linksklick: Optionen öffnen/schließen", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
-    GameTooltip:AddLine("Ziehen: am Rand verschieben", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+    if not dockParent then
+        GameTooltip:AddLine("Ziehen: am Rand verschieben", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+    end
     GameTooltip:Show()
 end)
 button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -112,8 +119,60 @@ ns.AddOption(3, "Kamera & Karte", {
     set = function(value)
         ns.db.minimapButton = value
         Apply()
+        -- hud.lua ordnet die Knopfspalte neu, falls der Knopf dort sitzt
+        if ns.OnMinimapButtonOption then pcall(ns.OnMinimapButtonOption) end
     end,
 })
+
+---------------------------------------------------------------------------
+-- Andocken: hud.lua setzt den Knopf in die Minimap-Knopfspalte
+---------------------------------------------------------------------------
+
+local highlight = button:GetHighlightTexture()
+
+-- Knopf füllt danach parent aus (eckig, ohne Ring); Sichtbarkeit folgt der Option
+function ns.MinimapButtonDock(parent)
+    if not parent then return end
+    if dockParent ~= parent then
+        dockParent = parent
+        button:SetScript("OnUpdate", nil)
+        button.isMoving = nil
+        button:SetParent(parent)
+        button:SetFrameStrata(parent:GetFrameStrata())
+        button:SetFrameLevel(parent:GetFrameLevel() + 2)
+        button:ClearAllPoints()
+        button:SetAllPoints(parent)
+        background:Hide()
+        border:Hide()
+        icon:ClearAllPoints()
+        icon:SetPoint("CENTER", button, "CENTER", 0, 0)
+        icon:SetSize(16, 16)
+        if highlight then highlight:SetAlpha(0) end
+    end
+    button:SetShown(ns.db and ns.db.minimapButton and true or false)
+end
+
+-- Zurück an den Minimap-Rand
+function ns.MinimapButtonUndock()
+    if not dockParent then return end
+    dockParent = nil
+    button:SetParent(Minimap)
+    button:SetFrameStrata("MEDIUM")
+    button:SetFrameLevel(8)
+    button:ClearAllPoints()
+    button:SetSize(31, 31)
+    background:Show()
+    border:Show()
+    icon:ClearAllPoints()
+    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -6)
+    icon:SetSize(18, 18)
+    if highlight then highlight:SetAlpha(1) end
+    if ns.db then Apply() end
+end
+
+function ns.IsMinimapButtonDocked()
+    return dockParent ~= nil
+end
 
 ns.On("PLAYER_LOGIN", function()
     Apply()

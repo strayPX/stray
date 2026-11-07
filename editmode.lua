@@ -198,7 +198,7 @@ local function CreateBar()
     title:SetText("stray · Bearbeiten-Modus")
     local hint = Text(bar, 10, 0.75, 0.8, 0.9)
     hint:SetPoint("LEFT", 12, -8)
-    hint:SetText("Ziehen zum Verschieben · Rechtsklick setzt zurück · Bedrohung, DMG-Meter und Haltbarkeit nur, wenn eingeschaltet")
+    hint:SetText("Ziehen zum Verschieben · Rechtsklick setzt zurück · ausgeschaltete Anzeigen erscheinen nicht")
 
     local done = BarButton("Fertig", 70, function() ExitEditMode() end)
     done:SetPoint("RIGHT", -8, 0)
@@ -275,6 +275,6 @@ ns.AddOption(3, "Bearbeiten", {
     type = "button",
     label = "Anzeigen verschieben",
     buttonText = "Bearbeiten",
-    tooltip = "Blendet alle eingeschalteten stray-Anzeigen ein und macht sie frei verschiebbar – ohne Shift. Rechtsklick auf eine Anzeige setzt sie auf ihre Standardposition zurück, „Fertig“ beendet den Modus.\n\nBetrifft Gruppenrahmen, Bedrohungsliste, DMG-Meter, Haltbarkeit und die Warntexte. Geht nur außerhalb des Kampfes. Auch per /stray edit.",
+    tooltip = "Blendet alle eingeschalteten stray-Anzeigen ein und macht sie frei verschiebbar – ohne Shift. Rechtsklick auf eine Anzeige setzt sie auf ihre Standardposition zurück, „Fertig“ beendet den Modus.\n\nBetrifft alle eingeschalteten stray-Anzeigen: Gruppenrahmen, Aktionsleisten, Abklingzeiten, Bedrohungsliste, DMG-Meter, Haltbarkeit, Erfahrungsleiste, Taschen- und Menüleiste, Taschenfenster und die Warntexte. Geht nur außerhalb des Kampfes. Auch per /stray edit.",
     onClick = function() ns.EnterEditMode() end,
 })

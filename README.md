@@ -59,6 +59,16 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 - **Knopf „Anzeigen verschieben“** oben im stray-Fenster startet den Bearbeiten-Modus direkt.
 - **Profile:** Einstellungen als Text exportieren und importieren.
 
+**Leisten & Minimap**
+- **Minimap-Knopfspalte:** Freunde, stray-Knopf, Addon-Tasche, Kartenmenü.
+- **Uhrzeit und FPS** unter der Minimap.
+- **Erfahrungsleiste oben.**
+- **Taschen- und Menüleiste** unten rechts.
+
+**Aktionsleisten / Abklingzeiten**
+- **Eigene Aktionsleisten:** 4 × 12 Knöpfe, schlicht, Tasten bleiben.
+- **Abklingzeiten über den Leisten:** Blizzards Cooldown-Manager im stray-Stil.
+
 **Kamera & Karte**
 - **Maximale Kamera-Entfernung:** so weit herauszoomen, wie das Spiel erlaubt.
 - **Minimap mit Mausrad zoomen:** Mausrad zoomt die Minimap, die Plus-/Minus-Knöpfe verschwinden.
@@ -89,6 +99,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.18.0-alpha – Eigene Aktionsleisten, Abklingzeiten über den Leisten, Minimap-Knopfspalte, Uhr/FPS, EP-Leiste oben, Taschen-/Menüleiste, eigenes Taschenfenster
 - 0.17.0-alpha – DMG-Meter: neues flaches Design, Größe unten rechts ziehbar; Umbenennung Schadensmesser → DMG-Meter
 - 0.16.0-alpha – Gruppenrahmen: Heilvorhersage, Schilde, „Geschwächte Seele“
 - 0.15.0-alpha – Knopf „Anzeigen verschieben“ oben im stray-Fenster

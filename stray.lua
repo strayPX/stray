@@ -39,6 +39,23 @@ ns.defaults = {
     partyHeight = 42,
     partySpacing = 4,
     partyBrightness = 60,
+    -- Oberfläche (hud.lua)
+    hudMinimapColumn = false,
+    hudClock = false,
+    hudXPBar = false,
+    hudMicroBar = false,
+    -- Aktionsleisten (actionbars.lua)
+    abEnabled = false,
+    abSize = 36,
+    abSpacing = 2,
+    abKeybinds = true,
+    -- Abklingzeiten (cooldowns.lua)
+    cdManager = false,
+    cdSize = 36,
+    -- Taschenfenster (bagwindow.lua)
+    bagWindow = false,
+    bagColumns = 10,
+    bagPinned = {},
     minimapButton = true, -- Ausnahme: anfangs an, weil der Knopf der Zugang zum Fenster ist
     minimapAngle = 225,
     threatList = false,
@@ -73,7 +90,9 @@ end
 
 eventFrame:SetScript("OnEvent", function(_, event, ...)
     for _, fn in ipairs(handlers[event]) do
-        fn(...)
+        -- Ein Fehler in einem Modul darf die anderen Module nicht aufhalten
+        local ok, err = pcall(fn, ...)
+        if not ok then geterrorhandler()(err) end
     end
 end)
 
