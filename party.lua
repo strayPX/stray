@@ -132,7 +132,7 @@ local function BuildTile(parent)
 
     t.bg = art:CreateTexture(nil, "BACKGROUND")
     t.bg:SetAllPoints()
-    t.bg:SetColorTexture(0.05, 0.06, 0.08, 0.9)
+    t.bg:SetColorTexture(0.051, 0.067, 0.090, 0.95)
 
     t.power = CreateFrame("StatusBar", nil, art)
     t.power:SetPoint("BOTTOMLEFT", art, "BOTTOMLEFT", 1, 1)
@@ -143,7 +143,7 @@ local function BuildTile(parent)
     t.power:SetValue(1)
     local powerBg = t.power:CreateTexture(nil, "BACKGROUND")
     powerBg:SetAllPoints()
-    powerBg:SetColorTexture(0, 0, 0, 0.6)
+    powerBg:SetColorTexture(0.051, 0.067, 0.090, 1)
 
     t.health = CreateFrame("StatusBar", nil, art)
     t.health:SetPoint("TOPLEFT", art, "TOPLEFT", 1, -1)
@@ -153,7 +153,7 @@ local function BuildTile(parent)
     t.health:SetValue(1)
     local healthBg = t.health:CreateTexture(nil, "BACKGROUND")
     healthBg:SetAllPoints()
-    healthBg:SetColorTexture(0.12, 0.12, 0.14, 0.9)
+    healthBg:SetColorTexture(0.110, 0.122, 0.149, 1)
 
     -- Texte und Symbol über den Balken
     local top = CreateFrame("Frame", nil, art)
