@@ -26,6 +26,16 @@ ns.defaults = {
     questItemSellWarn = false,
     gossipSkip = false,
     freeSlots = false,
+    -- Schadensmesser
+    dmShow = false,
+    dmAutoReset = false,
+    dmMode = "damage", -- "damage" oder "healing"
+    -- Gruppenrahmen
+    partyFrames = false,
+    partyHideBlizzard = false,
+    partyWidth = 96,
+    partyHeight = 42,
+    partySpacing = 4,
     minimapButton = true, -- Ausnahme: anfangs an, weil der Knopf der Zugang zum Fenster ist
     minimapAngle = 225,
     threatList = false,

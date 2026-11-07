@@ -41,7 +41,8 @@ local C = {
 -- Gruppen und Reihenfolge der Bereiche in der Seitenleiste
 local GROUPS = {
     { name = "Komfort", sections = { "Beute", "Händler", "Taschen", "Quests", "Filmsequenzen", "Chat" } },
-    { name = "Kampf", sections = { "Bedrohung", "Zaubern" } },
+    { name = "Kampf", sections = { "Bedrohung", "Schadensmesser", "Zaubern" } },
+    { name = "Gruppe", sections = { "Gruppenrahmen" } },
     { name = "Oberfläche", sections = { "Kamera & Karte", "Interface", "Sozial" } },
 }
 
@@ -54,6 +55,8 @@ local SUBTITLES = {
     ["Chat"] = "Kleine Helfer für den Chat.",
     ["Bedrohung"] = "Wer hat Aggro – für dich und deine Gruppe.",
     ["Zaubern"] = "Zaubern ohne Umwege – z. B. per Mouseover.",
+    ["Schadensmesser"] = "Schaden und Heilung – gesamt und je Kampf.",
+    ["Gruppenrahmen"] = "Deine 5er-Gruppe als Heiler-Rahmen.",
     ["Kamera & Karte"] = "Kamera, Minimap und der stray-Knopf.",
     ["Interface"] = "Weniger Meldungen, mehr Überblick.",
     ["Sozial"] = "Duelle, Wiederbelebung und Beschwörung.",
@@ -379,7 +382,7 @@ end
 
 local function SectionActive(name)
     for _, option in ipairs(sections[name]) do
-        if OptionEnabled(option) and option.get() then return true end
+        if option.type ~= "slider" and OptionEnabled(option) and option.get() then return true end
     end
     return false
 end
@@ -544,13 +547,67 @@ local function CreateRow(i)
     previewButton:SetScript("OnClick", function() if row.option then ShowPreview(row.option) end end)
     row.previewButton = previewButton
 
+    -- Schieberegler für Zahlen-Optionen (type = "slider")
+    local slider = CreateFrame("Slider", nil, row)
+    slider:SetOrientation("HORIZONTAL")
+    slider:SetSize(150, 16)
+    slider:SetPoint("RIGHT", -44, 0)
+    slider:EnableMouseWheel(true)
+    local sliderTrack = slider:CreateTexture(nil, "ARTWORK")
+    sliderTrack:SetPoint("LEFT"); sliderTrack:SetPoint("RIGHT"); sliderTrack:SetHeight(6)
+    sliderTrack:SetTexture(MEDIA .. "pill")
+    sliderTrack:SetVertexColor(0.149, 0.204, 0.290, 1)
+    local thumb = slider:CreateTexture(nil, "OVERLAY")
+    thumb:SetSize(14, 14)
+    thumb:SetTexture(MEDIA .. "dot")
+    thumb:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)
+    slider:SetThumbTexture(thumb)
+    if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
+    slider.value = Text(row, 12, C.text, FONT_BODY)
+    slider.value:SetPoint("RIGHT", 0, 0)
+    slider.value:SetJustifyH("RIGHT")
+    slider:SetScript("OnValueChanged", function(self, value)
+        if self.updating then return end
+        local option = row.option
+        if not option or option.type ~= "slider" or not OptionEnabled(option) then return end
+        local step = option.step or 1
+        value = math.floor(value / step + 0.5) * step
+        self.value:SetText(value)
+        if option.get() ~= value then
+            option.set(value)
+            SetDirty(true)
+        end
+    end)
+    slider:SetScript("OnMouseWheel", function(self, delta)
+        local option = row.option
+        if not option or not OptionEnabled(option) then return end
+        self:SetValue(self:GetValue() + delta * (option.step or 1))
+    end)
+    slider:SetScript("OnEnter", function() ShowTooltip(row) end)
+    slider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row.slider = slider
+
     row:SetScript("OnEnter", ShowTooltip)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    -- Klick auf die Zeile schaltet ebenfalls um
+    -- Klick auf die Zeile schaltet ebenfalls um (nicht bei Schiebereglern)
     row:SetScript("OnMouseUp", function(_, button)
-        if button == "LeftButton" then switch:Click() end
+        if button == "LeftButton" and row.option and row.option.type ~= "slider" then switch:Click() end
     end)
     return row
+end
+
+local function SetSlider(row, option, enabled)
+    local slider = row.slider
+    slider.updating = true
+    slider:SetMinMaxValues(option.min or 0, option.max or 100)
+    slider:SetValueStep(option.step or 1)
+    local value = option.get() or option.min or 0
+    slider:SetValue(value)
+    slider.value:SetText(value)
+    slider.updating = false
+    slider:EnableMouse(enabled)
+    slider:SetAlpha(enabled and 1 or 0.4)
+    slider.value:SetAlpha(enabled and 1 or 0.4)
 end
 
 for i = 1, MAX_ROWS do rows[i] = CreateRow(i) end
@@ -571,9 +628,17 @@ local function FillRows(options)
                 row.desc:SetText(ShortDesc(option))
                 row.desc:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
             end
-            SetSwitch(row.switch, option.get() and true or false, enabled)
+            local isSlider = option.type == "slider"
+            row.switch:SetShown(not isSlider)
+            row.slider:SetShown(isSlider)
+            row.slider.value:SetShown(isSlider)
+            if isSlider then
+                SetSlider(row, option, enabled)
+            else
+                SetSwitch(row.switch, option.get() and true or false, enabled)
+            end
             -- In der Suche keine Vorschau: dort können mehr Zeilen stehen, als Platz für das Bild bleibt
-            row.previewButton:SetShown(option.preview ~= nil and search:GetText() == "")
+            row.previewButton:SetShown(option.preview ~= nil and search:GetText() == "" and not isSlider)
             row.line:SetShown(i < shown)
             row:Show()
         else

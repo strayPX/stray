@@ -42,8 +42,16 @@ Hinweis: WoW Forever versiegelt manche Bedrohungswerte. stray nutzt nur die lesb
 
 Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplaketten (Taste V).
 
+**Schadensmesser**
+- **Schadensmesser anzeigen:** Schaden oder Heilung, gesamt und pro Sekunde – für alles, den aktuellen Kampf oder einzelne Kämpfe; mit Zurücksetzen.
+- **Nach Instanz zurücksetzen:** leert den Messer beim Verlassen eines Dungeons/Schlachtzugs.
+
 **Zaubern**
 - **Mouseover-Zauber:** schaltet Blizzards Einstellung um – Zauber gehen auf das Ziel unter der Maus.
+
+**Gruppenrahmen**
+- **Gruppenrahmen anzeigen:** 5er-Gruppe als senkrechte Spalte mit Leben, Mana, entfernbaren Schwächungen und Reichweite; Breite, Höhe, Abstand per Schieberegler.
+- **Blizzards Gruppenrahmen ausblenden.**
 
 **Kamera & Karte**
 - **Maximale Kamera-Entfernung:** so weit herauszoomen, wie das Spiel erlaubt.
@@ -75,6 +83,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.13.0-alpha – Schadensmesser mit Heilung, Heiler-Gruppenrahmen, Schieberegler im Fenster
 - 0.12.0-alpha – Mouseover-Zauber, Gesprächsmenü überspringen, freie Taschenplätze
 - 0.11.0-alpha – Questgegenstände markieren und Warnung beim Verkauf mit Rückkauf
 - 0.10.1-alpha – runde Punkte und Schalter; „Neu laden“ hervorgehoben, nach Änderungen Empfehlung zum Neuladen beim Schließen

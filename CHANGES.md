@@ -1,8 +1,8 @@
-# stray 0.12.0-alpha
+# stray 0.13.0-alpha
 
 **Neu**
-- **Mouseover-Zauber:** Blizzards Einstellung direkt in stray umschalten (Kampf → Zaubern). Zauber gehen dann auf das Ziel unter der Maus – praktisch zum Heilen über die Gruppenrahmen.
-- **Gesprächsmenü überspringen:** Hat ein NPC nur eine Gesprächsoption und keine Quests (Flugmeister, Bankier, Händler …), wählt stray sie automatisch. Mit Shift siehst du das Menü trotzdem.
-- **Freie Taschenplätze:** Die Zahl der freien Plätze steht auf dem Rucksack-Knopf – rot, wenn alles voll ist.
+- **Schadensmesser:** eigenes Fenster mit Schaden **und** Heilung – Gesamtwert und pro Sekunde, für den ganzen Abend, den aktuellen Kampf oder jeden einzelnen Kampf. Mit Knopf „Zurücksetzen“ und der Option, nach dem Verlassen eines Dungeons oder Schlachtzugs automatisch zurückzusetzen. (Kampf → Schadensmesser)
+- **Gruppenrahmen für Heiler:** deine 5er-Gruppe als senkrechte Spalte, frei platzierbar (Shift + Ziehen). Lebensbalken in Klassenfarbe, Mana, Schwächungen, die du entfernen kannst, und blass, wer außer Reichweite ist. Breite, Höhe und Abstand per Schieberegler. Mit „Mouseover-Zauber“ heilt deine normale Heiltaste das Mitglied unter der Maus. Blizzards Gruppenrahmen lassen sich dabei ausblenden. (Gruppe → Gruppenrahmen)
+- **Schieberegler** im stray-Fenster für Zahlen-Einstellungen.
 
-**Hinweis:** Nach dem Update das Spiel einmal komplett neu starten. Alle neuen Optionen sind anfangs aus – einschalten im stray-Fenster (`/stray` oder Minimap-Knopf).
+**Hinweis:** Nach dem Update das Spiel einmal komplett neu starten. Alle neuen Optionen sind anfangs aus. Der Schadensmesser nutzt Blizzards eingebauten Schadensmesser – „Zurücksetzen“ leert beide.
