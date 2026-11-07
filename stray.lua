@@ -37,7 +37,6 @@ ns.defaults = {
     partyHeight = 42,
     partySpacing = 4,
     partyBrightness = 60,
-    lockFrames = false, -- Griffleisten an den Anzeigen (false = entsperrt)
     minimapButton = true, -- Ausnahme: anfangs an, weil der Knopf der Zugang zum Fenster ist
     minimapAngle = 225,
     threatList = false,
@@ -211,9 +210,8 @@ end
 -- Beispielinhalt ein, den die Anzeige sonst nur bei offenem stray-Fenster zeigt.
 ns.movables = {}
 
--- opts.grip = false: keine Griffleiste (z. B. Warntexte, die nur kurz erscheinen)
-function ns.RegisterMovable(frame, label, preview, opts)
-    table.insert(ns.movables, { frame = frame, label = label, preview = preview, grip = not (opts and opts.grip == false) })
+function ns.RegisterMovable(frame, label, preview)
+    table.insert(ns.movables, { frame = frame, label = label, preview = preview })
 end
 
 ---------------------------------------------------------------------------
