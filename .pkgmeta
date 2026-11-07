@@ -1,3 +1,9 @@
 package-as: stray
 
 enable-nolib-creation: no
+
+# Lesbare Patchnotes statt Commit-Liste: Inhalt von CHANGES.md wird als
+# Änderungsprotokoll ins Release übernommen (GitHub und WowUp).
+manual-changelog:
+  filename: CHANGES.md
+  markup-type: markdown
