@@ -2,13 +2,14 @@
 ## Title: stray
 ## Notes: Komfort-Optionen per /stray – Beute, Händler, Taschen, Chat, Quests, Filmsequenzen, Bedrohung, Kamera, Interface, Sozial.
 ## Author: stray
-## Version: 0.10.1-alpha
+## Version: 0.11.0-alpha
 ## SavedVariables: strayDB
 
 stray.lua
 loot.lua
 merchant.lua
 bags.lua
+questitems.lua
 chat.lua
 quests.lua
 cinematics.lua

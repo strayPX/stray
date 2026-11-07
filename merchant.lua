@@ -5,7 +5,7 @@ local _, ns = ...
 ns.AddOption(1, "Händler", {
     key = "autoSell",
     label = "Automatisch verkaufen",
-    tooltip = "Verkauft beim Händler alle grauen Gegenstände aus deinen Taschen. Halte Shift gedrückt, um das zu verhindern.\n\nDer Händler kann nur die letzten 12 verkauften Gegenstände zurückkaufen.",
+    tooltip = "Verkauft beim Händler alle grauen Gegenstände aus deinen Taschen. Gegenstände, die eine Quest im Questlog noch braucht, verkauft stray dabei nie. Halte Shift gedrückt, um das zu verhindern.\n\nDer Händler kann nur die letzten 12 verkauften Gegenstände zurückkaufen.",
 })
 
 ns.AddOption(1, "Händler", {
@@ -29,6 +29,8 @@ local function GetJunk(bag, slot)
         link, count, noValue, quality, locked = h, c, nv, q, l
     end
     if not link or noValue then return end
+    -- Nie verkaufen, was eine Quest im Questlog noch braucht
+    if ns.QuestForItemLink and ns.QuestForItemLink(link) then return end
 
     local _, _, itemQuality, _, _, _, _, _, _, _, price = GetItemInfo(link)
     quality = quality or itemQuality

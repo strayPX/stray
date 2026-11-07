@@ -11,10 +11,12 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Min
 **Händler**
 - **Automatisch verkaufen:** verkauft graue Gegenstände beim Händler und zeigt Anzahl und Erlös im Chat.
 - **Automatisch reparieren:** repariert die Ausrüstung mit eigenem Gold.
+- **Warnung beim Verkauf:** Verkaufst du doch einen Questgegenstand, fragt stray „Zurückkaufen?“ – ein Klick holt ihn zurück.
 
 **Taschen**
 - **„LÖSCHEN“ vorausfüllen:** Das Bestätigungswort steht beim Zerstören schon im Feld.
 - **Ohne Nachfrage zerstören:** Gegenstände werden ohne Abfrage zerstört, auch epische.
+- **Questgegenstände markieren:** Gegenstände, die eine Quest im Questlog braucht (z. B. „Leinenstoff: 3/10“), bekommen einen goldenen Rahmen mit „!“.
 
 **Chat**
 - **Links kopierbar:** Webadressen im Chat werden anklickbar und öffnen ein Feld zum Kopieren.
@@ -68,6 +70,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.11.0-alpha – Questgegenstände markieren und Warnung beim Verkauf mit Rückkauf
 - 0.10.1-alpha – runde Punkte und Schalter; „Neu laden“ hervorgehoben, nach Änderungen Empfehlung zum Neuladen beim Schließen
 - 0.10.0-alpha – Neues Einstellungsfenster (Seitenleiste, Suche, Schalter, Vorschau); Bedrohung neu: lesbare Abfragen, sortierte Liste, Tank- und Aggro-Warnung zurück, ereignisbasiert
 - 0.9.0-alpha – Minimap-Knopf mit eigenem Symbol
