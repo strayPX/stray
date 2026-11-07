@@ -36,6 +36,7 @@ ns.defaults = {
     partyWidth = 96,
     partyHeight = 42,
     partySpacing = 4,
+    partyBrightness = 60,
     minimapButton = true, -- Ausnahme: anfangs an, weil der Knopf der Zugang zum Fenster ist
     minimapAngle = 225,
     threatList = false,

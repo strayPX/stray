@@ -45,10 +45,12 @@ local function Enabled()
     return ns.db and ns.db.partyFrames and true or false
 end
 
+-- Klassenfarbe, abgedunkelt nach „Helligkeit der Balken“ (Standard 60 %)
 local function ClassColor(class)
+    local f = ((ns.db and ns.db.partyBrightness) or 60) / 100
     local color = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
-    if color then return color.r, color.g, color.b end
-    return 0.2, 0.75, 0.3
+    if color then return color.r * f, color.g * f, color.b * f end
+    return 0.2 * f, 0.75 * f, 0.3 * f
 end
 
 local function DebuffColor(dispelName)
@@ -134,7 +136,7 @@ local function BuildTile(parent)
 
     t.bg = art:CreateTexture(nil, "BACKGROUND")
     t.bg:SetAllPoints()
-    t.bg:SetColorTexture(0.051, 0.067, 0.090, 0.95)
+    t.bg:SetColorTexture(0.051, 0.067, 0.090, 0.75)
 
     t.power = CreateFrame("StatusBar", nil, art)
     t.power:SetPoint("BOTTOMLEFT", art, "BOTTOMLEFT", 1, 1)
@@ -155,7 +157,7 @@ local function BuildTile(parent)
     t.health:SetValue(1)
     local healthBg = t.health:CreateTexture(nil, "BACKGROUND")
     healthBg:SetAllPoints()
-    healthBg:SetColorTexture(0.110, 0.122, 0.149, 1)
+    healthBg:SetColorTexture(0.110, 0.122, 0.149, 0.8)
 
     -- Texte und Symbol über den Balken
     local top = CreateFrame("Frame", nil, art)
@@ -509,6 +511,12 @@ local function PaintSample(t, s)
     t.art:SetAlpha(s.faded and FADED or 1)
 end
 
+local function RepaintSamples()
+    for _, f in ipairs(samples) do
+        if f.sample then PaintSample(f.stray, f.sample) end
+    end
+end
+
 local function LayoutSamples()
     local w, h, sp = Dims()
     -- Anker so groß wie die Spalte (auch bei ausgeschalteten Rahmen), damit das Bearbeiten-Overlay passt
@@ -533,6 +541,7 @@ local function EnsureSamples()
         f:SetScript("OnEnter", SampleEnter)
         f:SetScript("OnLeave", function() GameTooltip:Hide() end)
         f.stray = BuildTile(f)
+        f.sample = s
         PaintSample(f.stray, s)
         f:Hide()
         samples[i] = f
@@ -796,4 +805,17 @@ ns.AddOption(3, "Gruppenrahmen", {
     min = 0, max = 20, step = 1,
     tooltip = "Abstand zwischen den Kacheln in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
     set = function(v) ns.db.partySpacing = v; ns.PartyApplyLayout() end,
+})
+
+ns.AddOption(3, "Gruppenrahmen", {
+    key = "partyBrightness",
+    type = "slider",
+    label = "Helligkeit der Balken",
+    min = 30, max = 100, step = 5,
+    tooltip = "Dunkelt die Klassenfarben der Lebensbalken ab, damit die Rahmen nicht so grell leuchten (100 = volle Klassenfarbe). Die Testgruppe zeigt die Änderung sofort.",
+    set = function(v)
+        ns.db.partyBrightness = v
+        RepaintSamples()
+        pcall(RequestAll)
+    end,
 })
