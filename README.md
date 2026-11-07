@@ -89,7 +89,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
-- 0.16.1-alpha – Schadensmesser heißt jetzt DMG-Meter
+- 0.17.0-alpha – DMG-Meter: neues flaches Design, Größe unten rechts ziehbar; Umbenennung Schadensmesser → DMG-Meter
 - 0.16.0-alpha – Gruppenrahmen: Heilvorhersage, Schilde, „Geschwächte Seele“
 - 0.15.0-alpha – Knopf „Anzeigen verschieben“ oben im stray-Fenster
 - 0.14.1-alpha – Gruppenrahmen: Helligkeit der Balken (Standard 60 %)

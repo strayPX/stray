@@ -29,19 +29,29 @@ local function ApiAvailable() return HAS_API end
 -- Maße, Farben, Schrift (wie das stray-Fenster)
 ---------------------------------------------------------------------------
 
-local WIDTH = 230
-local MAX_ROWS = 8
-local ROW_H = 16
+-- Design „Variante 1 – flach wie die Gruppenrahmen“ (Leon 07.11.2026)
+local DEFAULT_W, DEFAULT_H = 230, 190
+local MIN_W, MIN_H, MAX_W, MAX_H = 160, 80, 600, 500
+local MAX_ROWS = 20 -- höchstens so viele Balken, egal wie hoch das Fenster ist
+local ROW_H = 18
 local ROW_GAP = 2
-local TOP_H = 46 -- Kopfzeile (Titel + Knöpfe) bis zum ersten Balken
+local HEADER_H = 20 -- Kopfzeile (Titel, S | H, Zurücksetzen); darunter 1 px Linie
+local TOP_H = HEADER_H + 1 + 3 -- bis zum ersten Balken
+local BOTTOM_PAD = 14 -- Platz für den Ziehgriff unten rechts, damit er keinen Wert verdeckt
+local SIDE_PAD = 4
 local MAX_SESSIONS = 10
 
 local FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local FONT_BODY = "Fonts\\ARIALN.TTF"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
+local RESET_ICON = "Interface\\Buttons\\UI-RefreshButton"
+local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
+local GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down"
+local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
 
 local C = {
-    bg       = { 0.051, 0.067, 0.090, 0.9 },
+    bg       = { 0.051, 0.067, 0.090, 0.75 }, -- wie die Kacheln der Gruppenrahmen
+    barBg    = { 0.110, 0.122, 0.149, 0.8 },  -- wie der Lebensbalken-Hintergrund
     border   = { 0.169, 0.290, 0.451, 1 },
     accent   = { 0.353, 0.659, 1.000, 1 },
     text     = { 0.890, 0.914, 0.953, 1 },
@@ -73,10 +83,6 @@ local function Border(frame, c)
     return lines
 end
 
-local function ColorLines(lines, c)
-    for _, t in ipairs(lines) do t:SetColorTexture(c[1], c[2], c[3], c[4] or 1) end
-end
-
 local function Text(parent, size, c, font, flags)
     local fs = parent:CreateFontString(nil, "OVERLAY")
     fs:SetFont(font or FONT_BODY, size, flags or "")
@@ -86,32 +92,45 @@ local function Text(parent, size, c, font, flags)
     return fs
 end
 
--- Kleiner flacher Knopf; SetActive hebt ihn blau hervor
-local function SmallButton(parent, label, width)
+-- Schrift mit Schatten (wie die Namen der Gruppenrahmen)
+local function ShadowText(parent, size, c)
+    local fs = Text(parent, size, c, FONT_BODY)
+    fs:SetShadowColor(0, 0, 0, 1)
+    fs:SetShadowOffset(1, -1)
+    return fs
+end
+
+-- Kompakter Buchstaben-Knopf für den Umschalter S | H; aktiv = Akzentblau
+local function LetterButton(parent, letter)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(width, 16)
-    b.bg = b:CreateTexture(nil, "BACKGROUND")
-    b.bg:SetAllPoints()
-    b.bg:SetColorTexture(1, 1, 1, 0.03)
-    b.lines = Border(b, C.border)
-    b.text = Text(b, 11, C.textSide)
-    b.text:SetPoint("CENTER")
-    b.text:SetText(label)
+    b:SetSize(14, 16)
+    b.text = Text(b, 12, C.textSide, FONT)
+    b.text:SetPoint("CENTER", b, "CENTER", 0, 0)
+    b.text:SetJustifyH("CENTER")
+    b.text:SetText(letter)
     local hover = b:CreateTexture(nil, "HIGHLIGHT")
     hover:SetAllPoints()
-    hover:SetColorTexture(1, 1, 1, 0.07)
+    hover:SetColorTexture(1, 1, 1, 0.08)
     function b:SetActive(on)
-        if on then
-            self.bg:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.18)
-            ColorLines(self.lines, C.accent)
-            self.text:SetTextColor(1, 1, 1, 1)
-        else
-            self.bg:SetColorTexture(1, 1, 1, 0.03)
-            ColorLines(self.lines, C.border)
-            self.text:SetTextColor(C.textSide[1], C.textSide[2], C.textSide[3], 1)
-        end
+        local c = on and C.accent or C.textSide
+        self.text:SetTextColor(c[1], c[2], c[3], 1)
     end
     return b
+end
+
+-- Klassenfarbe, abgedunkelt wie die Gruppenrahmen („Helligkeit der Balken“, Standard 60 %)
+local function BarColor(class)
+    local f = tonumber(ns.db and ns.db.partyBrightness) or 60
+    f = math.max(0, math.min(100, f)) / 100
+    local color = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
+    if color then return color.r * f, color.g * f, color.b * f end
+    return 0.5 * f, 0.5 * f, 0.5 * f
+end
+
+local function Clamp(v, lo, hi, default)
+    v = tonumber(v)
+    if not v then return default end
+    return math.max(lo, math.min(hi, math.floor(v + 0.5)))
 end
 
 local function Click()
@@ -169,7 +188,7 @@ end
 ---------------------------------------------------------------------------
 
 local main = CreateFrame("Frame", "strayDamageMeter", UIParent)
-main:SetSize(WIDTH, TOP_H + 26)
+main:SetSize(DEFAULT_W, DEFAULT_H)
 main:SetFrameStrata("MEDIUM")
 main:Hide()
 
@@ -178,8 +197,47 @@ mainBg:SetAllPoints()
 mainBg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4])
 Border(main, C.border)
 
+-- 1-px-Linie unter der Kopfzeile
+local headerLine = main:CreateTexture(nil, "BORDER")
+headerLine:SetColorTexture(C.border[1], C.border[2], C.border[3], 1)
+headerLine:SetPoint("TOPLEFT", main, "TOPLEFT", 0, -HEADER_H)
+headerLine:SetPoint("TOPRIGHT", main, "TOPRIGHT", 0, -HEADER_H)
+headerLine:SetHeight(1)
+
 ns.MakeMovable(main, "damagemeter", { "BOTTOMRIGHT", "BOTTOMRIGHT", -260, 180 })
 ns.RegisterMovable(main, "DMG-Meter")
+
+-- Größe ziehen (unten rechts). Grenzen: neue API SetResizeBounds, sonst SetMinResize/SetMaxResize.
+main:SetResizable(true)
+if not pcall(main.SetResizeBounds, main, MIN_W, MIN_H, MAX_W, MAX_H) then
+    if main.SetMinResize then pcall(main.SetMinResize, main, MIN_W, MIN_H) end
+    if main.SetMaxResize then pcall(main.SetMaxResize, main, MAX_W, MAX_H) end
+end
+
+-- Verschieben (Shift + ziehen) und Größenziehen schließen sich aus: Merker um die Skripte
+-- aus ns.MakeMovable legen. ForwardDrag holt sich die Skripte per GetScript, nutzt also diese.
+local moving, sizing = false, false
+do
+    local baseStart = main:GetScript("OnDragStart")
+    local baseStop = main:GetScript("OnDragStop")
+    main:SetScript("OnDragStart", function(self, ...)
+        if sizing then return end
+        if IsShiftKeyDown() then moving = true end
+        if baseStart then baseStart(self, ...) end
+    end)
+    main:SetScript("OnDragStop", function(self, ...)
+        if sizing then return end
+        moving = false
+        if baseStop then baseStop(self, ...) end
+    end)
+    -- Fenster verschwindet mitten im Verschieben: Merker nicht hängen lassen
+    main:HookScript("OnHide", function(self)
+        if moving then
+            moving = false
+            if baseStop then pcall(baseStop, self) end
+        end
+    end)
+end
 
 -- Ziehen an Knöpfen und Titel an das Fenster weiterreichen (Shift + ziehen)
 local function ForwardDrag(child)
@@ -199,63 +257,98 @@ local function MainTooltip(owner)
     GameTooltip:SetText("DMG-Meter", 1, 1, 1)
     GameTooltip:AddLine("Klick auf den Titel: Gesamt, aktueller Kampf oder ein einzelner Kampf.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
     GameTooltip:AddLine("Werte: gesamt (pro Sekunde). Die Daten kommen aus dem eingebauten Schadensmesser des Spiels.", 0.7, 0.7, 0.7, true)
+    GameTooltip:AddLine("S || H oben rechts: Schaden oder Heilung.", 0.7, 0.7, 0.7, true)
     GameTooltip:AddLine("Shift + ziehen zum Verschieben", 0.5, 0.5, 0.5)
+    GameTooltip:AddLine("Unten rechts ziehen: Größe ändern", 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end
 
 main:SetScript("OnEnter", function(self) MainTooltip(self) end)
 main:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
--- Titel (klickbar: Ansicht wählen)
+-- Kopfzeile rechts: Zurücksetzen (Symbol), davor der Umschalter S | H
+local resetButton = CreateFrame("Button", nil, main)
+resetButton:SetSize(14, 14)
+resetButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", -4, -3)
+resetButton.icon = resetButton:CreateTexture(nil, "ARTWORK")
+resetButton.icon:SetAllPoints()
+resetButton.text = Text(resetButton, 11, C.textSide, FONT)
+resetButton.text:SetPoint("CENTER", resetButton, "CENTER", 0, 0)
+resetButton.text:SetJustifyH("CENTER")
+resetButton.text:SetText("R")
+-- Symbol, falls die Textur da ist; sonst bleibt der Buchstabe „R“
+if resetButton.icon:SetTexture(RESET_ICON) == false then
+    resetButton.icon:Hide()
+else
+    resetButton.text:Hide()
+end
+local resetHover = resetButton:CreateTexture(nil, "HIGHLIGHT")
+resetHover:SetAllPoints()
+resetHover:SetColorTexture(1, 1, 1, 0.12)
+
+local healingButton = LetterButton(main, "H")
+healingButton:SetPoint("RIGHT", resetButton, "LEFT", -6, 0)
+local modeSeparator = Text(main, 11, C.textDim, FONT)
+modeSeparator:SetPoint("RIGHT", healingButton, "LEFT", 0, 0)
+modeSeparator:SetText("||") -- „||“ = ein sichtbarer Strich (| ist WoWs Steuerzeichen)
+local damageButton = LetterButton(main, "S")
+damageButton:SetPoint("RIGHT", modeSeparator, "LEFT", 0, 0)
+ForwardDrag(damageButton)
+ForwardDrag(healingButton)
+ForwardDrag(resetButton)
+
+local function ModeTooltip(owner, label)
+    GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+    GameTooltip:SetText(label, 1, 1, 1)
+    GameTooltip:Show()
+end
+damageButton:SetScript("OnEnter", function(self) ModeTooltip(self, "Schaden anzeigen") end)
+damageButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+healingButton:SetScript("OnEnter", function(self) ModeTooltip(self, "Heilung anzeigen") end)
+healingButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+-- Titel links (klickbar: Ansicht wählen)
 local titleButton = CreateFrame("Button", nil, main)
-titleButton:SetPoint("TOPLEFT", main, "TOPLEFT", 6, -5)
-titleButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", -6, -5)
-titleButton:SetHeight(18)
+titleButton:SetPoint("TOPLEFT", main, "TOPLEFT", 3, -2)
+titleButton:SetPoint("TOPRIGHT", damageButton, "TOPLEFT", -4, 0)
+titleButton:SetHeight(HEADER_H - 4)
 local titleHover = titleButton:CreateTexture(nil, "HIGHLIGHT")
 titleHover:SetAllPoints()
 titleHover:SetColorTexture(1, 1, 1, 0.06)
 local title = Text(titleButton, 12, C.text, FONT)
-title:SetPoint("LEFT", titleButton, "LEFT", 2, 0)
-title:SetPoint("RIGHT", titleButton, "RIGHT", -14, 0)
-local titleArrow = Text(titleButton, 11, C.accent)
+title:SetPoint("LEFT", titleButton, "LEFT", 3, 0)
+title:SetPoint("RIGHT", titleButton, "RIGHT", -12, 0)
+local titleArrow = Text(titleButton, 10, C.accent)
 titleArrow:SetPoint("RIGHT", titleButton, "RIGHT", -2, 0)
 titleArrow:SetText("v")
 ForwardDrag(titleButton)
 titleButton:SetScript("OnEnter", function(self) MainTooltip(self) end)
 titleButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
--- Umschalter Schaden | Heilung, Zurücksetzen
-local damageButton = SmallButton(main, "Schaden", 58)
-damageButton:SetPoint("TOPLEFT", main, "TOPLEFT", 6, -25)
-local healingButton = SmallButton(main, "Heilung", 58)
-healingButton:SetPoint("LEFT", damageButton, "RIGHT", 4, 0)
-local resetButton = SmallButton(main, "Zurücksetzen", 78)
-resetButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", -6, -25)
-ForwardDrag(damageButton)
-ForwardDrag(healingButton)
-ForwardDrag(resetButton)
-
 -- Hinweistext, wenn keine Balken da sind
 local emptyText = Text(main, 11, C.textDim)
-emptyText:SetPoint("TOPLEFT", main, "TOPLEFT", 8, -TOP_H - 2)
-emptyText:SetPoint("TOPRIGHT", main, "TOPRIGHT", -8, -TOP_H - 2)
+emptyText:SetPoint("TOPLEFT", main, "TOPLEFT", SIDE_PAD + 2, -TOP_H - 2)
+emptyText:SetPoint("TOPRIGHT", main, "TOPRIGHT", -SIDE_PAD - 2, -TOP_H - 2)
 emptyText:Hide()
 
--- Balken
+-- Balken (Pool wächst bei Bedarf bis MAX_ROWS; Breite folgt dem Fenster über TOPLEFT/TOPRIGHT)
 local rows = {}
-for i = 1, MAX_ROWS do
+
+local function NewRow(i)
     local bar = CreateFrame("StatusBar", nil, main)
-    bar:SetSize(WIDTH - 12, ROW_H)
-    bar:SetPoint("TOPLEFT", main, "TOPLEFT", 6, -TOP_H - (i - 1) * (ROW_H + ROW_GAP))
+    bar:SetHeight(ROW_H)
+    local y = -TOP_H - (i - 1) * (ROW_H + ROW_GAP)
+    bar:SetPoint("TOPLEFT", main, "TOPLEFT", SIDE_PAD, y)
+    bar:SetPoint("TOPRIGHT", main, "TOPRIGHT", -SIDE_PAD, y)
     bar:SetStatusBarTexture(WHITE)
     bar:SetMinMaxValues(0, 1)
     bar:SetValue(0)
 
     bar.bg = bar:CreateTexture(nil, "BACKGROUND")
     bar.bg:SetAllPoints()
-    bar.bg:SetColorTexture(1, 1, 1, 0.06)
+    bar.bg:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], C.barBg[4])
 
-    -- Markierung für den eigenen Balken
+    -- Eigene Zeile: 2 px blauer Strich am linken Rand
     bar.mark = bar:CreateTexture(nil, "OVERLAY")
     bar.mark:SetPoint("TOPLEFT")
     bar.mark:SetPoint("BOTTOMLEFT")
@@ -263,15 +356,74 @@ for i = 1, MAX_ROWS do
     bar.mark:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
     bar.mark:Hide()
 
-    bar.value = Text(bar, 11, C.text, FONT_BODY, "OUTLINE")
+    bar.value = ShadowText(bar, 11, { 1, 1, 1, 1 })
     bar.value:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
     bar.value:SetJustifyH("RIGHT")
-    bar.name = Text(bar, 11, C.text, FONT_BODY, "OUTLINE")
+    bar.name = ShadowText(bar, 11, { 1, 1, 1, 1 })
     bar.name:SetPoint("LEFT", bar, "LEFT", 5, 0)
     bar.name:SetPoint("RIGHT", bar.value, "LEFT", -4, 0)
     bar:Hide()
     rows[i] = bar
+    return bar
 end
+
+-- So viele Zeilen, wie in die aktuelle Höhe passen (mindestens 1, höchstens MAX_ROWS)
+local function VisibleRows()
+    local h = main:GetHeight()
+    if IsSecret(h) or type(h) ~= "number" then h = DEFAULT_H end
+    local n = math.floor((h - TOP_H - BOTTOM_PAD + ROW_GAP) / (ROW_H + ROW_GAP))
+    n = math.max(1, math.min(MAX_ROWS, n))
+    for i = #rows + 1, n do NewRow(i) end
+    return n
+end
+
+-- Ziehgriff unten rechts
+local grip = CreateFrame("Button", nil, main)
+grip:SetSize(16, 16)
+grip:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", -1, 1)
+grip:SetFrameLevel(main:GetFrameLevel() + 10)
+grip:SetNormalTexture(GRIP_UP)
+grip:SetPushedTexture(GRIP_DOWN)
+grip:SetHighlightTexture(GRIP_HIGHLIGHT)
+-- Leicht zurückgenommen, damit er den Wert der untersten Zeile kaum verdeckt
+grip:SetAlpha(0.5)
+
+local function SaveSizeAndPosition()
+    local w, h = main:GetSize()
+    if not IsSecret(w) and not IsSecret(h) then
+        ns.db.dmWidth = Clamp(w, MIN_W, MAX_W, DEFAULT_W)
+        ns.db.dmHeight = Clamp(h, MIN_H, MAX_H, DEFAULT_H)
+    end
+    -- Wie ns.MakeMovable beim Verschieben: Ankerpunkt nach StopMovingOrSizing übernehmen
+    local point, _, relPoint, x, y = main:GetPoint()
+    if point then ns.db.positions.damagemeter = { point, relPoint, x, y } end
+end
+
+local function StopSizing()
+    if not sizing then return end
+    sizing = false
+    main:StopMovingOrSizing()
+    if ns.db then SaveSizeAndPosition() end
+end
+
+grip:SetScript("OnMouseDown", function(_, button)
+    if button ~= "LeftButton" or moving or sizing or not ns.db then return end
+    GameTooltip:Hide()
+    if pcall(main.StartSizing, main, "BOTTOMRIGHT") then sizing = true end
+end)
+grip:SetScript("OnMouseUp", function() StopSizing() end)
+grip:SetScript("OnHide", function() StopSizing() end)
+grip:SetScript("OnEnter", function(self)
+    self:SetAlpha(1)
+    if sizing then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Ziehen: Größe ändern", 1, 1, 1)
+    GameTooltip:Show()
+end)
+grip:SetScript("OnLeave", function(self)
+    self:SetAlpha(0.5)
+    GameTooltip:Hide()
+end)
 
 ---------------------------------------------------------------------------
 -- Ansicht: "overall", "current" oder eine sessionID (einzelner Kampf)
@@ -464,32 +616,21 @@ end
 local function FillRow(bar, entry, max)
     SetName(bar.name, entry.name)
 
-    local color = entry.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[entry.class]
-    if color then
-        bar:SetStatusBarColor(color.r, color.g, color.b, 0.75)
-    else
-        bar:SetStatusBarColor(0.5, 0.5, 0.5, 0.75)
-    end
+    -- Flach in Klassenfarbe, abgedunkelt wie die Gruppenrahmen (Klasse ist nie versiegelt)
+    bar:SetStatusBarColor(BarColor(entry.class))
 
     if not pcall(bar.SetMinMaxValues, bar, 0, max) then bar:SetMinMaxValues(0, 1) end
     if not pcall(bar.SetValue, bar, entry.total) then bar:SetValue(0) end
 
-    if entry.me then
-        bar.bg:SetColorTexture(1, 1, 1, 0.16)
-        bar.mark:Show()
-    else
-        bar.bg:SetColorTexture(1, 1, 1, 0.06)
-        bar.mark:Hide()
-    end
+    bar.mark:SetShown(entry.me and true or false)
 
     return SetAmountText(bar.value, entry.total, entry.perSec)
 end
 
 local function ShowEmpty(message)
-    for i = 1, MAX_ROWS do rows[i]:Hide() end
+    for i = 1, #rows do rows[i]:Hide() end
     emptyText:SetText(message)
     emptyText:Show()
-    main:SetHeight(TOP_H + 20)
 end
 
 local function UpdateHeader(demo)
@@ -500,10 +641,10 @@ local function UpdateHeader(demo)
     healingButton:SetActive(Mode() == "healing")
     if HAS_RESET then
         resetButton:Enable()
-        resetButton.text:SetAlpha(1)
+        resetButton:SetAlpha(1)
     else
         resetButton:Disable()
-        resetButton.text:SetAlpha(0.4)
+        resetButton:SetAlpha(0.4)
     end
 end
 
@@ -532,9 +673,9 @@ local function Update()
     end
 
     emptyText:Hide()
-    local shown = math.min(#entries, MAX_ROWS)
+    local shown = math.min(#entries, VisibleRows())
     local allOk = true
-    for i = 1, MAX_ROWS do
+    for i = 1, #rows do
         local bar = rows[i]
         if i <= shown then
             if not FillRow(bar, entries[i], max) then allOk = false end
@@ -548,7 +689,6 @@ local function Update()
         ShowEmpty("Werte gerade nicht anzeigbar.")
         return
     end
-    main:SetHeight(TOP_H + shown * (ROW_H + ROW_GAP) + 4)
 end
 
 local function Flush()
@@ -583,6 +723,9 @@ local function Request()
     pending = true
     driver:Show()
 end
+
+-- Größe geändert: Zeilenzahl neu bestimmen und neu zeichnen (zusammengefasst über Request)
+main:SetScript("OnSizeChanged", function() Request() end)
 
 ---------------------------------------------------------------------------
 -- Auswahlmenü (Klick auf den Titel)
@@ -846,6 +989,9 @@ ns.OnConfig(function() Request() end)
 
 ns.On("PLAYER_LOGIN", function()
     if ns.db.dmMode ~= "damage" and ns.db.dmMode ~= "healing" then ns.db.dmMode = "damage" end
+    ns.db.dmWidth = Clamp(ns.db.dmWidth, MIN_W, MAX_W, DEFAULT_W)
+    ns.db.dmHeight = Clamp(ns.db.dmHeight, MIN_H, MAX_H, DEFAULT_H)
+    main:SetSize(ns.db.dmWidth, ns.db.dmHeight)
     ns.RestorePosition(main)
     RefreshEvents()
 end)
@@ -869,7 +1015,7 @@ end
 ns.AddOption(2, "DMG-Meter", {
     key = "dmShow",
     label = "DMG-Meter anzeigen",
-    tooltip = "Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Bis zu 8 Balken mit Gesamtwert und Wert pro Sekunde, dein eigener Balken ist hervorgehoben. Oben schaltest du zwischen Schaden und Heilung um; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben.",
+    tooltip = "Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (so hell wie die Gruppenrahmen), dein eigener Balken hat links einen blauen Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit S || H zwischen Schaden und Heilung um; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben.",
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("dmShow"),

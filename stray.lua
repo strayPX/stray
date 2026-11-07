@@ -30,6 +30,8 @@ ns.defaults = {
     dmShow = false,
     dmAutoReset = false,
     dmMode = "damage", -- "damage" oder "healing"
+    dmWidth = 230,
+    dmHeight = 190,
     -- Gruppenrahmen
     partyFrames = false,
     partyHideBlizzard = false,
