@@ -10,6 +10,8 @@
 -- WoW Forever kann Werte versiegeln („secret values“). Versiegelte Werte werden nie verglichen
 -- oder verrechnet, sondern nur an Anzeige-Funktionen (SetText, SetValue, SetTexture …) in pcall
 -- weitergereicht. Die Optik jeder Kachel liegt in einem nicht-sicheren Unterrahmen („art“).
+-- Fester Bestandteil (ohne eigene Option): Heilvorhersage, Schild mit Überschild-Strich,
+-- Symbole für Machtwort: Schild und „Geschwächte Seele“ – alles nicht-sichere Kinder von „art“.
 
 local _, ns = ...
 
@@ -102,6 +104,131 @@ local function StopDrag()
 end
 
 ---------------------------------------------------------------------------
+-- Heilvorhersage, Schilde, „Geschwächte Seele“ (fester Bestandteil, ohne eigene Option)
+---------------------------------------------------------------------------
+
+local HEAL_TOTAL = { 0.3, 0.9, 0.45, 0.55 }  -- ein Balken: gesamte eingehende Heilung
+local HEAL_OWN = { 0.35, 1, 0.5, 0.6 }       -- eigene Heilung
+local HEAL_OTHER = { 0.2, 0.65, 0.35, 0.5 }  -- Heilung anderer
+local ABSORB_COLOR = { 0.75, 0.88, 1, 0.5 }
+local ABSORB_STRIPES = "Interface\\RaidFrame\\Shield-Overlay"
+local OVERSHIELD_COLOR = { 0.9, 0.97, 1, 1 }
+local WEAKENED_SOUL_IDS = { 6788 }
+local SHIELD_IDS = { 17, 592, 600, 3747, 6065, 6066, 10898, 10899, 10900, 10901 } -- Machtwort: Schild, alle Ränge
+local SHIELD_ICON_FALLBACK = "Interface\\Icons\\Spell_Holy_PowerWordShield"
+local SOUL_ICON_FALLBACK = "Interface\\Icons\\Spell_Holy_AshesToAshes"
+
+-- Methode eines Objekts (z. B. des Vorhersage-Rechners) geschützt aufrufen: ok, Rückgaben …
+local function CallMethod(obj, method, ...)
+    if type(obj) == "nil" then return false end
+    local okGet, fn = pcall(function() return obj[method] end)
+    if not okGet or type(fn) ~= "function" then return false end
+    return pcall(fn, obj, ...)
+end
+
+local function SpellTexture(id, fallback)
+    if C_Spell and C_Spell.GetSpellTexture then
+        local ok, tex = pcall(C_Spell.GetSpellTexture, id)
+        if ok and not IsSecret(tex) and tex then return tex end
+    end
+    if GetSpellTexture then
+        local ok, tex = pcall(GetSpellTexture, id)
+        if ok and not IsSecret(tex) and tex then return tex end
+    end
+    return fallback
+end
+
+local spellNames = {}
+local function SpellName(id)
+    if spellNames[id] then return spellNames[id] end
+    local name
+    if C_Spell and C_Spell.GetSpellName then
+        local ok, n = pcall(C_Spell.GetSpellName, id)
+        if ok then name = Public(n) end
+    end
+    if type(name) ~= "string" and GetSpellInfo then
+        local ok, n = pcall(GetSpellInfo, id)
+        if ok then name = Public(n) end
+    end
+    if type(name) == "string" and name ~= "" then
+        spellNames[id] = name
+        return name
+    end
+    return nil
+end
+
+-- Sucht eine Aura nach Zauber-IDs bzw. Name. Gibt die Aura-Tabelle oder nil zurück.
+-- spellId wird nur verglichen, wenn sie lesbar ist.
+local function FindAura(unit, ids, name, filter)
+    local api = C_UnitAuras
+    -- Gezielte Abfrage nach ID; liefert sie nichts (z. B. bei anderen Spielern), weiter mit dem Namen
+    if api and api.GetUnitAuraBySpellID then
+        for _, id in ipairs(ids) do
+            local ok, aura = pcall(api.GetUnitAuraBySpellID, unit, id)
+            if ok and type(aura) == "table" then return aura end
+        end
+    end
+    if name and api and api.GetAuraDataBySpellName then
+        local ok, aura = pcall(api.GetAuraDataBySpellName, unit, name, filter)
+        if ok then
+            if type(aura) == "table" then return aura end
+            return nil
+        end
+    end
+    -- Rückfall: Auren durchgehen
+    for i = 1, 40 do
+        local aura
+        if api and api.GetAuraDataByIndex then
+            local ok, a = pcall(api.GetAuraDataByIndex, unit, i, filter)
+            if not ok or type(a) ~= "table" then return nil end
+            aura = a
+        elseif UnitAura then
+            local ok, n, icon, _, _, duration, expirationTime, _, _, _, spellId = pcall(UnitAura, unit, i, filter)
+            if not ok or type(n) == "nil" then return nil end
+            aura = { icon = icon, duration = duration, expirationTime = expirationTime, spellId = spellId }
+        else
+            return nil
+        end
+        local spellId = aura.spellId
+        -- Versiegelte IDs: Durchsuchen kann nichts finden → abbrechen statt 40 Auren zu prüfen
+        if IsSecret(spellId) then return nil end
+        if type(spellId) == "number" then
+            for _, id in ipairs(ids) do
+                if spellId == id then return aura end
+            end
+        end
+    end
+    return nil
+end
+
+-- Vorhersage-Rechner (Midnight), je Kachel einmal; gibt calc, absorbClamp zurück
+local function NewCalculator()
+    if type(CreateUnitHealPredictionCalculator) ~= "function" then return nil, false end
+    local ok, calc = pcall(CreateUnitHealPredictionCalculator)
+    if not ok or type(calc) == "nil" then return nil, false end
+    -- Schild auf fehlendes Leben klemmen lassen → „geklemmt“ heißt Überschild (nur falls bekannt)
+    local clamp = false
+    local modes = Enum and Enum.UnitDamageAbsorbClampMode
+    local mode = type(modes) == "table" and modes.MissingHealth
+    if type(mode) == "number" and CallMethod(calc, "SetDamageAbsorbClampMode", mode) then clamp = true end
+    return calc, clamp
+end
+
+local function MakePredictBar(parent, after, color)
+    local bar = CreateFrame("StatusBar", nil, parent)
+    bar:SetFrameLevel(parent:GetFrameLevel() + 1)
+    bar:SetStatusBarTexture(BAR_TEXTURE)
+    bar:SetStatusBarColor(color[1], color[2], color[3], color[4])
+    -- Beginnt am rechten Ende der vorherigen Füllung; Überstand schneidet der Clip-Bereich ab
+    bar:SetPoint("TOPLEFT", after, "TOPRIGHT", 0, 0)
+    bar:SetPoint("BOTTOMLEFT", after, "BOTTOMRIGHT", 0, 0)
+    bar:SetWidth(1)
+    bar:SetMinMaxValues(0, 1)
+    bar:SetValue(0)
+    return bar
+end
+
+---------------------------------------------------------------------------
 -- Kachel-Optik (für echte Knöpfe und Beispielkacheln gleich)
 ---------------------------------------------------------------------------
 
@@ -159,11 +286,40 @@ local function BuildTile(parent)
     healthBg:SetAllPoints()
     healthBg:SetColorTexture(0.110, 0.122, 0.149, 0.8)
 
+    -- Heilvorhersage und Schild: Balken in einem Clip-Bereich genau über dem Lebensbalken
+    local clip = CreateFrame("Frame", nil, art)
+    clip:SetAllPoints(t.health)
+    clip:SetFrameLevel(t.health:GetFrameLevel() + 1)
+    pcall(clip.SetClipsChildren, clip, true)
+    t.clip = clip
+    t.heal1 = MakePredictBar(clip, t.health:GetStatusBarTexture(), HEAL_TOTAL)
+    t.heal2 = MakePredictBar(clip, t.heal1:GetStatusBarTexture(), HEAL_OTHER)
+    t.absorb = MakePredictBar(clip, t.heal2:GetStatusBarTexture(), ABSORB_COLOR)
+    -- Streifen-Optik über der Schild-Füllung (falls die Textur vorhanden ist)
+    t.stripes = t.absorb:CreateTexture(nil, "OVERLAY")
+    local okTex, res = pcall(t.stripes.SetTexture, t.stripes, ABSORB_STRIPES, "REPEAT", "REPEAT")
+    if okTex and res ~= false then
+        pcall(t.stripes.SetHorizTile, t.stripes, true)
+        pcall(t.stripes.SetVertTile, t.stripes, true)
+        t.stripes:SetAllPoints(t.absorb:GetStatusBarTexture())
+        t.stripes:SetAlpha(0.7)
+        t.hasStripes = true
+    end
+    t.stripes:Hide()
+
     -- Texte und Symbol über den Balken
     local top = CreateFrame("Frame", nil, art)
     top:SetAllPoints(art)
-    top:SetFrameLevel(t.health:GetFrameLevel() + 2)
+    top:SetFrameLevel(t.health:GetFrameLevel() + 4)
     t.top = top
+
+    -- Überschild-Strich am rechten Rand des Lebensbalkens
+    t.over = top:CreateTexture(nil, "ARTWORK")
+    t.over:SetColorTexture(OVERSHIELD_COLOR[1], OVERSHIELD_COLOR[2], OVERSHIELD_COLOR[3], OVERSHIELD_COLOR[4])
+    t.over:SetPoint("TOPRIGHT", t.health, "TOPRIGHT", 0, 0)
+    t.over:SetPoint("BOTTOMRIGHT", t.health, "BOTTOMRIGHT", 0, 0)
+    t.over:SetWidth(3)
+    t.over:Hide()
 
     t.name = top:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     t.name:SetPoint("TOPLEFT", top, "TOPLEFT", 4, -4)
@@ -189,15 +345,130 @@ local function BuildTile(parent)
     t.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     t.icon:Hide()
 
+    -- Schild-Symbol (Machtwort: Schild) und „Geschwächte Seele“ links neben dem Prozenttext
+    t.shieldIcon = top:CreateTexture(nil, "OVERLAY")
+    t.shieldIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    if not pcall(t.shieldIcon.SetTexture, t.shieldIcon, SpellTexture(17, SHIELD_ICON_FALLBACK)) then
+        pcall(t.shieldIcon.SetTexture, t.shieldIcon, SHIELD_ICON_FALLBACK)
+    end
+    t.shieldIcon:Hide()
+
+    t.soulIcon = top:CreateTexture(nil, "OVERLAY")
+    t.soulIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    t.soulTexture = SpellTexture(6788, SOUL_ICON_FALLBACK)
+    pcall(t.soulIcon.SetTexture, t.soulIcon, t.soulTexture)
+    t.soulIcon:Hide()
+
+    local okCD, cd = pcall(CreateFrame, "Cooldown", nil, top, "CooldownFrameTemplate")
+    if not okCD or not cd then cd = CreateFrame("Cooldown", nil, top) end
+    cd:SetAllPoints(t.soulIcon)
+    pcall(cd.SetDrawEdge, cd, false)
+    pcall(cd.SetHideCountdownNumbers, cd, false) -- Restzeit in Sekunden anzeigen
+    cd:Hide()
+    t.soulCD = cd
+    t.iconOrder = { t.shieldIcon, t.soulIcon } -- von rechts nach links
+
     t.dispel = MakeBorder(top, 2, 0, "OVERLAY", 6)
     t.target = MakeBorder(top, 1, 1, "OVERLAY", 7)
     t.target:SetColor(1, 1, 1, 0.9)
     return t
 end
 
-local function ResizeTile(t, h)
+-- Größe der Symbole und Breite der Vorhersage-/Schildbalken (= Breite des Lebensbalkens)
+local function ResizeTile(t, h, w)
     local size = math.max(10, math.min(18, math.floor(h * 0.38)))
     t.icon:SetSize(size, size)
+    local small = math.max(12, math.min(14, math.floor(h * 0.32)))
+    t.shieldIcon:SetSize(small, small)
+    t.soulIcon:SetSize(small, small)
+    local barW = math.max(1, (tonumber(w) or 96) - 2)
+    t.heal1:SetWidth(barW)
+    t.heal2:SetWidth(barW)
+    t.absorb:SetWidth(barW)
+end
+
+-- Schild-/Seelen-Symbol links neben dem Prozenttext reihen; Name endet vor dem ersten Symbol
+local function LayoutIcons(t)
+    local last
+    for _, icon in ipairs(t.iconOrder) do
+        if icon:IsShown() then
+            icon:ClearAllPoints()
+            if last then
+                icon:SetPoint("TOPRIGHT", last, "TOPLEFT", -1, 0)
+            else
+                icon:SetPoint("TOPRIGHT", t.pct, "TOPLEFT", -2, 1)
+            end
+            last = icon
+        end
+    end
+    t.name:ClearAllPoints()
+    t.name:SetPoint("TOPLEFT", t.top, "TOPLEFT", 4, -4)
+    if last then
+        t.name:SetPoint("TOPRIGHT", last, "TOPLEFT", -2, -1)
+    else
+        t.name:SetPoint("TOPRIGHT", t.top, "TOPRIGHT", -34, -4)
+    end
+end
+
+-- Balkenwert setzen; nil → 0. Versiegelte Werte gehen nur an SetMinMaxValues/SetValue.
+local function SetBar(bar, maxValue, value)
+    if not pcall(bar.SetMinMaxValues, bar, 0, maxValue) then
+        bar:SetMinMaxValues(0, 1)
+        bar:SetValue(0)
+        return
+    end
+    if type(value) == "nil" or not pcall(bar.SetValue, bar, value) then bar:SetValue(0) end
+end
+
+local function SetHeals(t, maxValue, mode, a, b)
+    if mode == "split" then
+        t.heal1:SetStatusBarColor(HEAL_OWN[1], HEAL_OWN[2], HEAL_OWN[3], HEAL_OWN[4])
+        t.heal2:SetStatusBarColor(HEAL_OTHER[1], HEAL_OTHER[2], HEAL_OTHER[3], HEAL_OTHER[4])
+        SetBar(t.heal1, maxValue, a)
+        SetBar(t.heal2, maxValue, b)
+    else
+        t.heal1:SetStatusBarColor(HEAL_TOTAL[1], HEAL_TOTAL[2], HEAL_TOTAL[3], HEAL_TOTAL[4])
+        SetBar(t.heal1, maxValue, a)
+        SetBar(t.heal2, maxValue, 0)
+    end
+end
+
+-- Restzeit nur mit lesbaren Werten; versiegelt → Dauerobjekt (Midnight), sonst ohne Abklinganzeige
+local function SetSoulCooldown(t, duration, expirationTime, unit, auraInstanceID)
+    local cd = t.soulCD
+    if not IsSecret(duration) and not IsSecret(expirationTime)
+        and type(duration) == "number" and type(expirationTime) == "number" then
+        if duration > 0 and pcall(cd.SetCooldown, cd, expirationTime - duration, duration) then
+            cd:Show()
+            return
+        end
+    elseif unit and type(auraInstanceID) ~= "nil" and C_UnitAuras and C_UnitAuras.GetAuraDuration
+        and cd.SetCooldownFromDurationObject then
+        local ok, durationObj = pcall(C_UnitAuras.GetAuraDuration, unit, auraInstanceID)
+        if ok and type(durationObj) ~= "nil" and pcall(cd.SetCooldownFromDurationObject, cd, durationObj) then
+            cd:Show()
+            return
+        end
+    end
+    if cd.Clear then pcall(cd.Clear, cd) else pcall(cd.SetCooldown, cd, 0, 0) end
+    cd:Hide()
+end
+
+local function HideSoul(t)
+    t.soulIcon:Hide()
+    if t.soulCD.Clear then pcall(t.soulCD.Clear, t.soulCD) end
+    t.soulCD:Hide()
+end
+
+local function ClearPrediction(t)
+    SetBar(t.heal1, 1, 0)
+    SetBar(t.heal2, 1, 0)
+    SetBar(t.absorb, 1, 0)
+    t.stripes:Hide()
+    t.over:Hide()
+    t.shieldIcon:Hide()
+    HideSoul(t)
+    LayoutIcons(t)
 end
 
 ---------------------------------------------------------------------------
@@ -351,6 +622,110 @@ local function PaintRange(t, unit)
     t.art:SetAlpha(inRange and 1 or FADED)
 end
 
+-- Eingehende Heilung: gibt "split", eigene, fremde  oder  "total", gesamt  zurück
+local function IncomingHeals(t, unit, calcFilled)
+    if calcFilled then
+        local ok, total, own, others = CallMethod(t.calc, "GetIncomingHeals")
+        if ok then
+            if type(own) == "number" and type(others) == "number" then return "split", own, others end
+            if type(total) == "number" then return "total", total end
+        end
+    end
+    if type(UnitGetIncomingHeals) ~= "function" then return "total", nil end
+    local okT, total = pcall(UnitGetIncomingHeals, unit)
+    if not okT then total = nil end
+    local okO, own = pcall(UnitGetIncomingHeals, unit, "player")
+    if okO and not IsSecret(total) and not IsSecret(own) then
+        total = type(total) == "number" and total or 0
+        own = type(own) == "number" and own or 0
+        if own > total then own = total end
+        return "split", own, total - own
+    end
+    -- Versiegelt: kein Rechnen → ein Balken mit der Gesamtheilung
+    return "total", total
+end
+
+local function PaintPrediction(t, unit)
+    if StatusText(unit) then
+        ClearPrediction(t)
+        return
+    end
+    local maxHP = UnitHealthMax(unit)
+
+    local calcFilled = false
+    if t.calc and type(UnitGetDetailedHealPrediction) == "function" then
+        calcFilled = pcall(UnitGetDetailedHealPrediction, unit, "player", t.calc)
+    end
+
+    -- Heilung
+    local ok, mode, a, b = pcall(IncomingHeals, t, unit, calcFilled)
+    if ok then SetHeals(t, maxHP, mode, a, b) else SetHeals(t, 1, "total", 0) end
+
+    -- Schild
+    local absorb
+    if type(UnitGetTotalAbsorbs) == "function" then
+        local okA, v = pcall(UnitGetTotalAbsorbs, unit)
+        if okA then absorb = v end
+    end
+    SetBar(t.absorb, maxHP, absorb)
+    local readable = type(absorb) == "number" and not IsSecret(absorb)
+    if t.hasStripes then
+        if readable then t.stripes:SetShown(absorb > 0)
+        else t.stripes:SetShown(type(absorb) ~= "nil") end
+    end
+
+    -- Überschild-Strich: nur mit lesbaren Werten vergleichen
+    t.over:SetAlpha(1)
+    local over = false
+    if readable then
+        local cur = UnitHealth(unit)
+        if not IsSecret(cur) and not IsSecret(maxHP) and type(cur) == "number" and type(maxHP) == "number" then
+            over = absorb > 0 and absorb > (maxHP - cur)
+        end
+        t.over:SetShown(over)
+    elseif calcFilled and t.absorbClamp and t.over.SetAlphaFromBoolean then
+        -- Rechner klemmt den Schild aufs fehlende Leben: „geklemmt“ = Überschild, ohne Vergleich
+        local okD, _, clamped = CallMethod(t.calc, "GetDamageAbsorbs")
+        if okD and type(clamped) == "boolean" then
+            if IsSecret(clamped) then
+                if pcall(t.over.SetAlphaFromBoolean, t.over, clamped, 1, 0) then t.over:Show() else t.over:Hide() end
+            else
+                t.over:SetShown(clamped)
+            end
+        else
+            t.over:Hide()
+        end
+    else
+        t.over:Hide()
+    end
+
+    -- Schild-Symbol: lesbarer Wert > 0 (hier) oder Buff Machtwort: Schild (PaintBuffIcons, nur bei UNIT_AURA)
+    t.hasShieldValue = (readable and absorb > 0) and true or false
+    t.shieldIcon:SetShown(t.hasShieldValue or t.shieldBuff == true)
+    LayoutIcons(t)
+end
+
+-- Symbole aus Auren (Schild-Buff, „Geschwächte Seele“) – nur bei UNIT_AURA und vollem Neuzeichnen,
+-- nicht bei jeder Lebens- oder Mana-Änderung (Auren durchsuchen kostet)
+local function PaintBuffIcons(t, unit)
+    local okShield, shieldAura = pcall(FindAura, unit, SHIELD_IDS, SpellName(17), "HELPFUL")
+    t.shieldBuff = okShield and type(shieldAura) == "table"
+    t.shieldIcon:SetShown(t.hasShieldValue == true or t.shieldBuff)
+
+    local okSoul, soul = pcall(FindAura, unit, WEAKENED_SOUL_IDS, SpellName(6788), "HARMFUL")
+    if okSoul and type(soul) == "table" then
+        if type(soul.icon) == "nil" or not pcall(t.soulIcon.SetTexture, t.soulIcon, soul.icon) then
+            pcall(t.soulIcon.SetTexture, t.soulIcon, t.soulTexture)
+        end
+        t.soulIcon:Show()
+        pcall(SetSoulCooldown, t, soul.duration, soul.expirationTime, unit, soul.auraInstanceID)
+    else
+        pcall(HideSoul, t)
+    end
+
+    LayoutIcons(t)
+end
+
 ---------------------------------------------------------------------------
 -- Sichere Knöpfe
 ---------------------------------------------------------------------------
@@ -373,8 +748,10 @@ local function UpdateButton(button)
     if not unit then return end
     pcall(PaintName, t, unit)
     pcall(PaintHealth, t, unit)
+    pcall(PaintPrediction, t, unit)
     pcall(PaintPower, t, unit)
     pcall(PaintAuras, t, unit)
+    pcall(PaintBuffIcons, t, unit)
     pcall(PaintTarget, t, unit)
     pcall(PaintRange, t, unit)
 end
@@ -422,7 +799,8 @@ local function InitButton(_, name)
     if not button or button.stray then return end
     local w, h = Dims()
     local t = BuildTile(button)
-    ResizeTile(t, h)
+    t.calc, t.absorbClamp = NewCalculator()
+    ResizeTile(t, h, w)
     button.stray = t
     table.insert(buttons, button)
 
@@ -471,11 +849,14 @@ header:Hide()
 ---------------------------------------------------------------------------
 
 local SAMPLES = {
-    { name = "Leon", class = "PRIEST", hp = 0.92, power = "MANA", mp = 0.7 },
-    { name = "Kael", class = "MAGE", hp = 0.64, power = "MANA", mp = 0.45, dispel = "Poison", icon = "Interface\\Icons\\Ability_Creature_Poison_03" },
+    -- Leon: Schild größer als das fehlende Leben → Überschild-Strich
+    { name = "Leon", class = "PRIEST", hp = 0.92, power = "MANA", mp = 0.7, absorb = 0.15 },
+    -- Kael: laufende Heilung +30 % (eigene 20 % hell, fremde 10 % dunkler)
+    { name = "Kael", class = "MAGE", hp = 0.64, power = "MANA", mp = 0.45, dispel = "Poison", icon = "Interface\\Icons\\Ability_Creature_Poison_03", healOwn = 0.2, healOther = 0.1 },
     { name = "Mira", class = "DRUID", hp = 1.0, power = "MANA", mp = 0.9, faded = true },
     { name = "Brom", class = "WARRIOR", hp = 0, power = "RAGE", mp = 0, status = "Tot" },
-    { name = "Sera", class = "ROGUE", hp = 0.38, power = "ENERGY", mp = 0.8, target = true },
+    -- Sera: Schild (gestreift) mit Schild-Symbol und „Geschwächte Seele“ (noch 9 von 15 s)
+    { name = "Sera", class = "ROGUE", hp = 0.38, power = "ENERGY", mp = 0.8, target = true, absorb = 0.25, soulLeft = 9, soulDuration = 15 },
 }
 
 local samples = {}
@@ -486,6 +867,33 @@ local function SampleEnter(self)
     GameTooltip:AddLine("Shift + ziehen zum Verschieben. Breite, Höhe und Abstand stellst du im stray-Fenster ein.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
     GameTooltip:AddLine("Die Testgruppe verschwindet, wenn du das stray-Fenster schließt (oder echte Gruppenrahmen in deiner Gruppe laufen).", 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
+end
+
+-- Beispielwerte sind lesbare Zahlen (Anteile 0–1)
+local function PaintSamplePrediction(t, s)
+    if s.status then
+        ClearPrediction(t)
+        return
+    end
+    if s.healOwn then
+        SetHeals(t, 1, "split", s.healOwn, s.healOther or 0)
+    else
+        SetHeals(t, 1, "total", s.heal or 0)
+    end
+    local absorb = s.absorb or 0
+    SetBar(t.absorb, 1, absorb)
+    if t.hasStripes then t.stripes:SetShown(absorb > 0) end
+    t.over:SetAlpha(1)
+    t.over:SetShown(absorb > 0 and absorb > 1 - s.hp)
+    t.shieldIcon:SetShown(absorb > 0)
+    if s.soulDuration then
+        pcall(t.soulIcon.SetTexture, t.soulIcon, t.soulTexture)
+        t.soulIcon:Show()
+        SetSoulCooldown(t, s.soulDuration, GetTime() + (s.soulLeft or s.soulDuration))
+    else
+        HideSoul(t)
+    end
+    LayoutIcons(t)
 end
 
 local function PaintSample(t, s)
@@ -509,6 +917,7 @@ local function PaintSample(t, s)
     PaintDispel(t, s.dispel ~= nil, s.icon, s.dispel)
     t.target:SetShown(s.target and true or false)
     t.art:SetAlpha(s.faded and FADED or 1)
+    pcall(PaintSamplePrediction, t, s)
 end
 
 local function RepaintSamples()
@@ -525,7 +934,7 @@ local function LayoutSamples()
         f:SetSize(w, h)
         f:ClearAllPoints()
         f:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, -(i - 1) * (h + sp))
-        ResizeTile(f.stray, h)
+        ResizeTile(f.stray, h, w)
     end
 end
 
@@ -554,7 +963,11 @@ end
 local function UpdatePreview()
     local show = ns.IsConfigOpen() and not (Enabled() and IsInGroup())
     if show then EnsureSamples() end
-    for _, f in ipairs(samples) do f:SetShown(show) end
+    for _, f in ipairs(samples) do
+        -- Beim Einblenden neu zeichnen: startet die Abklinganzeige der Testgruppe neu
+        if show and not f:IsShown() and f.sample then PaintSample(f.stray, f.sample) end
+        f:SetShown(show)
+    end
     -- Der Anker hält den sicheren Header: nur außerhalb des Kampfes ein-/ausblenden
     if not InCombatLockdown() then
         if show then
@@ -608,7 +1021,17 @@ local EVENTS = {
     "UNIT_HEALTH", "UNIT_MAXHEALTH", "UNIT_POWER_UPDATE", "UNIT_MAXPOWER", "UNIT_DISPLAYPOWER",
     "UNIT_AURA", "UNIT_CONNECTION", "UNIT_NAME_UPDATE", "UNIT_FLAGS",
     "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED",
+    -- Heilvorhersage und Schilde (per pcall registriert, falls der Client sie nicht kennt)
+    "UNIT_HEAL_PREDICTION", "UNIT_ABSORB_AMOUNT_CHANGED", "UNIT_HEAL_ABSORB_AMOUNT_CHANGED",
 }
+
+-- Diese Ereignisse zeichnen nur Heilvorhersage/Schild neu
+local PREDICTION_EVENTS = {
+    UNIT_HEAL_PREDICTION = true, UNIT_ABSORB_AMOUNT_CHANGED = true, UNIT_HEAL_ABSORB_AMOUNT_CHANGED = true,
+}
+-- Häufige Ereignisse: nur den betroffenen Teil neu zeichnen (keine Aura-Suche)
+local HEALTH_EVENTS = { UNIT_HEALTH = true, UNIT_MAXHEALTH = true }
+local POWER_EVENTS = { UNIT_POWER_UPDATE = true, UNIT_MAXPOWER = true, UNIT_DISPLAYPOWER = true }
 
 local pendingRefresh = false
 local Refresh -- weiter unten
@@ -635,9 +1058,21 @@ events:SetScript("OnEvent", function(_, event, unit)
         return
     end
     if type(unit) ~= "string" then return end
+    local predictionOnly = PREDICTION_EVENTS[event]
     for _, button in ipairs(buttons) do
         if button:IsShown() and button:GetAttribute("unit") == unit then
-            UpdateButton(button)
+            if predictionOnly then
+                if button.stray and ButtonUnit(button) then pcall(PaintPrediction, button.stray, unit) end
+            elseif HEALTH_EVENTS[event] then
+                if button.stray and ButtonUnit(button) then
+                    pcall(PaintHealth, button.stray, unit)
+                    pcall(PaintPrediction, button.stray, unit)
+                end
+            elseif POWER_EVENTS[event] then
+                if button.stray and ButtonUnit(button) then pcall(PaintPower, button.stray, unit) end
+            else
+                UpdateButton(button)
+            end
         end
     end
 end)
@@ -682,7 +1117,7 @@ function ns.PartyApplyLayout()
     header:SetAttribute("strayHeight", h)
     for _, button in ipairs(buttons) do
         button:SetSize(w, h)
-        if button.stray then ResizeTile(button.stray, h) end
+        if button.stray then ResizeTile(button.stray, h, w) end
     end
     -- Zuletzt: löst die Neuanordnung durch den Header aus
     header:SetAttribute("yOffset", -sp)
@@ -757,7 +1192,7 @@ end
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyFrames",
     label = "Gruppenrahmen anzeigen",
-    tooltip = "Eigene Gruppenrahmen für Heiler: du und deine 5er-Gruppe als senkrechte Spalte (nicht im Schlachtzug). Lebensbalken in Klassenfarbe, Leben in Prozent, Ressourcenbalken, „Tot“/„Geist“/„Offline“; wer außer Reichweite ist, wird blass. Hat jemand eine Schwächung, die du entfernen kannst, bekommt die Kachel einen farbigen Rahmen (Gift grün, Krankheit braun, Fluch lila, Magie blau) und ein kleines Symbol.\n\nLinksklick wählt das Mitglied als Ziel, Rechtsklick öffnet sein Menü. Mit eingeschaltetem „Mouseover-Zauber“ (Kampf → Zaubern) heilt deine normale Heiltaste das Mitglied unter der Maus.\n\nVerschieben mit Shift + Ziehen; solange das stray-Fenster offen ist, zeigt eine Testgruppe mit 5 Spielern Größe und Position – auch wenn die Gruppenrahmen noch aus sind. Änderungen wirken nur außerhalb des Kampfes.",
+    tooltip = "Eigene Gruppenrahmen für Heiler: du und deine 5er-Gruppe als senkrechte Spalte (nicht im Schlachtzug). Lebensbalken in Klassenfarbe, Leben in Prozent, Ressourcenbalken, „Tot“/„Geist“/„Offline“; wer außer Reichweite ist, wird blass. Hat jemand eine Schwächung, die du entfernen kannst, bekommt die Kachel einen farbigen Rahmen (Gift grün, Krankheit braun, Fluch lila, Magie blau) und ein kleines Symbol. Außerdem zeigen die Kacheln eingehende Heilung (hellgrün), Schilde (hellblau gestreift, mit Symbol) und „Geschwächte Seele“ mit Restzeit.\n\nLinksklick wählt das Mitglied als Ziel, Rechtsklick öffnet sein Menü. Mit eingeschaltetem „Mouseover-Zauber“ (Kampf → Zaubern) heilt deine normale Heiltaste das Mitglied unter der Maus.\n\nVerschieben mit Shift + Ziehen; solange das stray-Fenster offen ist, zeigt eine Testgruppe mit 5 Spielern Größe und Position – auch wenn die Gruppenrahmen noch aus sind. Änderungen wirken nur außerhalb des Kampfes.",
     set = function(value)
         ns.db.partyFrames = value
         CombatNote()
