@@ -41,7 +41,7 @@ local C = {
 -- Gruppen und Reihenfolge der Bereiche in der Seitenleiste
 local GROUPS = {
     { name = "Komfort", sections = { "Beute", "Händler", "Taschen", "Quests", "Filmsequenzen", "Chat" } },
-    { name = "Kampf", sections = { "Bedrohung", "Schadensmesser", "Zaubern" } },
+    { name = "Kampf", sections = { "Bedrohung", "DMG-Meter", "Zaubern" } },
     { name = "Gruppe", sections = { "Gruppenrahmen" } },
     { name = "Oberfläche", sections = { "Kamera & Karte", "Interface", "Sozial" } },
     { name = "System", sections = { "Bearbeiten", "Profile" } },
@@ -56,7 +56,7 @@ local SUBTITLES = {
     ["Chat"] = "Kleine Helfer für den Chat.",
     ["Bedrohung"] = "Wer hat Aggro – für dich und deine Gruppe.",
     ["Zaubern"] = "Zaubern ohne Umwege – z. B. per Mouseover.",
-    ["Schadensmesser"] = "Schaden und Heilung – gesamt und je Kampf.",
+    ["DMG-Meter"] = "Schaden und Heilung – gesamt und je Kampf.",
     ["Gruppenrahmen"] = "Deine 5er-Gruppe als Heiler-Rahmen.",
     ["Bearbeiten"] = "Alle stray-Anzeigen auf einmal verschieben.",
     ["Profile"] = "Einstellungen exportieren und importieren.",

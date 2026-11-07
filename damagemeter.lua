@@ -1,4 +1,4 @@
--- stray – Schadensmesser: eigenes Fenster für Schaden und Heilung (gesamt, aktueller Kampf, einzelne Kämpfe)
+-- stray – DMG-Meter: eigenes Fenster für Schaden und Heilung (gesamt, aktueller Kampf, einzelne Kämpfe)
 --
 -- Die Werte kommen aus Blizzards eingebautem Schadensmesser (C_DamageMeter), nicht aus dem Kampflog.
 -- Im Kampf versiegelt WoW Forever Name, GUID, Gesamtwert und Wert pro Sekunde („secret values“).
@@ -161,7 +161,7 @@ local noticeShown = false
 local function NoticeLocked()
     if noticeShown then return end
     noticeShown = true
-    ns.Print("WoW Forever lässt die Werte des Schadensmessers hier gerade nicht anzeigen – stray versucht es weiter, spätestens nach dem Kampf klappt es wieder.")
+    ns.Print("WoW Forever lässt die Werte des DMG-Meters hier gerade nicht anzeigen – stray versucht es weiter, spätestens nach dem Kampf klappt es wieder.")
 end
 
 ---------------------------------------------------------------------------
@@ -179,7 +179,7 @@ mainBg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4])
 Border(main, C.border)
 
 ns.MakeMovable(main, "damagemeter", { "BOTTOMRIGHT", "BOTTOMRIGHT", -260, 180 })
-ns.RegisterMovable(main, "Schadensmesser")
+ns.RegisterMovable(main, "DMG-Meter")
 
 -- Ziehen an Knöpfen und Titel an das Fenster weiterreichen (Shift + ziehen)
 local function ForwardDrag(child)
@@ -196,7 +196,7 @@ end
 
 local function MainTooltip(owner)
     GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
-    GameTooltip:SetText("Schadensmesser", 1, 1, 1)
+    GameTooltip:SetText("DMG-Meter", 1, 1, 1)
     GameTooltip:AddLine("Klick auf den Titel: Gesamt, aktueller Kampf oder ein einzelner Kampf.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
     GameTooltip:AddLine("Werte: gesamt (pro Sekunde). Die Daten kommen aus dem eingebauten Schadensmesser des Spiels.", 0.7, 0.7, 0.7, true)
     GameTooltip:AddLine("Shift + ziehen zum Verschieben", 0.5, 0.5, 0.5)
@@ -679,15 +679,15 @@ local function DoReset(auto)
         return false
     end
     if not pcall(DM.ResetAllCombatSessions) then
-        ns.Print("Der Schadensmesser ließ sich nicht zurücksetzen.")
+        ns.Print("Der DMG-Meter ließ sich nicht zurücksetzen.")
         return false
     end
     view, viewLabel = "overall", nil
     menu:Hide()
     if auto then
-        ns.Print("Schadensmesser zurückgesetzt (Instanz verlassen).")
+        ns.Print("DMG-Meter zurückgesetzt (Instanz verlassen).")
     else
-        ns.Print("Schadensmesser zurückgesetzt.")
+        ns.Print("DMG-Meter zurückgesetzt.")
     end
     Request()
     return true
@@ -695,7 +695,7 @@ end
 
 if StaticPopupDialogs then
     StaticPopupDialogs["STRAY_DAMAGEMETER_RESET"] = {
-        text = "Alle Kämpfe im Schadensmesser zurücksetzen?\n\nDas betrifft auch Blizzards eigenen Schadensmesser.",
+        text = "Alle Kämpfe im DMG-Meter zurücksetzen?\n\nDas betrifft auch Blizzards eigenen Schadensmesser.",
         button1 = YES or "Ja",
         button2 = NO or "Nein",
         OnAccept = function() DoReset(false) end,
@@ -866,19 +866,19 @@ local function Setter(key)
     end
 end
 
-ns.AddOption(2, "Schadensmesser", {
+ns.AddOption(2, "DMG-Meter", {
     key = "dmShow",
-    label = "Schadensmesser anzeigen",
+    label = "DMG-Meter anzeigen",
     tooltip = "Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Bis zu 8 Balken mit Gesamtwert und Wert pro Sekunde, dein eigener Balken ist hervorgehoben. Oben schaltest du zwischen Schaden und Heilung um; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben.",
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("dmShow"),
 })
 
-ns.AddOption(2, "Schadensmesser", {
+ns.AddOption(2, "DMG-Meter", {
     key = "dmAutoReset",
     label = "Nach Instanz zurücksetzen",
-    tooltip = "Setzt den Schadensmesser zurück, sobald du einen Dungeon oder Schlachtzug verlässt. Im Chat erscheint dann eine kurze Meldung. Das betrifft auch Blizzards eigenen Schadensmesser, weil beide dieselben Daten nutzen.",
+    tooltip = "Setzt den DMG-Meter zurück, sobald du einen Dungeon oder Schlachtzug verlässt. Im Chat erscheint dann eine kurze Meldung. Das betrifft auch Blizzards eigenen Schadensmesser, weil beide dieselben Daten nutzen.",
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("dmAutoReset"),

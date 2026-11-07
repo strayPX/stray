@@ -26,7 +26,7 @@ ns.defaults = {
     questItemSellWarn = false,
     gossipSkip = false,
     freeSlots = false,
-    -- Schadensmesser
+    -- DMG-Meter
     dmShow = false,
     dmAutoReset = false,
     dmMode = "damage", -- "damage" oder "healing"

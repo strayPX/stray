@@ -42,8 +42,8 @@ Hinweis: WoW Forever versiegelt manche Bedrohungswerte. stray nutzt nur die lesb
 
 Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplaketten (Taste V).
 
-**Schadensmesser**
-- **Schadensmesser anzeigen:** Schaden oder Heilung, gesamt und pro Sekunde – für alles, den aktuellen Kampf oder einzelne Kämpfe; mit Zurücksetzen.
+**DMG-Meter**
+- **DMG-Meter anzeigen:** Schaden oder Heilung, gesamt und pro Sekunde – für alles, den aktuellen Kampf oder einzelne Kämpfe; mit Zurücksetzen.
 - **Nach Instanz zurücksetzen:** leert den Messer beim Verlassen eines Dungeons/Schlachtzugs.
 
 **Zaubern**
@@ -89,6 +89,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.16.1-alpha – Schadensmesser heißt jetzt DMG-Meter
 - 0.16.0-alpha – Gruppenrahmen: Heilvorhersage, Schilde, „Geschwächte Seele“
 - 0.15.0-alpha – Knopf „Anzeigen verschieben“ oben im stray-Fenster
 - 0.14.1-alpha – Gruppenrahmen: Helligkeit der Balken (Standard 60 %)
