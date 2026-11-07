@@ -89,9 +89,9 @@ Hinweis: Hat ein anderes Addon (z. B. Leatrix Plus oder Questie) die gleiche Aut
 
 ## Installation
 
-**Mit WowUp:** „Addons holen“ → „Von URL installieren“ → `https://github.com/strayfling/stray` einfügen. Fertig – Updates zeigt WowUp danach automatisch an.
+**Mit WowUp:** „Addons holen“ → „Von URL installieren“ → `https://github.com/strayPX/stray` einfügen. Fertig – Updates zeigt WowUp danach automatisch an.
 
-**Von Hand:** Die ZIP aus den [Releases](https://github.com/strayfling/stray/releases) entpacken, den Ordner `stray` nach `World of Warcraft\_forever_\Interface\AddOns\` kopieren und das Spiel neu starten.
+**Von Hand:** Die ZIP aus den [Releases](https://github.com/strayPX/stray/releases) entpacken, den Ordner `stray` nach `World of Warcraft\_forever_\Interface\AddOns\` kopieren und das Spiel neu starten.
 
 ## Lizenz
 
