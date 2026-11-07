@@ -1,6 +1,6 @@
 # stray
 
-Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` öffnet ein Fenster mit allen Optionen. Fährst du mit der Maus über eine Option, erklärt ein Tooltip, was sie macht. Alle Optionen sind anfangs aus.
+Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Minimap-Knopf öffnet das Einstellungsfenster: links die Bereiche und eine Suche, rechts die Optionen mit Schaltern und Kurzbeschreibung. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Alle Optionen sind anfangs aus (außer dem Minimap-Knopf).
 
 ## Optionen
 
@@ -28,13 +28,15 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` öffnet ein 
 - **Immer überspringen:** beendet Sequenzen und Videos automatisch.
 
 **Bedrohung**
-- **Bedrohungsliste:** Balken pro Gruppenmitglied für dein Ziel, wer hat Aggro, wer ist kurz davor. Bei offenem stray-Fenster mit Beispielwerten zum Verschieben. Alle Bedrohungsoptionen zeigen im Tooltip ein Beispielbild.
+- **Bedrohungsliste:** Balken pro Gruppenmitglied für dein Ziel, wer hat Aggro, wer ist kurz davor. Sortiert: wer Aggro hat zuerst. Bei offenem stray-Fenster mit Beispielwerten zum Verschieben. Alle Bedrohungsoptionen haben ein Beispielbild („Vorschau“).
 - **Rahmen an Namensplaketten:** rot = du hast Aggro, gelb = Aggro wechselt gleich, grün = keine Aggro.
 - **Prozent an Namensplaketten:** deine Bedrohung neben dem Lebensbalken, 0 % = keine, 100 % = Aggro.
+- **Tank-Warnung:** Verlierst du bei einem Gegner die Aggro, steht mittig, wen er jetzt angreift.
+- **Aggro-Warnung ab 90 %:** für Schaden und Heiler, bevor sie Aggro ziehen.
 
-Hinweis: WoW Forever gibt Bedrohungswerte im Kampf nur versiegelt an Addons weiter. stray zeigt sie trotzdem an, darf sie aber nicht auswerten – deshalb ist die Liste nicht nach Bedrohung sortiert (du stehst oben). Lässt ein Client auch das Anzeigen nicht zu, pausieren die Anzeigen mit einem Hinweis im Chat.
+Hinweis: WoW Forever versiegelt manche Bedrohungswerte. stray nutzt nur die lesbaren Abfragen; ist ein Wert doch versiegelt, wird er nur angezeigt oder ausgelassen (die Liste ist dann unsortiert), und ein Hinweis erscheint einmal im Chat.
 
-Rahmen und Prozent brauchen eingeschaltete gegnerische Namensplaketten (Taste V).
+Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplaketten (Taste V).
 
 **Kamera & Karte**
 - **Maximale Kamera-Entfernung:** so weit herauszoomen, wie das Spiel erlaubt.
@@ -66,6 +68,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.10.0-alpha – Neues Einstellungsfenster (Seitenleiste, Suche, Schalter, Vorschau); Bedrohung neu: lesbare Abfragen, sortierte Liste, Tank- und Aggro-Warnung zurück, ereignisbasiert
 - 0.9.0-alpha – Minimap-Knopf mit eigenem Symbol
 - 0.8.1-alpha – Tank- und Aggro-Warnung entfernt (in WoW Forever nicht möglich)
 - 0.8.0-alpha – Bedrohung trotz versiegelter Werte: Liste, Rahmen und Prozent zeigen die Werte über Blizzards Farbkurven an (Liste ohne Sortierung, experimentell)
