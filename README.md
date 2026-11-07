@@ -52,6 +52,7 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 **Gruppenrahmen**
 - **Gruppenrahmen anzeigen:** 5er-Gruppe als senkrechte Spalte mit Leben, Mana, entfernbaren Schwächungen und Reichweite; Breite, Höhe, Abstand per Schieberegler.
 - **Blizzards Gruppenrahmen ausblenden.**
+- **Heilvorhersage, Schilde, „Geschwächte Seele“:** immer Teil der Gruppenrahmen – laufende Heilung hellgrün, Schilde gestreift, Symbol mit Restzeit.
 
 **System**
 - **Bearbeiten:** alle eingeschalteten Anzeigen auf einmal verschieben (ohne Shift, mit Raster, Rechtsklick setzt zurück) – auch per `/stray edit`.
