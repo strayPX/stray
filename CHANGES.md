@@ -1,6 +1,7 @@
-# stray 0.14.1-alpha
+# stray 0.15.0-alpha
 
-**Verbessert**
-- **Gruppenrahmen weniger grell:** neuer Schieberegler „Helligkeit der Balken“ (Gruppe → Gruppenrahmen). Die Klassenfarben der Lebensbalken sind jetzt standardmäßig auf 60 % abgedunkelt – der Priester leuchtet nicht mehr weiß. 100 % = volle Klassenfarbe. Der Hintergrund der Kacheln ist leicht durchscheinend.
+**Neu**
+- **Griffleiste zum Verschieben:** Gruppenrahmen, Bedrohungsliste, Schadensmesser und Haltbarkeit haben oben eine schmale Leiste mit ihrem Namen. Daran ziehen verschiebt die Anzeige direkt – ohne Shift und ohne Bearbeiten-Modus. Rechtsklick setzt sie zurück. Im Kampf lässt sich nichts verschieben.
+- **Anzeigen sperren:** neuer Schalter unter System → Bearbeiten – blendet die Leisten aus, damit sich nichts aus Versehen verschiebt.
 
-**Hinweis:** `/reload` reicht. Die Testgruppe im stray-Fenster zeigt die Helligkeit sofort.
+**Hinweis:** `/reload` reicht.

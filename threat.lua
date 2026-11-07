@@ -369,7 +369,7 @@ local function MovableWarning(f, key, y, label, optionKey, sample)
             f.anim:Stop()
             f:Hide()
         end
-    end)
+    end, { grip = false })
 end
 MovableWarning(tankWarning, "tankwarn", -150, "Tank-Warnung", "threatTankWarn", "Aggro verloren: Defias-Späher greift Mira an")
 MovableWarning(aggroWarning, "aggrowarn", -190, "Aggro-Warnung", "threatAggroWarn", "Gleich ziehst du Aggro! 92 %")
