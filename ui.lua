@@ -16,6 +16,7 @@ local ROW_H = 48
 local MAX_ROWS = 7
 local CONTENT_PAD = 22
 
+local MEDIA = "Interface\\AddOns\\stray\\media\\"
 local FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local FONT_BODY = "Fonts\\ARIALN.TTF"
 
@@ -287,9 +288,58 @@ local closeButton = FlatButton(content, "Schließen", 96, true)
 closeButton:SetPoint("BOTTOMRIGHT")
 closeButton:SetScript("OnClick", function() frame:Hide() end)
 
-local reloadButton = FlatButton(content, "Neu laden", 96, false)
+-- „Neu laden“ sticht in Bernstein heraus; nach einer Änderung pulsiert er
+local AMBER = { 1, 0.722, 0.251, 1 }
+
+local reloadButton = FlatButton(content, "Neu laden", 104, false)
 reloadButton:SetPoint("RIGHT", closeButton, "LEFT", -8, 0)
 reloadButton:SetScript("OnClick", function() ReloadUI() end)
+Border(reloadButton, AMBER)
+reloadButton.text:SetTextColor(AMBER[1], AMBER[2], AMBER[3])
+local reloadFill = reloadButton:CreateTexture(nil, "BACKGROUND", nil, 1)
+reloadFill:SetAllPoints()
+reloadFill:SetColorTexture(AMBER[1], AMBER[2], AMBER[3], 0.10)
+
+local reloadGlow = reloadButton:CreateTexture(nil, "BACKGROUND", nil, 2)
+reloadGlow:SetPoint("TOPLEFT", -4, 4)
+reloadGlow:SetPoint("BOTTOMRIGHT", 4, -4)
+reloadGlow:SetColorTexture(AMBER[1], AMBER[2], AMBER[3], 0.35)
+reloadGlow:Hide()
+local reloadPulse = reloadGlow:CreateAnimationGroup()
+reloadPulse:SetLooping("BOUNCE")
+local pulseAlpha = reloadPulse:CreateAnimation("Alpha")
+pulseAlpha:SetFromAlpha(0.15)
+pulseAlpha:SetToAlpha(1)
+pulseAlpha:SetDuration(0.8)
+
+-- Wurde im Fenster etwas umgeschaltet? Dann beim Schließen Neuladen empfehlen.
+local dirty = false
+
+local function SetDirty(value)
+    dirty = value
+    if value then
+        footNote:SetText("Geändert – Neu laden empfohlen.")
+        footNote:SetTextColor(AMBER[1], AMBER[2], AMBER[3])
+        reloadGlow:Show()
+        reloadPulse:Play()
+    else
+        footNote:SetText("Änderungen gelten sofort.")
+        footNote:SetTextColor(0.365, 0.451, 0.576)
+        reloadPulse:Stop()
+        reloadGlow:Hide()
+    end
+end
+
+StaticPopupDialogs["STRAY_RELOAD"] = {
+    text = "stray: Du hast Einstellungen geändert.\nJetzt neu laden, damit alles sicher übernommen wird?",
+    button1 = "Neu laden",
+    button2 = "Später",
+    OnAccept = function() ReloadUI() end,
+    timeout = 0,
+    whileDead = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
 
 ---------------------------------------------------------------------------
 -- Bereiche aus dem Register sammeln
@@ -385,8 +435,7 @@ do
         b.dot = b:CreateTexture(nil, "ARTWORK")
         b.dot:SetSize(7, 7)
         b.dot:SetPoint("RIGHT", -14, 0)
-        b.dot:SetTexture("Interface\\Buttons\\WHITE8X8")
-        Round(b.dot)
+        b.dot:SetTexture(MEDIA .. "dot")
 
         b:SetScript("OnClick", function(self) SelectSection(self.section) end)
         table.insert(navButtons, b)
@@ -400,15 +449,25 @@ end
 
 local rows = {}
 
+-- Färbt eine Textur (z. B. die Pillenform) mit Verlauf, ohne die Textur zu ersetzen
+local function Tint(tex, c1, c2)
+    tex:SetVertexColor(c1[1], c1[2], c1[3], c1[4] or 1)
+    if CreateColor then
+        pcall(tex.SetGradient, tex, "HORIZONTAL",
+            CreateColor(c1[1], c1[2], c1[3], c1[4] or 1), CreateColor(c2[1], c2[2], c2[3], c2[4] or 1))
+    end
+end
+
+local SWITCH_OFF = { 0.149, 0.204, 0.290, 1 }
+
 local function SetSwitch(switch, on, enabled)
+    switch.knob:ClearAllPoints()
     if on then
-        Gradient(switch.track, "HORIZONTAL", C.accentDim, C.accent)
-        switch.knob:ClearAllPoints()
+        Tint(switch.track, C.accentDim, C.accent)
         switch.knob:SetPoint("RIGHT", -2, 0)
         switch.knob:SetVertexColor(1, 1, 1, 1)
     else
-        Color(switch.track, { 0.149, 0.204, 0.290, 1 })
-        switch.knob:ClearAllPoints()
+        Tint(switch.track, SWITCH_OFF, SWITCH_OFF)
         switch.knob:SetPoint("LEFT", 2, 0)
         switch.knob:SetVertexColor(0.486, 0.565, 0.678, 1)
     end
@@ -461,16 +520,17 @@ local function CreateRow(i)
     switch:SetPoint("RIGHT", 0, 0)
     switch.track = switch:CreateTexture(nil, "ARTWORK")
     switch.track:SetAllPoints()
+    switch.track:SetTexture(MEDIA .. "pill")
     switch.knob = switch:CreateTexture(nil, "OVERLAY")
     switch.knob:SetSize(14, 14)
-    switch.knob:SetTexture("Interface\\Buttons\\WHITE8X8")
-    Round(switch.knob)
+    switch.knob:SetTexture(MEDIA .. "dot")
     switch:SetScript("OnClick", function()
         local option = row.option
         if not option or not OptionEnabled(option) then return end
         local value = not option.get()
         ns.Sound(value and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
         option.set(value)
+        SetDirty(true)
         Refresh()
     end)
     switch:SetScript("OnEnter", function() ShowTooltip(row) end)
@@ -606,6 +666,11 @@ frame:SetScript("OnShow", function()
 end)
 frame:SetScript("OnHide", function()
     ns.Sound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
+    -- Egal wie geschlossen wird (X, „Schließen“, Esc): nach Änderungen Neuladen empfehlen
+    if dirty then
+        SetDirty(false)
+        StaticPopup_Show("STRAY_RELOAD")
+    end
     search:ClearFocus()
     preview:Hide()
     GameTooltip:Hide()
