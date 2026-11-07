@@ -1,42 +1,109 @@
--- stray – Bedrohung: Liste, Rahmen an Namensplaketten, Tank- und Aggro-Warnung
--- Nutzt die Bedrohungswerte, die der Server liefert (UnitDetailedThreatSituation / UnitThreatSituation).
+-- stray – Bedrohung: Liste und Anzeige an Namensplaketten
+--
+-- WoW Forever liefert Bedrohungswerte im Kampf als „geheime Werte“ (secret values).
+-- Addons dürfen sie nicht vergleichen, nicht damit rechnen und nicht als Bedingung testen.
+-- Erlaubt ist nur, sie an Anzeige-Funktionen weiterzureichen (Text, Balken) oder über
+-- Blizzards Farbkurven (C_CurveUtil) in eine Farbe zu verwandeln. Genau das macht dieses Modul:
+-- Es zeigt die Werte an, ohne sie je selbst auszuwerten. Jeder Anzeige-Schritt läuft in pcall;
+-- klappt einer nicht, bleibt die Anzeige leer statt Fehler zu werfen.
 
 local _, ns = ...
 
-local HAS_API = (UnitDetailedThreatSituation and UnitThreatSituation) and true or false
+local HAS_API = UnitDetailedThreatSituation and true or false
 local NO_API = "Diese Spielversion liefert keine Bedrohungswerte."
-
-local function ApiAvailable() return HAS_API end
-
--- WoW Forever liefert Bedrohungswerte im Kampf als „geheime Werte“ (secret values).
--- Addons dürfen sie nicht vergleichen oder damit rechnen, sonst bricht WoW mit einem Fehler ab.
--- Deshalb vor jeder Auswertung prüfen und versiegelte Werte in Ruhe lassen.
-local function IsSecret(value)
-    if not issecretvalue then return false end
-    local ok, secret = pcall(issecretvalue, value)
-    return ok and secret == true
-end
-
-local function AnySecret(...)
-    for i = 1, select("#", ...) do
-        if IsSecret((select(i, ...))) then return true end
-    end
-    return false
-end
-
-local lockedNoticeShown = false
-
-local function NoticeLocked()
-    if lockedNoticeShown then return end
-    lockedNoticeShown = true
-    ns.Print("WoW Forever gibt Bedrohungswerte im Kampf nicht an Addons weiter. Die Bedrohungsanzeigen pausieren deshalb.")
-end
-
-local WARNINGS_POSSIBLE = false -- Tank- und Aggro-Warnung brauchen Vergleiche, in Forever gesperrt
 local NO_WARNINGS = "In WoW Forever nicht möglich: Das Spiel gibt Bedrohungswerte im Kampf nur versiegelt an Addons weiter, und diese Warnung müsste sie vergleichen."
 
-local function PlaySoundMaster(kit)
-    if kit then PlaySound(kit, "Master") end
+local function ApiAvailable() return HAS_API end
+local function NeverAvailable() return false end
+
+local IsSecret = ns.IsSecret
+
+local noticeShown = {}
+
+-- Einmaliger Hinweis je Teil, falls die Anzeige versiegelter Werte im Client nicht klappt
+local function NoticeLocked(part)
+    if noticeShown[part] then return end
+    noticeShown[part] = true
+    ns.Print(("WoW Forever lässt die Bedrohungswerte im Kampf hier nicht anzeigen – „%s“ pausiert deshalb."):format(part))
+end
+
+-- Steht die Einheit auf der Bedrohungsliste? Ein versiegelter Status heißt „ja“;
+-- ein unversiegeltes nil heißt „nein“. Der Wert selbst wird dabei nie ausgewertet.
+local function OnThreatList(status)
+    return IsSecret(status) or status ~= nil
+end
+
+---------------------------------------------------------------------------
+-- Farben: Tabellen für normale Werte, Farbkurven für versiegelte
+---------------------------------------------------------------------------
+
+local GREEN, YELLOW, ORANGE, RED = { 0.25, 0.9, 0.25 }, { 1, 0.85, 0 }, { 1, 0.55, 0.1 }, { 1, 0.15, 0.15 }
+
+-- Status 3 = du hast sicher Aggro, 2 = du hast Aggro, jemand liegt vorn,
+-- 1 = du liegst vorn, hast aber noch keine Aggro, 0 = keine Aggro
+local STATUS_POINTS = { { 0, GREEN }, { 1, YELLOW }, { 3, RED } }
+-- Prozent bis zur Aggro (Liste und Plaketten-Zahl)
+local PERCENT_POINTS = { { 0, GREEN }, { 70, YELLOW }, { 90, ORANGE }, { 100, RED } }
+
+local function PlainColor(points, value)
+    local color = points[1][2]
+    for _, point in ipairs(points) do
+        if value >= point[1] then color = point[2] end
+    end
+    return color
+end
+
+local function NewStepCurve(points)
+    if not (C_CurveUtil and C_CurveUtil.CreateColorCurve and CreateColor) then return nil end
+    local ok, curve = pcall(C_CurveUtil.CreateColorCurve)
+    if not ok or type(curve) ~= "table" and type(curve) ~= "userdata" then return nil end
+    if Enum and Enum.LuaCurveType and Enum.LuaCurveType.Step and curve.SetType then
+        pcall(curve.SetType, curve, Enum.LuaCurveType.Step)
+    end
+    for _, point in ipairs(points) do
+        local c = point[2]
+        if not pcall(curve.AddPoint, curve, point[1], CreateColor(c[1], c[2], c[3], 1)) then
+            return nil
+        end
+    end
+    return curve
+end
+
+local statusCurve = NewStepCurve(STATUS_POINTS)
+local percentCurve = NewStepCurve(PERCENT_POINTS)
+
+-- Gibt ok, r, g, b zurück; r, g, b können versiegelt sein und werden nur weitergereicht
+local function CurveColor(curve, value)
+    if not curve then return false end
+    if curve.EvaluateUnpacked then
+        local ok, r, g, b = pcall(curve.EvaluateUnpacked, curve, value)
+        if ok then return true, r, g, b end
+    end
+    local ok, color = pcall(curve.Evaluate, curve, value)
+    if not ok or type(color) ~= "table" then return false end
+    local okRGB, r, g, b = pcall(function() return color:GetRGB() end)
+    if not okRGB then return false end
+    return true, r, g, b
+end
+
+local function ColorFor(points, curve, value)
+    if not IsSecret(value) then
+        if type(value) ~= "number" then return false end
+        local c = PlainColor(points, value)
+        return true, c[1], c[2], c[3]
+    end
+    return CurveColor(curve, value)
+end
+
+-- Prozentzahl in einen Text schreiben (versiegelt: nur formatieren, nie rechnen)
+local function SetPercentText(fontString, value)
+    if not IsSecret(value) then
+        if type(value) ~= "number" then return false end
+        fontString:SetText(("%.0f %%"):format(value))
+        return true
+    end
+    if pcall(fontString.SetFormattedText, fontString, "%.0f %%", value) then return true end
+    return pcall(function() fontString:SetText(string.format("%.0f %%", value)) end)
 end
 
 ---------------------------------------------------------------------------
@@ -83,22 +150,17 @@ end
 list:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText("Bedrohung", 1, 1, 1)
-    GameTooltip:AddLine("Prozent = wie nah jemand daran ist, die Aggro zu ziehen.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:AddLine("Prozent = wie nah jemand daran ist, die Aggro zu ziehen. 100 % = hat die Aggro.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:AddLine("Reihenfolge fest (du zuerst), weil WoW Forever das Sortieren nach Bedrohung nicht erlaubt.", 0.7, 0.7, 0.7, true)
     GameTooltip:AddLine("Shift + ziehen zum Verschieben", 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end)
 list:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-local function BarColor(entry)
-    if entry.tanking then return 0.8, 0.12, 0.12 end -- hat Aggro
-    if entry.pct >= 90 then return 0.85, 0.45, 0.1 end -- knapp
-    if entry.pct >= 70 then return 0.8, 0.65, 0.15 end -- aufpassen
-    return 0.3, 0.6, 0.18 -- sicher
-end
-
 local function NameColor(unit)
     if not unit or not UnitIsPlayer(unit) then return 1, 1, 1 end
     local _, class = UnitClass(unit)
+    class = ns.Public(class)
     local color = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
     if color then return color.r, color.g, color.b end
     return 1, 1, 1
@@ -106,14 +168,18 @@ end
 
 local function GroupUnits()
     local units = {}
+    -- Du (und dein Begleiter) immer zuerst
+    units[1] = "player"
+    if UnitExists("pet") then units[#units + 1] = "pet" end
     if IsInRaid() then
         for i = 1, GetNumGroupMembers() do
-            units[#units + 1] = "raid" .. i
-            if UnitExists("raidpet" .. i) then units[#units + 1] = "raidpet" .. i end
+            local unit, pet = "raid" .. i, "raidpet" .. i
+            if not UnitIsUnit(unit, "player") then
+                units[#units + 1] = unit
+                if UnitExists(pet) then units[#units + 1] = pet end
+            end
         end
     else
-        units[1] = "player"
-        if UnitExists("pet") then units[#units + 1] = "pet" end
         for i = 1, GetNumSubgroupMembers() do
             units[#units + 1] = "party" .. i
             if UnitExists("partypet" .. i) then units[#units + 1] = "partypet" .. i end
@@ -126,37 +192,40 @@ local function IsEnemy(unit)
     return UnitExists(unit) and UnitCanAttack("player", unit) and not UnitIsDead(unit)
 end
 
+-- Feste Reihenfolge: Sortieren hieße vergleichen, und das ist bei versiegelten Werten verboten
 local function CollectThreat(mob)
     local entries = {}
     for _, unit in ipairs(GroupUnits()) do
         if UnitExists(unit) then
-            local isTanking, status, scaled = UnitDetailedThreatSituation(unit, mob)
-            if AnySecret(isTanking, status, scaled) then
-                NoticeLocked()
-            elseif status then -- nil = steht nicht auf der Bedrohungsliste
-                entries[#entries + 1] = {
-                    unit = unit,
-                    name = ns.Public(UnitName(unit)),
-                    tanking = isTanking and true or false,
-                    pct = isTanking and 100 or math.min(scaled or 0, 100),
-                }
+            local _, status, scaled = UnitDetailedThreatSituation(unit, mob)
+            if OnThreatList(status) then
+                entries[#entries + 1] = { unit = unit, name = ns.Public(UnitName(unit)), pct = scaled }
             end
         end
     end
-    table.sort(entries, function(a, b)
-        if a.tanking ~= b.tanking then return a.tanking end
-        return a.pct > b.pct
-    end)
     return entries
 end
 
 local function DemoEntries()
     return {
-        { unit = "player", name = (UnitName("player") or "Du"), tanking = true, pct = 100 },
-        { name = "Beispiel-Magier", tanking = false, pct = 92 },
-        { name = "Beispiel-Jäger", tanking = false, pct = 71 },
-        { name = "Beispiel-Heiler", tanking = false, pct = 44 },
+        { unit = "player", name = ns.Public(UnitName("player")) or "Du", pct = 100 },
+        { name = "Beispiel-Magier", pct = 92 },
+        { name = "Beispiel-Jäger", pct = 71 },
+        { name = "Beispiel-Heiler", pct = 44 },
     }
+end
+
+local function FillRow(bar, entry)
+    bar.name:SetText(entry.name or "?")
+    bar.name:SetTextColor(NameColor(entry.unit))
+    -- Klappt der Balken nicht, bleibt er leer; die Prozentzahl reicht dann
+    if not pcall(bar.SetValue, bar, entry.pct) then bar:SetValue(0) end
+    local okText = SetPercentText(bar.pct, entry.pct)
+    local okColor, r, g, b = ColorFor(PERCENT_POINTS, percentCurve, entry.pct)
+    if not (okColor and pcall(bar.SetStatusBarColor, bar, r, g, b)) then
+        bar:SetStatusBarColor(0.5, 0.5, 0.5)
+    end
+    return okText
 end
 
 local function UpdateList()
@@ -180,76 +249,60 @@ local function UpdateList()
 
     header:SetText("Bedrohung · " .. (title or "?"))
     local shown = math.min(#entries, MAX_ROWS)
+    local allOk = true
     for i = 1, MAX_ROWS do
-        local bar, entry = rows[i], entries[i]
+        local bar = rows[i]
         if i <= shown then
-            bar:SetValue(entry.pct)
-            bar:SetStatusBarColor(BarColor(entry))
-            bar.name:SetText(entry.name or "?")
-            bar.name:SetTextColor(NameColor(entry.unit))
-            bar.pct:SetText(("%d %%"):format(math.floor(entry.pct + 0.5)))
+            if not FillRow(bar, entries[i]) then allOk = false end
             bar:Show()
         else
             bar:Hide()
         end
+    end
+    if not allOk then
+        NoticeLocked("Bedrohungsliste")
+        list:Hide()
+        return
     end
     list:SetHeight(28 + shown * (ROW_H + ROW_GAP))
     list:Show()
 end
 
 ---------------------------------------------------------------------------
--- Warnungen in der Bildschirmmitte
+-- Namensplaketten: Rahmen und Prozent
 ---------------------------------------------------------------------------
 
-local function CreateWarning(y, r, g, b, size)
-    local f = CreateFrame("Frame", nil, UIParent)
-    f:SetSize(900, 40)
-    f:SetPoint("TOP", UIParent, "TOP", 0, y)
-    f:SetFrameStrata("HIGH")
-    f:Hide()
-
-    f.text = f:CreateFontString(nil, "OVERLAY")
-    f.text:SetFont(STANDARD_TEXT_FONT, size, "OUTLINE")
-    f.text:SetTextColor(r, g, b)
-    f.text:SetPoint("CENTER")
-
-    f.anim = f:CreateAnimationGroup()
-    local fade = f.anim:CreateAnimation("Alpha")
-    fade:SetFromAlpha(1)
-    fade:SetToAlpha(0)
-    fade:SetStartDelay(2)
-    fade:SetDuration(0.6)
-    f.anim:SetScript("OnFinished", function() f:Hide() end)
-    return f
-end
-
-local tankWarning = CreateWarning(-150, 1, 0.23, 0.23, 24)
-local aggroWarning = CreateWarning(-190, 1, 0.69, 0.13, 19)
-
-local function ShowWarning(f, message, sound)
-    f.anim:Stop()
-    f.text:SetText(message)
-    f:SetAlpha(1)
-    f:Show()
-    f.anim:Play()
-    PlaySoundMaster(sound)
-end
-
----------------------------------------------------------------------------
--- Namensplaketten und Tank-Warnung
----------------------------------------------------------------------------
-
--- Status von UnitThreatSituation: 3 = du hast sicher Aggro, 2 = du hast Aggro, aber jemand
--- liegt vorn, 1 = du liegst vorn, hast aber noch keine Aggro, 0 = keine Aggro, nil = nicht auf der Liste
-local PLATE_COLORS = {
-    [3] = { 1, 0.15, 0.15 },
-    [2] = { 1, 0.85, 0 },
-    [1] = { 1, 0.85, 0 },
-    [0] = { 0.25, 0.9, 0.25 },
-}
-
--- Plakette → { border = Rahmen, text = Prozentzahl }
+-- Plakette → { border = { Rahmen, Kanten }, text = Prozentzahl }
 local decorations = setmetatable({}, { __mode = "k" })
+
+local function CreateBorder(health)
+    local frame = CreateFrame("Frame", nil, health)
+    frame:SetPoint("TOPLEFT", health, "TOPLEFT", -2, 2)
+    frame:SetPoint("BOTTOMRIGHT", health, "BOTTOMRIGHT", 2, -2)
+    local edges = {}
+    local function Edge(p1, p2, horizontal)
+        local t = frame:CreateTexture(nil, "OVERLAY")
+        t:SetColorTexture(1, 1, 1, 1)
+        t:SetPoint(p1, frame, p1)
+        t:SetPoint(p2, frame, p2)
+        if horizontal then t:SetHeight(2) else t:SetWidth(2) end
+        edges[#edges + 1] = t
+    end
+    Edge("TOPLEFT", "TOPRIGHT", true)
+    Edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
+    Edge("TOPLEFT", "BOTTOMLEFT", false)
+    Edge("TOPRIGHT", "BOTTOMRIGHT", false)
+    frame.edges = edges
+    frame:Hide()
+    return frame
+end
+
+local function ColorBorder(border, r, g, b)
+    for _, edge in ipairs(border.edges) do
+        if not pcall(edge.SetVertexColor, edge, r, g, b) then return false end
+    end
+    return true
+end
 
 local function GetDecoration(plate)
     if decorations[plate] then return decorations[plate] end
@@ -257,13 +310,7 @@ local function GetDecoration(plate)
     local health = unitFrame and (unitFrame.healthBar or unitFrame.HealthBar)
     if not health then return end
 
-    local border = CreateFrame("Frame", nil, health, ns.BACKDROP_TEMPLATE)
-    border:SetPoint("TOPLEFT", health, "TOPLEFT", -2, 2)
-    border:SetPoint("BOTTOMRIGHT", health, "BOTTOMRIGHT", 2, -2)
-    if border.SetBackdrop then
-        border:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8X8", edgeSize = 2 })
-    end
-    border:Hide()
+    local border = CreateBorder(health)
 
     local holder = CreateFrame("Frame", nil, health)
     holder:SetAllPoints(health)
@@ -287,31 +334,34 @@ local function UpdatePlate(plate, unit)
     if not deco then return end
 
     local showBorder, showText = ns.db.threatPlates, ns.db.threatPercent
-    local status, pct
+    local status, scaled
     if (showBorder or showText) and unit and UnitCanAttack("player", unit) then
-        local isTanking, detailStatus, scaled = UnitDetailedThreatSituation("player", unit)
-        if AnySecret(isTanking, detailStatus, scaled) then
-            NoticeLocked()
-        else
-            status = detailStatus
-            if status then pct = isTanking and 100 or math.min(scaled or 0, 100) end
-        end
+        local _
+        _, status, scaled = UnitDetailedThreatSituation("player", unit)
     end
-    local color = status and PLATE_COLORS[status]
+    if not OnThreatList(status) then
+        deco.border:Hide()
+        deco.text:Hide()
+        return
+    end
 
-    if showBorder and color then
-        deco.border:SetBackdropBorderColor(color[1], color[2], color[3], 1)
+    local okColor, r, g, b = ColorFor(STATUS_POINTS, statusCurve, status)
+
+    if showBorder and okColor and ColorBorder(deco.border, r, g, b) then
         deco.border:Show()
     else
         deco.border:Hide()
+        if showBorder then NoticeLocked("Rahmen an Namensplaketten") end
     end
 
-    if showText and color and pct then
-        deco.text:SetText(("%d %%"):format(math.floor(pct + 0.5)))
-        deco.text:SetTextColor(color[1], color[2], color[3])
+    if showText and SetPercentText(deco.text, scaled) then
+        if not (okColor and pcall(deco.text.SetTextColor, deco.text, r, g, b)) then
+            deco.text:SetTextColor(1, 1, 1)
+        end
         deco.text:Show()
     else
         deco.text:Hide()
+        if showText then NoticeLocked("Prozent an Namensplaketten") end
     end
 end
 
@@ -319,49 +369,12 @@ local function HideDecorations(part)
     for _, deco in pairs(decorations) do deco[part]:Hide() end
 end
 
-local lastStatus, lastWarn = {}, {}
-
-local function CheckLost(unit)
-    if not IsEnemy(unit) then return end
-    local guid = UnitGUID(unit)
-    if not guid then return end
-    local status = UnitThreatSituation("player", unit)
-    local previous = lastStatus[guid]
-    lastStatus[guid] = status
-    if not ns.db.threatTankWarn then return end
-    if previous and previous >= 2 and status and status < 2 then
-        local now = GetTime()
-        if (lastWarn[guid] or 0) + 3 > now then return end
-        lastWarn[guid] = now
-        local mob = UnitName(unit) or "?"
-        local victim = UnitName(unit .. "target")
-        -- Kein Pfeilzeichen: die WoW-Schrift kennt es nicht
-        local message = victim and ("Aggro verloren: %s greift %s an"):format(mob, victim) or ("Aggro verloren: %s"):format(mob)
-        ShowWarning(tankWarning, message, SOUNDKIT.RAID_WARNING)
+local function UpdatePlates()
+    if not (ns.db.threatPlates or ns.db.threatPercent) then return end
+    if not (C_NamePlate and C_NamePlate.GetNamePlates) then return end
+    for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
+        pcall(UpdatePlate, plate, PlateUnit(plate))
     end
-end
-
-local function UpdateEnemies()
-    local doPlates = ns.db.threatPlates or ns.db.threatPercent
-    local doTank = WARNINGS_POSSIBLE and ns.db.threatTankWarn
-    if not doPlates and not doTank then return end
-    local seen = {}
-    if C_NamePlate and C_NamePlate.GetNamePlates then
-        for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
-            local unit = PlateUnit(plate)
-            if doPlates then pcall(UpdatePlate, plate, unit) end
-            if unit and doTank then
-                local guid = UnitGUID(unit)
-                if guid and not seen[guid] then
-                    seen[guid] = true
-                    CheckLost(unit)
-                end
-            end
-        end
-    end
-    -- Das aktuelle Ziel auch ohne sichtbare Plakette prüfen
-    local targetGUID = UnitGUID("target")
-    if doTank and targetGUID and not seen[targetGUID] then CheckLost("target") end
 end
 
 ns.On("NAME_PLATE_UNIT_ADDED", function(unit)
@@ -380,38 +393,6 @@ ns.On("NAME_PLATE_UNIT_REMOVED", function(unit)
 end)
 
 ---------------------------------------------------------------------------
--- Aggro-Warnung für Schaden und Heiler
----------------------------------------------------------------------------
-
-local armed = true
-
-local function CheckAggro()
-    if not WARNINGS_POSSIBLE or not ns.db.threatAggroWarn then return end
-    if not IsEnemy("target") then
-        armed = true
-        return
-    end
-    -- Tankt das eigene Begleittier (Jäger, Hexenmeister), ist hohe Bedrohung gewollt
-    if UnitExists("pet") and UnitIsUnit("targettarget", "pet") then return end
-    local isTanking, _, scaled = UnitDetailedThreatSituation("player", "target")
-    if isTanking or not scaled then return end
-    if scaled >= 90 and armed then
-        armed = false
-        ShowWarning(aggroWarning, ("Gleich ziehst du Aggro! %d %%"):format(math.floor(scaled)), SOUNDKIT.RAID_WARNING)
-    elseif scaled < 80 then
-        armed = true
-    end
-end
-
-ns.On("PLAYER_TARGET_CHANGED", function() armed = true end)
-
-ns.On("PLAYER_REGEN_ENABLED", function()
-    wipe(lastStatus)
-    wipe(lastWarn)
-    armed = true
-end)
-
----------------------------------------------------------------------------
 -- Takt: fünfmal pro Sekunde aktualisieren
 ---------------------------------------------------------------------------
 
@@ -422,10 +403,8 @@ driver:SetScript("OnUpdate", function(_, delta)
     if elapsed < 0.2 then return end
     elapsed = 0
     if not HAS_API or not ns.db then return end
-    -- pcall: Ein unerwarteter versiegelter Wert darf nicht fünfmal pro Sekunde Fehler auslösen
     pcall(UpdateList)
-    pcall(UpdateEnemies)
-    pcall(CheckAggro)
+    pcall(UpdatePlates)
 end)
 
 ns.OnConfig(function() pcall(UpdateList) end)
@@ -442,12 +421,12 @@ ns.AddOption(2, "Bedrohung", {
     key = "threatList",
     preview = "threat_list",
     label = "Bedrohungsliste",
-    tooltip = "Kleines Fenster mit einem Balken pro Gruppenmitglied für dein aktuelles Ziel: Wer hat Aggro, wer ist kurz davor? Außerhalb des Kampfes ist es ausgeblendet.\n\nSolange das stray-Fenster offen ist, zeigt die Liste Beispielwerte – dann kannst du sie mit Shift + linker Maustaste verschieben.",
+    tooltip = "Kleines Fenster mit einem Balken pro Gruppenmitglied für dein aktuelles Ziel: 100 % = hat die Aggro, je näher an 100 %, desto knapper. Die Reihenfolge ist fest (du zuerst), weil WoW Forever das Sortieren nach Bedrohung nicht erlaubt. Außerhalb des Kampfes ist es ausgeblendet.\n\nSolange das stray-Fenster offen ist, zeigt die Liste Beispielwerte – dann kannst du sie mit Shift + linker Maustaste verschieben.",
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = function(value)
         ns.db.threatList = value
-        UpdateList()
+        pcall(UpdateList)
     end,
 })
 
@@ -481,8 +460,8 @@ ns.AddOption(2, "Bedrohung", {
     key = "threatTankWarn",
     preview = "threat_tankwarn",
     label = "Tank-Warnung",
-    tooltip = "Verlierst du bei einem Gegner die Aggro, steht groß in der Bildschirmmitte, wen er jetzt angreift – mit Warnton.\n\nPrüft dein Ziel und alle Gegner mit sichtbarer Namensplakette (Taste V).",
-    isEnabled = function() return HAS_API and WARNINGS_POSSIBLE end,
+    tooltip = "Verlierst du bei einem Gegner die Aggro, steht groß in der Bildschirmmitte, wen er jetzt angreift – mit Warnton.",
+    isEnabled = NeverAvailable,
     disabledHint = NO_WARNINGS,
 })
 
@@ -490,7 +469,7 @@ ns.AddOption(2, "Bedrohung", {
     key = "threatAggroWarn",
     preview = "threat_aggrowarn",
     label = "Aggro-Warnung ab 90 %",
-    tooltip = "Für Schaden und Heiler: Erreichst du 90 % der Bedrohung, die zum Aggroziehen nötig ist, erscheint „Gleich ziehst du Aggro!“ – Zeit, langsamer zu machen. Wer die Aggro schon hat, bekommt keine Warnung.",
-    isEnabled = function() return HAS_API and WARNINGS_POSSIBLE end,
+    tooltip = "Für Schaden und Heiler: Erreichst du 90 % der Bedrohung, die zum Aggroziehen nötig ist, erscheint „Gleich ziehst du Aggro!“.",
+    isEnabled = NeverAvailable,
     disabledHint = NO_WARNINGS,
 })

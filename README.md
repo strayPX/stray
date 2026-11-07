@@ -33,7 +33,7 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` öffnet ein 
 - **Prozent an Namensplaketten:** deine Bedrohung neben dem Lebensbalken, 0 % = keine, 100 % = Aggro.
 - **Tank-Warnung** und **Aggro-Warnung ab 90 %:** in WoW Forever derzeit nicht möglich und deshalb ausgegraut.
 
-Hinweis: WoW Forever gibt Bedrohungswerte im Kampf nur versiegelt an Addons weiter. Die Bedrohungsanzeigen pausieren dann (Hinweis im Chat).
+Hinweis: WoW Forever gibt Bedrohungswerte im Kampf nur versiegelt an Addons weiter. stray zeigt sie trotzdem an, darf sie aber nicht auswerten – deshalb ist die Liste nicht nach Bedrohung sortiert (du stehst oben). Lässt ein Client auch das Anzeigen nicht zu, pausieren die Anzeigen mit einem Hinweis im Chat.
 
 Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplaketten (Taste V).
 
@@ -66,6 +66,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.8.0-alpha – Bedrohung trotz versiegelter Werte: Liste, Rahmen und Prozent zeigen die Werte über Blizzards Farbkurven an (Liste ohne Sortierung, experimentell)
 - 0.7.1-alpha – Notfix: Forever versiegelt Bedrohungswerte im Kampf (Fehlerflut behoben); Tank- und Aggro-Warnung deaktiviert; weitere Absicherungen gegen versiegelte Werte
 - 0.7.0-alpha – Beispielbilder im Tooltip der Bedrohungsoptionen
 - 0.6.0-alpha – Prozentanzeige an Namensplaketten
