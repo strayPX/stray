@@ -255,6 +255,21 @@ closeHover:SetAllPoints()
 closeHover:SetColorTexture(1, 1, 1, 0.07)
 close:SetScript("OnClick", function() frame:Hide() end)
 
+-- Auffälliger Knopf oben: startet direkt den Bearbeiten-Modus (alle Anzeigen verschieben)
+local moveButton = FlatButton(content, "Anzeigen verschieben", 150, true)
+moveButton:SetHeight(24)
+moveButton:SetPoint("RIGHT", close, "LEFT", -8, 0)
+moveButton:SetScript("OnClick", function()
+    if ns.EnterEditMode then ns.EnterEditMode() end
+end)
+moveButton:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+    GameTooltip:SetText("Anzeigen verschieben", 1, 1, 1)
+    GameTooltip:AddLine("Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein. Fertig oben in der Leiste beendet den Modus.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:Show()
+end)
+moveButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
 local headLine = Line(content, C.line)
 headLine:SetPoint("TOPLEFT", 0, -56); headLine:SetPoint("TOPRIGHT", 0, -56); headLine:SetHeight(1)
 
