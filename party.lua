@@ -19,7 +19,8 @@ local Public = ns.Public
 local POWER_H = 4
 local MAX_TILES = 5
 local FADED = 0.4
-local BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
+-- Flache, einfarbige Balken (Design A, Leon 07.11.2026) – keine Streifen/Glanz der Blizzard-Textur
+local BAR_TEXTURE = "Interface\\Buttons\\WHITE8X8"
 
 local FALLBACK_DEBUFF_COLORS = {
     Magic   = { r = 0.20, g = 0.60, b = 1.00 },
