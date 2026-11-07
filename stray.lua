@@ -25,13 +25,11 @@ ns.defaults = {
     threatList = false,
     threatPlates = false,
     threatPercent = false,
-    threatTankWarn = false,
-    threatAggroWarn = false,
     positions = {}, -- verschobene Anzeigen: [Schlüssel] = { Punkt, relPunkt, x, y }
 }
 
--- Einstellungen, die es nicht mehr gibt (Flugzeit, entfernt in 0.4.0-alpha)
-local REMOVED_KEYS = { "flightTimer", "flightTimes" }
+-- Einstellungen, die es nicht mehr gibt (Flugzeit 0.4.0-alpha, Tank-/Aggro-Warnung 0.8.1-alpha)
+local REMOVED_KEYS = { "flightTimer", "flightTimes", "threatTankWarn", "threatAggroWarn" }
 
 ns.GOLD = { 1, 0.82, 0 }
 ns.GOLD_DARK = { 0.79, 0.64, 0.29 }

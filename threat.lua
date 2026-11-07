@@ -1,4 +1,5 @@
 -- stray – Bedrohung: Liste und Anzeige an Namensplaketten
+-- (Tank- und Aggro-Warnung wurden in 0.8.1-alpha entfernt: sie müssten versiegelte Werte vergleichen.)
 --
 -- WoW Forever liefert Bedrohungswerte im Kampf als „geheime Werte“ (secret values).
 -- Addons dürfen sie nicht vergleichen, nicht damit rechnen und nicht als Bedingung testen.
@@ -11,10 +12,8 @@ local _, ns = ...
 
 local HAS_API = UnitDetailedThreatSituation and true or false
 local NO_API = "Diese Spielversion liefert keine Bedrohungswerte."
-local NO_WARNINGS = "In WoW Forever nicht möglich: Das Spiel gibt Bedrohungswerte im Kampf nur versiegelt an Addons weiter, und diese Warnung müsste sie vergleichen."
 
 local function ApiAvailable() return HAS_API end
-local function NeverAvailable() return false end
 
 local IsSecret = ns.IsSecret
 
@@ -454,22 +453,4 @@ ns.AddOption(2, "Bedrohung", {
         ns.db.threatPercent = value
         if not value then HideDecorations("text") end
     end,
-})
-
-ns.AddOption(2, "Bedrohung", {
-    key = "threatTankWarn",
-    preview = "threat_tankwarn",
-    label = "Tank-Warnung",
-    tooltip = "Verlierst du bei einem Gegner die Aggro, steht groß in der Bildschirmmitte, wen er jetzt angreift – mit Warnton.",
-    isEnabled = NeverAvailable,
-    disabledHint = NO_WARNINGS,
-})
-
-ns.AddOption(2, "Bedrohung", {
-    key = "threatAggroWarn",
-    preview = "threat_aggrowarn",
-    label = "Aggro-Warnung ab 90 %",
-    tooltip = "Für Schaden und Heiler: Erreichst du 90 % der Bedrohung, die zum Aggroziehen nötig ist, erscheint „Gleich ziehst du Aggro!“.",
-    isEnabled = NeverAvailable,
-    disabledHint = NO_WARNINGS,
 })
