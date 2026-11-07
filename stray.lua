@@ -49,6 +49,10 @@ ns.defaults = {
     abSize = 36,
     abSpacing = 2,
     abKeybinds = true,
+    -- je Leiste 1–5: anzeigen, Knopfgröße, Knöpfe pro Reihe (Standard: Leisten 1–4 an, 12 pro Reihe)
+    abShow1 = true, abShow2 = true, abShow3 = true, abShow4 = true, abShow5 = false,
+    abSize1 = 36, abSize2 = 36, abSize3 = 36, abSize4 = 36, abSize5 = 36,
+    abCols1 = 12, abCols2 = 12, abCols3 = 12, abCols4 = 12, abCols5 = 12,
     -- Abklingzeiten (cooldowns.lua)
     cdManager = false,
     cdSize = 36,

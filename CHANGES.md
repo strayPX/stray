@@ -1,7 +1,7 @@
 # stray 0.18.0-alpha
 
 **Neu – große Oberflächen-Erweiterung** (alles anfangs aus, einzeln einschaltbar)
-- **Eigene Aktionsleisten** (Kampf → Aktionsleisten): 4 Leisten mit je 12 Knöpfen statt Blizzards Leisten – schlicht, quadratisch, ohne Greifen und Hintergrund. Deine Belegung und deine Tasten bleiben. Tastenkürzel klein oben, Abklingzeit groß in der Mitte, außer Reichweite rot. Knopfgröße und Abstand per Schieberegler, verschieben über „Anzeigen verschieben“.
+- **Eigene Aktionsleisten** (Kampf → Aktionsleisten): bis zu 5 Leisten mit je 12 Knöpfen statt Blizzards Leisten – schlicht, quadratisch, ohne Greifen und Hintergrund. Standard: 4 Leisten mittig übereinander. Jede Leiste einzeln an/aus, mit eigener Knopfgröße und Knöpfen pro Reihe („Leiste bearbeiten 1–5“). Deine Belegung und deine Tasten bleiben. Tastenkürzel klein oben, Abklingzeit groß in der Mitte, außer Reichweite rot. Verschieben über „Anzeigen verschieben“.
 - **Abklingzeiten über den Leisten** (Kampf → Abklingzeiten): Blizzards eingebauter Cooldown-Manager im stray-Stil, direkt über den Aktionsleisten.
 - **Minimap-Knopfspalte** (Oberfläche → Leisten & Minimap): Freunde-Knopf mit Liste der Freunde online, der stray-Knopf und eine Addon-Tasche, die die Minimap-Knöpfe anderer Addons einsammelt; dazu ein kleines Kartenmenü.
 - **Uhrzeit und FPS** unter der Minimap.

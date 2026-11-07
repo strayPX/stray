@@ -403,7 +403,7 @@ end
 
 local function SectionActive(name)
     for _, option in ipairs(sections[name]) do
-        if option.type ~= "slider" and option.type ~= "button" and OptionEnabled(option) and option.get() then return true end
+        if not option.type and OptionEnabled(option) and option.get() then return true end
     end
     return false
 end
@@ -621,6 +621,13 @@ local function CreateRow(i)
     action:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.action = action
 
+    -- Auswahl-Knöpfe (type = "choice", values = {…}, labels = {…}), z. B. „Leiste 1 2 3 4 5“
+    local choice = CreateFrame("Frame", nil, row)
+    choice:SetSize(10, 22)
+    choice:SetPoint("RIGHT", 0, 0)
+    choice.buttons = {}
+    row.choice = choice
+
     row:SetScript("OnEnter", ShowTooltip)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- Klick auf die Zeile schaltet ebenfalls um (nur bei Schaltern)
@@ -644,6 +651,44 @@ local function SetSlider(row, option, enabled)
     slider.value:SetAlpha(enabled and 1 or 0.4)
 end
 
+local function SetChoice(row, option, enabled)
+    local choice = row.choice
+    local values = option.values or {}
+    local current = option.get()
+    local x = 0
+    for i = #values, 1, -1 do
+        local b = choice.buttons[i]
+        if not b then
+            b = FlatButton(choice, "", 26, false)
+            b:SetHeight(22)
+            b.selected = b:CreateTexture(nil, "BACKGROUND", nil, 2)
+            b.selected:SetAllPoints()
+            b.selected:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.45)
+            b:SetScript("OnEnter", function() ShowTooltip(row) end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            choice.buttons[i] = b
+        end
+        local value = values[i]
+        b.text:SetText(option.labels and option.labels[i] or tostring(value))
+        b:SetWidth(math.max(26, b.text:GetStringWidth() + 14))
+        b:ClearAllPoints()
+        b:SetPoint("RIGHT", choice, "RIGHT", -x, 0)
+        x = x + b:GetWidth() + 4
+        b.selected:SetShown(current == value)
+        b.text:SetTextColor(current == value and 1 or C.textSide[1], current == value and 1 or C.textSide[2], current == value and 1 or C.textSide[3])
+        b:SetScript("OnClick", function()
+            if not OptionEnabled(option) then return end
+            ns.Sound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+            option.set(value)
+            Refresh()
+        end)
+        b:SetAlpha(enabled and 1 or 0.4)
+        b:Show()
+    end
+    for i = #values + 1, #choice.buttons do choice.buttons[i]:Hide() end
+    choice:SetWidth(math.max(10, x))
+end
+
 for i = 1, MAX_ROWS do rows[i] = CreateRow(i) end
 
 local function FillRows(options)
@@ -664,12 +709,16 @@ local function FillRows(options)
             end
             local isSlider = option.type == "slider"
             local isButton = option.type == "button"
-            row.switch:SetShown(not isSlider and not isButton)
+            local isChoice = option.type == "choice"
+            row.switch:SetShown(not isSlider and not isButton and not isChoice)
             row.slider:SetShown(isSlider)
             row.slider.value:SetShown(isSlider)
             row.action:SetShown(isButton)
+            row.choice:SetShown(isChoice)
             if isSlider then
                 SetSlider(row, option, enabled)
+            elseif isChoice then
+                SetChoice(row, option, enabled)
             elseif isButton then
                 row.action.text:SetText(option.buttonText or option.label)
                 row.action:SetAlpha(enabled and 1 or 0.4)
@@ -677,7 +726,7 @@ local function FillRows(options)
                 SetSwitch(row.switch, option.get() and true or false, enabled)
             end
             -- In der Suche keine Vorschau: dort können mehr Zeilen stehen, als Platz für das Bild bleibt
-            row.previewButton:SetShown(option.preview ~= nil and search:GetText() == "" and not isSlider and not isButton)
+            row.previewButton:SetShown(option.preview ~= nil and search:GetText() == "" and not isSlider and not isButton and not isChoice)
             row.line:SetShown(i < shown)
             row:Show()
         else

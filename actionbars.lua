@@ -1,10 +1,11 @@
 -- stray – eigene Aktionsleisten
--- 4 Leisten à 12 Knöpfe statt Blizzards Leisten, frei verschiebbar über den Bearbeiten-Modus.
+-- 5 Leisten à 12 Knöpfe statt Blizzards Leisten, frei verschiebbar über den Bearbeiten-Modus.
+-- Jede Leiste einzeln an/aus, mit eigener Knopfgröße und Knöpfen pro Reihe (Raster).
 -- Optik: quadratische Knöpfe, 1-px-dunkler Rand, beschnittenes Symbol, Tastenkürzel oben rechts,
 -- Anzahl unten rechts, Abklingzeit mit großer Zahl, Reichweite rot, nicht nutzbar dunkel, kein Mana blau.
 --
 -- Aufbau:
---   strayAB1 … strayAB4         – SecureHandlerStateTemplate (Leiste 1 mit Seitenwechsel-Treiber)
+--   strayAB1 … strayAB5         – SecureHandlerStateTemplate (Leiste 1 mit Seitenwechsel-Treiber)
 --   strayAB<l>Button<i>         – CheckButton mit SecureActionButtonTemplate, type = "action"
 -- Alles Geschützte (Erzeugen, SetAttribute, SetPoint/SetSize, Show/Hide, RegisterForClicks,
 -- Tastenbelegung) läuft nur außerhalb des Kampfes; im Kampf Gewünschtes wird bei
@@ -18,7 +19,7 @@ local _, ns = ...
 local IsSecret = ns.IsSecret
 local Public = ns.Public
 
-local NUM_BARS = 4
+local NUM_BARS = 5
 local NUM_BUTTONS = 12
 local BASE_Y = 4 -- Abstand der untersten Leiste zum unteren Bildschirmrand
 
@@ -28,6 +29,7 @@ local BARS = {
     { first = 61, binding = "MULTIACTIONBAR1BUTTON" },                -- MultiBarBottomLeft
     { first = 49, binding = "MULTIACTIONBAR2BUTTON" },                -- MultiBarBottomRight
     { first = 25, binding = "MULTIACTIONBAR3BUTTON" },                -- MultiBarRight
+    { first = 37, binding = "MULTIACTIONBAR4BUTTON" },                -- MultiBarLeft („Rechts 2“)
 }
 
 local COLOR_NORMAL = { 1, 1, 1 }
@@ -51,13 +53,38 @@ local function Enabled()
     return ns.db and ns.db.abEnabled and true or false
 end
 
-local function Dims()
-    local db = ns.db or ns.defaults
-    local size = tonumber(db.abSize) or 36
-    local sp = tonumber(db.abSpacing) or 2
-    size = math.max(24, math.min(56, math.floor(size + 0.5)))
-    sp = math.max(0, math.min(10, math.floor(sp + 0.5)))
-    return size, sp
+-- Gespeicherter Wert, sonst Standardwert
+local function DbVal(key)
+    local v = ns.db and ns.db[key]
+    if v == nil and ns.defaults then v = ns.defaults[key] end
+    return v
+end
+
+local function Clamp(v, lo, hi, default)
+    v = tonumber(v) or default
+    return math.max(lo, math.min(hi, math.floor(v + 0.5)))
+end
+
+-- Soll Leiste l angezeigt werden (Einstellung, unabhängig von abEnabled)?
+local function ShowWanted(l)
+    local v = DbVal("abShow" .. l)
+    if v == nil then return l <= 4 end
+    return v and true or false
+end
+
+-- Leiste l aktiv: eigene Leisten an und Leiste eingeschaltet
+local function BarActive(l)
+    return Enabled() and ShowWanted(l)
+end
+
+local function BarSize(l) return Clamp(DbVal("abSize" .. l), 24, 56, 36) end
+local function BarCols(l) return Clamp(DbVal("abCols" .. l), 1, NUM_BUTTONS, NUM_BUTTONS) end
+local function Spacing() return Clamp(DbVal("abSpacing"), 0, 10, 2) end
+
+-- Knopfgröße, Knöpfe pro Reihe, Zeilen, Abstand
+local function BarDims(l)
+    local cols = BarCols(l)
+    return BarSize(l), cols, math.ceil(NUM_BUTTONS / cols), Spacing()
 end
 
 ---------------------------------------------------------------------------
@@ -489,7 +516,7 @@ local function CreateButton(bar, l, i)
 
     b.outOfRange, b.unusable, b.noMana, b.hasAction = false, false, false, false
     -- Schrift sofort setzen: SetText vor SetFont wäre ein Fehler
-    ApplyFonts(b, (Dims()))
+    ApplyFonts(b, BarSize(l))
 
     b:RegisterForDrag("LeftButton", "RightButton")
     b:SetScript("OnEnter", OnEnter)
@@ -566,9 +593,16 @@ end
 -- Leisten bauen und anordnen
 ---------------------------------------------------------------------------
 
+-- Standard: angezeigte Leisten mittig unten übereinander (1 unten, 5 oben)
 local function DefaultPoint(l)
-    local size, sp = Dims()
-    return { "BOTTOM", "BOTTOM", 0, BASE_Y + (l - 1) * (size + sp) }
+    local y = BASE_Y
+    for k = 1, l - 1 do
+        if ShowWanted(k) then
+            local size, _, rows, sp = BarDims(k)
+            y = y + rows * size + (rows - 1) * sp + sp
+        end
+    end
+    return { "BOTTOM", "BOTTOM", 0, y }
 end
 
 local function Build()
@@ -598,16 +632,17 @@ local function Layout()
         pending = true
         return
     end
-    local size, sp = Dims()
     for l, bar in ipairs(bars) do
-        bar:SetSize(NUM_BUTTONS * size + (NUM_BUTTONS - 1) * sp, size)
+        local size, cols, rows, sp = BarDims(l)
+        bar:SetSize(cols * size + (cols - 1) * sp, rows * size + (rows - 1) * sp)
         for i, b in ipairs(bar.buttons) do
+            local r, c = math.floor((i - 1) / cols), (i - 1) % cols
             b:SetSize(size, size)
             b:ClearAllPoints()
-            b:SetPoint("LEFT", bar, "LEFT", (i - 1) * (size + sp), 0)
+            b:SetPoint("TOPLEFT", bar, "TOPLEFT", c * (size + sp), -r * (size + sp))
             ApplyFonts(b, size)
         end
-        -- Standardstapel folgt Größe und Abstand; gespeicherte Positionen bleiben
+        -- Standardstapel folgt Zeilen, Größe und Abstand; gespeicherte Positionen bleiben
         bar.strayDefault = DefaultPoint(l)
         pcall(ns.RestorePosition, bar)
     end
@@ -641,9 +676,12 @@ local function ApplyBindings()
     bindingsPending = false
     local list, sig = {}, {}
     for _, b in ipairs(buttons) do
-        for _, key in ipairs(BindingKeys(b.bindingCommand)) do
-            table.insert(list, { key, b:GetName() })
-            table.insert(sig, key .. "=" .. b:GetName())
+        -- Ausgeschaltete Leisten: Tasten bleiben bei Blizzards (unsichtbaren) Knöpfen
+        if BarActive(b.barIndex) then
+            for _, key in ipairs(BindingKeys(b.bindingCommand)) do
+                table.insert(list, { key, b:GetName() })
+                table.insert(sig, key .. "=" .. b:GetName())
+            end
         end
     end
     local signature = table.concat(sig, ";")
@@ -675,8 +713,9 @@ hiddenParent:Hide()
 local hooked = {} -- eigene Tabelle statt Felder an Blizzard-Rahmen (kein Taint)
 
 local MAIN_BARS = { "MainMenuBar", "MainActionBar" }
--- MultiBarLeft (Plätze 37–48) bleibt bei Blizzard: stray hat dafür keine eigene Leiste
-local OTHER_BARS = { "MultiBarBottomLeft", "MultiBarBottomRight", "MultiBarRight" }
+-- Alle vier Zusatzleisten, auch MultiBarLeft (Plätze 37–48 = stray-Leiste 5) – unabhängig davon,
+-- ob die jeweilige stray-Leiste angezeigt wird
+local OTHER_BARS = { "MultiBarBottomLeft", "MultiBarBottomRight", "MultiBarRight", "MultiBarLeft" }
 -- Bleiben sichtbar, auch wenn sie im Client Kinder der Hauptleiste sind
 local KEEP = {
     "StanceBar", "StanceBarFrame", "PetActionBar", "PetActionBarFrame",
@@ -868,7 +907,8 @@ local function Apply()
         end
         Layout()
         RegisterClicks()
-        for _, bar in ipairs(bars) do bar:Show() end
+        -- Ausgeschaltete Leisten verstecken (IsShown false, z. B. für die Abklingzeiten-Verankerung)
+        for l, bar in ipairs(bars) do bar:SetShown(BarActive(l)) end
         HideBlizzard()
         lastBindings = nil
         ApplyBindings()
@@ -925,10 +965,15 @@ end
 
 local function IsOn() return Enabled() end
 
+local DISABLED_HINT = "Erst „Eigene Aktionsleisten“ einschalten."
+
+-- Gerade bearbeitete Leiste (nur für diese Sitzung, nicht in ns.db, nicht im Profil)
+local selectedBar = 1
+
 ns.AddOption(2, "Aktionsleisten", {
     key = "abEnabled",
     label = "Eigene Aktionsleisten",
-    tooltip = "Ersetzt Blizzards Aktionsleisten durch 4 schlichte stray-Leisten à 12 Knöpfe. Deine Belegung und deine Tasten bleiben: Leiste 1 ist die Hauptleiste (mit Seitenwechsel bei Haltung, Gestalt, Verstohlenheit und Umschalt+Mausrad), Leiste 2 die untere linke, Leiste 3 die untere rechte und Leiste 4 die rechte Leiste. Haltungs- und Begleiterleiste bleiben von Blizzard.\n\nVerschieben über „Anzeigen verschieben“ (Bearbeiten-Modus); dort und bei offenem stray-Fenster siehst du auch die leeren Plätze. Änderungen wirken nur außerhalb des Kampfes.\n\nMit Blizzards Hauptleiste verschwinden auch die Blizzard-EP-Leiste und – falls sie daran hängen – Taschen- und Menüknöpfe: Schalte unter „Leisten & Minimap“ die stray-EP-Leiste und die Taschen- und Menüleiste ein.\n\nAusschalten erfordert Neuladen.",
+    tooltip = "Ersetzt Blizzards Aktionsleisten durch bis zu 5 schlichte stray-Leisten à 12 Knöpfe. Deine Belegung und deine Tasten bleiben: Leiste 1 ist die Hauptleiste (mit Seitenwechsel bei Haltung, Gestalt, Verstohlenheit und Umschalt+Mausrad), Leiste 2 die untere linke, Leiste 3 die untere rechte, Leiste 4 die rechte und Leiste 5 die Leiste „Rechts 2“. Haltungs- und Begleiterleiste bleiben von Blizzard.\n\nUnter „Leiste bearbeiten“ wählst du eine Leiste und stellst ein, ob sie angezeigt wird, wie groß ihre Knöpfe sind und wie viele in einer Reihe stehen. Standard: Leisten 1–4 an, 5 aus.\n\nVerschieben über „Anzeigen verschieben“ (Bearbeiten-Modus); dort und bei offenem stray-Fenster siehst du auch die leeren Plätze. Änderungen wirken nur außerhalb des Kampfes.\n\nMit Blizzards Hauptleiste verschwinden auch die Blizzard-EP-Leiste und – falls sie daran hängen – Taschen- und Menüknöpfe: Schalte unter „Leisten & Minimap“ die stray-EP-Leiste und die Taschen- und Menüleiste ein.\n\nAusschalten erfordert Neuladen.",
     set = function(value)
         ns.db.abEnabled = value
         CombatNote()
@@ -941,17 +986,14 @@ ns.AddOption(2, "Aktionsleisten", {
 })
 
 ns.AddOption(2, "Aktionsleisten", {
-    key = "abSize",
-    type = "slider",
-    label = "Knopfgröße",
-    min = 24, max = 56, step = 1,
-    tooltip = "Größe der Aktionsknöpfe in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    key = "abKeybinds",
+    label = "Tastenkürzel anzeigen",
+    tooltip = "Zeigt die Taste jedes Knopfs klein oben rechts (z. B. „S1“ für Umschalt+1).",
     isEnabled = IsOn,
-    disabledHint = "Erst „Eigene Aktionsleisten“ einschalten.",
-    set = function(v)
-        ns.db.abSize = v
-        CombatNote()
-        Layout()
+    disabledHint = DISABLED_HINT,
+    set = function(value)
+        ns.db.abKeybinds = value
+        ForEach(UpdateHotkey)
     end,
 })
 
@@ -960,9 +1002,9 @@ ns.AddOption(2, "Aktionsleisten", {
     type = "slider",
     label = "Abstand",
     min = 0, max = 10, step = 1,
-    tooltip = "Abstand zwischen den Knöpfen und zwischen den gestapelten Leisten in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = "Abstand zwischen den Knöpfen und zwischen den gestapelten Leisten in Pixeln (gilt für alle Leisten). Im Kampf wird die Änderung erst danach übernommen.",
     isEnabled = IsOn,
-    disabledHint = "Erst „Eigene Aktionsleisten“ einschalten.",
+    disabledHint = DISABLED_HINT,
     set = function(v)
         ns.db.abSpacing = v
         CombatNote()
@@ -971,13 +1013,67 @@ ns.AddOption(2, "Aktionsleisten", {
 })
 
 ns.AddOption(2, "Aktionsleisten", {
-    key = "abKeybinds",
-    label = "Tastenkürzel anzeigen",
-    tooltip = "Zeigt die Taste jedes Knopfs klein oben rechts (z. B. „S1“ für Umschalt+1).",
+    key = "abEdit",
+    type = "choice",
+    label = "Leiste bearbeiten",
+    values = { 1, 2, 3, 4, 5 },
+    labels = { "1", "2", "3", "4", "5" },
+    noExport = true,
+    tooltip = "Wählt die Leiste, die die drei Zeilen darunter einstellen. 1 Hauptleiste, 2 unten links, 3 unten rechts, 4 rechts, 5 rechts 2.",
     isEnabled = IsOn,
-    disabledHint = "Erst „Eigene Aktionsleisten“ einschalten.",
+    disabledHint = DISABLED_HINT,
+    get = function() return selectedBar end,
+    set = function(v)
+        v = tonumber(v)
+        if v and v >= 1 and v <= NUM_BARS then selectedBar = math.floor(v) end
+    end,
+})
+
+ns.AddOption(2, "Aktionsleisten", {
+    key = "abShowSel",
+    label = "Leiste anzeigen",
+    noExport = true,
+    tooltip = "Zeigt die gewählte Leiste an. Leiste 1 ersetzt die Hauptleiste, 2 die untere linke, 3 die untere rechte, 4 die rechte und 5 die Leiste „Rechts 2“.\n\nEine ausgeschaltete Leiste ist versteckt; ihre Tasten laufen dann über Blizzards unsichtbare Leiste weiter. Im Kampf gilt die Änderung erst danach.",
+    isEnabled = IsOn,
+    disabledHint = DISABLED_HINT,
+    get = function() return ShowWanted(selectedBar) end,
     set = function(value)
-        ns.db.abKeybinds = value
-        ForEach(UpdateHotkey)
+        ns.db["abShow" .. selectedBar] = value and true or false
+        CombatNote()
+        Apply()
+    end,
+})
+
+ns.AddOption(2, "Aktionsleisten", {
+    key = "abSizeSel",
+    type = "slider",
+    label = "Knopfgröße",
+    min = 24, max = 56, step = 1,
+    noExport = true,
+    tooltip = "Größe der Knöpfe der gewählten Leiste in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    isEnabled = IsOn,
+    disabledHint = DISABLED_HINT,
+    get = function() return BarSize(selectedBar) end,
+    set = function(v)
+        ns.db["abSize" .. selectedBar] = Clamp(v, 24, 56, 36)
+        CombatNote()
+        Layout()
+    end,
+})
+
+ns.AddOption(2, "Aktionsleisten", {
+    key = "abColsSel",
+    type = "slider",
+    label = "Knöpfe pro Reihe",
+    min = 1, max = NUM_BUTTONS, step = 1,
+    noExport = true,
+    tooltip = "Wie viele Knöpfe der gewählten Leiste nebeneinander stehen; die übrigen bilden weitere Reihen (z. B. 6 → 2 Reihen, 4 → 3 Reihen). Im Kampf wird die Änderung erst danach übernommen.",
+    isEnabled = IsOn,
+    disabledHint = DISABLED_HINT,
+    get = function() return BarCols(selectedBar) end,
+    set = function(v)
+        ns.db["abCols" .. selectedBar] = Clamp(v, 1, NUM_BUTTONS, NUM_BUTTONS)
+        CombatNote()
+        Layout()
     end,
 })

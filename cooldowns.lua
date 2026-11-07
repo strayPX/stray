@@ -27,7 +27,7 @@ local EDGE = { 0.169, 0.290, 0.451 }
 -- Symbol-Viewer, die umgestaltet werden (die Balken-Anzeige bleibt, wie sie ist)
 local STYLE_VIEWERS = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer" }
 -- Mögliche Rahmen der stray-Aktionsleisten (oberste zuerst)
-local BAR_FRAMES = { "strayAB4", "strayAB3", "strayAB2", "strayAB1",
+local BAR_FRAMES = { "strayAB5", "strayAB4", "strayAB3", "strayAB2", "strayAB1",
     "strayActionBar4", "strayActionBar3", "strayActionBar2", "strayActionBar1", "strayActionBars" }
 -- Teile des Atlas-Namens, an denen Blizzards Rahmen/Schatten zu erkennen sind
 local HIDE_ATLAS = { "cooldownmanager", "border", "shadow", "iconoverlay", "ring" }

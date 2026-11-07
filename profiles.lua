@@ -74,7 +74,7 @@ local function CollectOptions()
         for _, section in ipairs(sections) do
             for _, option in ipairs(section.options) do
                 local key = option.key
-                if key and option.type ~= "button" and not SKIP_KEYS[key] and not byKey[key] then
+                if key and option.type ~= "button" and option.type ~= "choice" and not option.noExport and not SKIP_KEYS[key] and not byKey[key] then
                     byKey[key] = option
                     table.insert(list, option)
                 end
