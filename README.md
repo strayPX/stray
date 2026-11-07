@@ -39,6 +39,7 @@ Rahmen und Prozent brauchen eingeschaltete gegnerische Namensplaketten (Taste V)
 **Kamera & Karte**
 - **Maximale Kamera-Entfernung:** so weit herauszoomen, wie das Spiel erlaubt.
 - **Minimap mit Mausrad zoomen:** Mausrad zoomt die Minimap, die Plus-/Minus-Knöpfe verschwinden.
+- **Minimap-Knopf anzeigen:** runder stray-Knopf (blaues S) am Minimap-Rand; Linksklick öffnet das Fenster, Ziehen verschiebt ihn. Anfangs an.
 
 **Interface**
 - **Fehlermeldungen ausblenden:** rote Meldungen wie „Nicht genug Mana“ verschwinden; „Taschen voll“ und „Questlog voll“ bleiben.
@@ -65,6 +66,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.9.0-alpha – Minimap-Knopf mit eigenem Symbol
 - 0.8.1-alpha – Tank- und Aggro-Warnung entfernt (in WoW Forever nicht möglich)
 - 0.8.0-alpha – Bedrohung trotz versiegelter Werte: Liste, Rahmen und Prozent zeigen die Werte über Blizzards Farbkurven an (Liste ohne Sortierung, experimentell)
 - 0.7.1-alpha – Notfix: Forever versiegelt Bedrohungswerte im Kampf (Fehlerflut behoben); Tank- und Aggro-Warnung deaktiviert; weitere Absicherungen gegen versiegelte Werte
