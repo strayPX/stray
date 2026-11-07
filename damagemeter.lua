@@ -179,6 +179,7 @@ mainBg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4])
 Border(main, C.border)
 
 ns.MakeMovable(main, "damagemeter", { "BOTTOMRIGHT", "BOTTOMRIGHT", -260, 180 })
+ns.RegisterMovable(main, "Schadensmesser")
 
 -- Ziehen an Knöpfen und Titel an das Fenster weiterreichen (Shift + ziehen)
 local function ForwardDrag(child)

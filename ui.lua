@@ -10,7 +10,7 @@ local _, ns = ...
 -- Maße und Farben
 ---------------------------------------------------------------------------
 
-local WIDTH, HEIGHT = 760, 540
+local WIDTH, HEIGHT = 760, 600
 local SIDE_W = 190
 local ROW_H = 48
 local MAX_ROWS = 7
@@ -44,6 +44,7 @@ local GROUPS = {
     { name = "Kampf", sections = { "Bedrohung", "Schadensmesser", "Zaubern" } },
     { name = "Gruppe", sections = { "Gruppenrahmen" } },
     { name = "Oberfläche", sections = { "Kamera & Karte", "Interface", "Sozial" } },
+    { name = "System", sections = { "Bearbeiten", "Profile" } },
 }
 
 local SUBTITLES = {
@@ -57,6 +58,8 @@ local SUBTITLES = {
     ["Zaubern"] = "Zaubern ohne Umwege – z. B. per Mouseover.",
     ["Schadensmesser"] = "Schaden und Heilung – gesamt und je Kampf.",
     ["Gruppenrahmen"] = "Deine 5er-Gruppe als Heiler-Rahmen.",
+    ["Bearbeiten"] = "Alle stray-Anzeigen auf einmal verschieben.",
+    ["Profile"] = "Einstellungen exportieren und importieren.",
     ["Kamera & Karte"] = "Kamera, Minimap und der stray-Knopf.",
     ["Interface"] = "Weniger Meldungen, mehr Überblick.",
     ["Sozial"] = "Duelle, Wiederbelebung und Beschwörung.",
@@ -382,7 +385,7 @@ end
 
 local function SectionActive(name)
     for _, option in ipairs(sections[name]) do
-        if option.type ~= "slider" and OptionEnabled(option) and option.get() then return true end
+        if option.type ~= "slider" and option.type ~= "button" and OptionEnabled(option) and option.get() then return true end
     end
     return false
 end
@@ -587,11 +590,24 @@ local function CreateRow(i)
     slider:SetScript("OnLeave", function() GameTooltip:Hide() end)
     row.slider = slider
 
+    -- Knopf für Aktionen (type = "button"), z. B. Bearbeiten-Modus oder Profil exportieren
+    local action = FlatButton(row, "", 130, true)
+    action:SetPoint("RIGHT", 0, 0)
+    action:SetScript("OnClick", function()
+        local option = row.option
+        if not option or option.type ~= "button" or not OptionEnabled(option) then return end
+        ns.Sound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
+        if option.onClick then option.onClick() end
+    end)
+    action:SetScript("OnEnter", function() ShowTooltip(row) end)
+    action:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    row.action = action
+
     row:SetScript("OnEnter", ShowTooltip)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    -- Klick auf die Zeile schaltet ebenfalls um (nicht bei Schiebereglern)
+    -- Klick auf die Zeile schaltet ebenfalls um (nur bei Schaltern)
     row:SetScript("OnMouseUp", function(_, button)
-        if button == "LeftButton" and row.option and row.option.type ~= "slider" then switch:Click() end
+        if button == "LeftButton" and row.option and not row.option.type then switch:Click() end
     end)
     return row
 end
@@ -629,16 +645,21 @@ local function FillRows(options)
                 row.desc:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
             end
             local isSlider = option.type == "slider"
-            row.switch:SetShown(not isSlider)
+            local isButton = option.type == "button"
+            row.switch:SetShown(not isSlider and not isButton)
             row.slider:SetShown(isSlider)
             row.slider.value:SetShown(isSlider)
+            row.action:SetShown(isButton)
             if isSlider then
                 SetSlider(row, option, enabled)
+            elseif isButton then
+                row.action.text:SetText(option.buttonText or option.label)
+                row.action:SetAlpha(enabled and 1 or 0.4)
             else
                 SetSwitch(row.switch, option.get() and true or false, enabled)
             end
             -- In der Suche keine Vorschau: dort können mehr Zeilen stehen, als Platz für das Bild bleibt
-            row.previewButton:SetShown(option.preview ~= nil and search:GetText() == "" and not isSlider)
+            row.previewButton:SetShown(option.preview ~= nil and search:GetText() == "" and not isSlider and not isButton)
             row.line:SetShown(i < shown)
             row:Show()
         else
@@ -718,17 +739,12 @@ function Refresh()
     preview:SetPoint("TOPLEFT", card, card:IsShown() and "BOTTOMLEFT" or "TOPLEFT", 0, -12)
 end
 
--- Module können reagieren, wenn das Fenster auf- oder zugeht (z. B. Beispielanzeigen)
-ns.configCallbacks = ns.configCallbacks or {}
-
-local function NotifyConfig(open)
-    for _, fn in ipairs(ns.configCallbacks) do fn(open) end
-end
-
 frame:SetScript("OnShow", function()
+    -- Fenster und Bearbeiten-Modus nicht gleichzeitig
+    if ns.editMode and ns.ExitEditMode then ns.ExitEditMode() end
     ns.Sound(SOUNDKIT.IG_CHARACTER_INFO_OPEN)
     Refresh()
-    NotifyConfig(true)
+    ns.NotifyConfig()
 end)
 frame:SetScript("OnHide", function()
     ns.Sound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE)
@@ -740,7 +756,7 @@ frame:SetScript("OnHide", function()
     search:ClearFocus()
     preview:Hide()
     GameTooltip:Hide()
-    NotifyConfig(false)
+    ns.NotifyConfig()
 end)
 
 -- Falls Einstellungen woanders geändert werden (z. B. Blizzard-Optionen)
@@ -761,9 +777,14 @@ end
 ---------------------------------------------------------------------------
 
 SLASH_STRAY1 = "/stray"
-SlashCmdList["STRAY"] = function()
+SlashCmdList["STRAY"] = function(msg)
     if not ns.db then
         ns.Print("noch nicht geladen.")
+        return
+    end
+    msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if (msg == "edit" or msg == "bearbeiten") and ns.EnterEditMode then
+        ns.EnterEditMode()
         return
     end
     frame:SetShown(not frame:IsShown())

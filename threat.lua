@@ -148,6 +148,7 @@ list:SetSize(WIDTH, 40)
 list:SetFrameStrata("MEDIUM")
 ns.ApplyBackdrop(list)
 ns.MakeMovable(list, "threat", { "RIGHT", "RIGHT", -60, -60 })
+ns.RegisterMovable(list, "Bedrohungsliste")
 list:Hide()
 
 local header = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -352,6 +353,26 @@ end
 
 local tankWarning = CreateWarning(-150, 1, 0.23, 0.23, 24)
 local aggroWarning = CreateWarning(-190, 1, 0.69, 0.13, 19)
+
+-- Warntexte im Bearbeiten-Modus verschiebbar (sonst fangen sie keine Mausklicks ab)
+local function MovableWarning(f, key, y, label, optionKey, sample)
+    f:SetWidth(520)
+    ns.MakeMovable(f, key, { "TOP", "TOP", 0, y })
+    f:EnableMouse(false)
+    ns.RegisterMovable(f, label, function(on)
+        if on and ns.db and ns.db[optionKey] then
+            f.anim:Stop()
+            f.text:SetText(sample)
+            f:SetAlpha(1)
+            f:Show()
+        elseif not on then
+            f.anim:Stop()
+            f:Hide()
+        end
+    end)
+end
+MovableWarning(tankWarning, "tankwarn", -150, "Tank-Warnung", "threatTankWarn", "Aggro verloren: Defias-Späher greift Mira an")
+MovableWarning(aggroWarning, "aggrowarn", -190, "Aggro-Warnung", "threatAggroWarn", "Gleich ziehst du Aggro! 92 %")
 
 local function ShowWarning(f, message)
     f.anim:Stop()
@@ -706,6 +727,8 @@ ns.OnConfig(function() pcall(UpdateList) end)
 
 ns.On("PLAYER_LOGIN", function()
     ns.RestorePosition(list)
+    ns.RestorePosition(tankWarning)
+    ns.RestorePosition(aggroWarning)
     RefreshEvents()
 end)
 

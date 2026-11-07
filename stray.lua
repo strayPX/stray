@@ -183,16 +183,34 @@ function ns.RestorePosition(frame)
     frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
 end
 
--- Ist das stray-Fenster offen? (Anzeigen zeigen dann Beispielwerte zum Verschieben)
+-- Ist das stray-Fenster offen oder läuft der Bearbeiten-Modus?
+-- (Anzeigen zeigen dann Beispielwerte, damit man sie sehen und verschieben kann)
+ns.editMode = false
+
 function ns.IsConfigOpen()
+    if ns.editMode then return true end
     return strayFrame and strayFrame:IsShown() or false
 end
 
 ns.configCallbacks = {}
 
--- fn(open) wird aufgerufen, wenn das stray-Fenster auf- oder zugeht
+-- fn(open) wird aufgerufen, wenn das stray-Fenster bzw. der Bearbeiten-Modus auf- oder zugeht
 function ns.OnConfig(fn)
     table.insert(ns.configCallbacks, fn)
+end
+
+function ns.NotifyConfig()
+    local open = ns.IsConfigOpen()
+    for _, fn in ipairs(ns.configCallbacks) do pcall(fn, open) end
+end
+
+-- Verschiebbare Anzeigen für den Bearbeiten-Modus.
+-- frame braucht strayKey/strayDefault (über ns.MakeMovable). preview(on) blendet bei Bedarf
+-- Beispielinhalt ein, den die Anzeige sonst nur bei offenem stray-Fenster zeigt.
+ns.movables = {}
+
+function ns.RegisterMovable(frame, label, preview)
+    table.insert(ns.movables, { frame = frame, label = label, preview = preview })
 end
 
 ---------------------------------------------------------------------------

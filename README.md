@@ -53,6 +53,10 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 - **Gruppenrahmen anzeigen:** 5er-Gruppe als senkrechte Spalte mit Leben, Mana, entfernbaren Schwächungen und Reichweite; Breite, Höhe, Abstand per Schieberegler.
 - **Blizzards Gruppenrahmen ausblenden.**
 
+**System**
+- **Bearbeiten:** alle eingeschalteten Anzeigen auf einmal verschieben (ohne Shift, mit Raster, Rechtsklick setzt zurück) – auch per `/stray edit`.
+- **Profile:** Einstellungen als Text exportieren und importieren.
+
 **Kamera & Karte**
 - **Maximale Kamera-Entfernung:** so weit herauszoomen, wie das Spiel erlaubt.
 - **Minimap mit Mausrad zoomen:** Mausrad zoomt die Minimap, die Plus-/Minus-Knöpfe verschwinden.
@@ -83,6 +87,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.14.0-alpha – Bearbeiten-Modus, Profile Import/Export, flache Gruppenrahmen, Testgruppe; enthält 0.13.0 (nie einzeln veröffentlicht)
 - 0.13.0-alpha – Schadensmesser mit Heilung, Heiler-Gruppenrahmen, Schieberegler im Fenster
 - 0.12.0-alpha – Mouseover-Zauber, Gesprächsmenü überspringen, freie Taschenplätze
 - 0.11.0-alpha – Questgegenstände markieren und Warnung beim Verkauf mit Rückkauf

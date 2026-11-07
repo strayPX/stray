@@ -73,6 +73,7 @@ local anchor = CreateFrame("Frame", "strayPartyAnchor", UIParent)
 anchor:SetPoint("CENTER", UIParent, "CENTER", -220, 0)
 anchor:SetSize(96, 5 * 42 + 4 * 4)
 ns.MakeMovable(anchor, "party", { "CENTER", "CENTER", -220, 0 })
+ns.RegisterMovable(anchor, "Gruppenrahmen")
 -- Der Anker selbst fängt keine Klicks ab; gezogen wird über die Kacheln
 anchor:EnableMouse(false)
 anchor:Hide()
@@ -510,6 +511,8 @@ end
 
 local function LayoutSamples()
     local w, h, sp = Dims()
+    -- Anker so groß wie die Spalte (auch bei ausgeschalteten Rahmen), damit das Bearbeiten-Overlay passt
+    if not InCombatLockdown() then anchor:SetSize(w, MAX_TILES * h + (MAX_TILES - 1) * sp) end
     for i, f in ipairs(samples) do
         f:SetSize(w, h)
         f:ClearAllPoints()

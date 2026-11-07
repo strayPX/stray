@@ -52,6 +52,7 @@ panel:SetSize(130, 24)
 panel:SetFrameStrata("MEDIUM")
 ns.ApplyBackdrop(panel)
 ns.MakeMovable(panel, "durability", { "TOPRIGHT", "TOPRIGHT", -30, -200 })
+ns.RegisterMovable(panel, "Haltbarkeit")
 panel:Hide()
 
 local text = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
