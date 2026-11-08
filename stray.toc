@@ -33,6 +33,11 @@ locale\enUS_21.lua
 locale\enUS_22.lua
 locale\enUS_25.lua
 locale\enUS_26.lua
+locale\enUS_27.lua
+locale\enUS_28.lua
+locale\enUS_29.lua
+locale\enUS_30.lua
+locale\enUS_31.lua
 stray.lua
 style.lua
 glow.lua
