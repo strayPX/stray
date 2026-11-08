@@ -128,7 +128,7 @@ local PAGES = {
         { name = "Profile", sections = { "Profile" } },
     } },
     { group = "SYSTEM", name = "Sprache & System", icon = "settings", tabs = {
-        { name = "Allgemein", keys = { "language", "strayUI" }, sections = { "stray-Oberfläche" } },
+        { name = "Allgemein", keys = { "language", "updateNotice", "strayUI" }, sections = { "stray-Oberfläche" } },
         { name = "Bearbeiten", sections = { "Bearbeiten" } },
         { name = "Interface", sections = { "Interface" } },
         { name = "Kamera", sections = { "Kamera & Karte" } },

@@ -3,6 +3,10 @@
 
 local ADDON_NAME, ns = ...
 ns.name = ADDON_NAME
+-- Version der Lua-Dateien. Beim Release zusammen mit „## Version:“ in stray.toc anheben:
+-- WoW liest die toc nur beim Spielstart, der Vergleich beider Werte zeigt, ob nach einem Update
+-- ein kompletter Neustart nötig ist (siehe PLAYER_LOGIN unten).
+ns.VERSION = "1.0.0"
 local L = ns.L
 
 ns.defaults = {
@@ -61,6 +65,8 @@ ns.defaults = {
     bagWindow = false,
     bagColumns = 10,
     bagPinned = {},
+    updateNotice = true, -- Chat-Hinweis nach einem Update (Reload oder Neustart)
+    -- lastVersion: zuletzt gesehene Version, wird beim ersten Login gesetzt (kein Standardwert)
     minimapButton = true, -- Ausnahme: anfangs an, weil der Knopf der Zugang zum Fenster ist
     minimapAngle = 225,
     threatList = false,
@@ -320,6 +326,41 @@ function ns.AddOption(column, sectionName, option)
     end
     table.insert(section.options, option)
 end
+
+---------------------------------------------------------------------------
+-- Update-Hinweis im Chat: Neustart nötig oder nur „aktualisiert“ (einmal pro Login)
+---------------------------------------------------------------------------
+
+ns.On("PLAYER_LOGIN", function()
+    local db = ns.db
+    if type(db) ~= "table" then return end
+    local current = ns.VERSION
+    local show = db.updateNotice ~= false
+    -- toc-Version = Stand beim Spielstart (ändert sich bei /reload nicht)
+    local ok, tocVersion = pcall(ns.GetVersion)
+    if not ok or type(tocVersion) ~= "string" or tocVersion == "" then return end -- nicht lesbar: nichts melden
+    if tocVersion ~= current then
+        -- Dateien sind neuer als beim Spielstart: Reload reicht nicht, lastVersion bleibt unberührt
+        if show then
+            ns.Print("|cffff8000" .. string.format(
+                L["stray wurde aktualisiert (Version %s). Bitte WoW komplett neu starten – ein /reload reicht nicht, weil neue Dateien erst beim Start geladen werden."],
+                current) .. "|r")
+        end
+        return
+    end
+    local last = db.lastVersion
+    if type(last) == "string" and last ~= current and show then
+        ns.Print(string.format(L["stray wurde auf Version %s aktualisiert. Neuerungen: /stray"], current))
+    end
+    db.lastVersion = current
+end)
+
+ns.AddOption(3, "Profile", {
+    key = "updateNotice",
+    label = L["Update-Hinweis im Chat"],
+    tooltip = L["Zeigt nach einem Update im Chat, ob ein /reload reicht oder WoW neu gestartet werden muss."],
+    keywords = { "update", "version", "neustart", "reload", "hinweis", "restart", "notice" },
+})
 
 ---------------------------------------------------------------------------
 -- Sprache (Seite System, Bereich Profile; wirkt nach dem Neuladen)

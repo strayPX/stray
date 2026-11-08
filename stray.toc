@@ -28,6 +28,7 @@ locale\enUS_16.lua
 locale\enUS_17.lua
 locale\enUS_18.lua
 locale\enUS_19.lua
+locale\enUS_20.lua
 stray.lua
 glow.lua
 conflicts.lua

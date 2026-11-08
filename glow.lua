@@ -26,6 +26,9 @@ local data = {}     -- [Rand-Frame] = { lines = { { a, b }, … } }
 local pool = {}
 local visibleCount = 0
 local elapsedTotal = 0
+local pending = 0   -- seit dem letzten Zeichnen vergangene Zeit
+local STEP = 1 / 30 -- höchstens 30 Aktualisierungen pro Sekunde (bei 4 s je Runde nicht sichtbar)
+local EDGES = { 0, 0, 0, 0 } -- wiederverwendet, spart Speichermüll
 
 local driver = CreateFrame("Frame")
 
@@ -64,7 +67,8 @@ local function UpdateGlow(glow, progress)
     local w, h = glow:GetWidth(), glow:GetHeight()
     if type(w) ~= "number" or type(h) ~= "number" or w <= 4 or h <= 4 then return end
 
-    local edges = { w, h, w, h }
+    local edges = EDGES
+    edges[1], edges[2], edges[3], edges[4] = w, h, w, h
     local perimeter = 2 * (w + h)
     -- Strichlänge: knapp die Hälfte des Abstands zwischen zwei Strichen, höchstens die kürzere Seite
     local length = math.min(perimeter / LINES * 0.45, math.min(w, h))
@@ -93,7 +97,10 @@ end
 ---------------------------------------------------------------------------
 
 local function Step(_, elapsed)
-    elapsedTotal = (elapsedTotal + (elapsed or 0)) % PERIOD
+    pending = pending + (elapsed or 0)
+    if pending < STEP then return end
+    elapsedTotal = (elapsedTotal + pending) % PERIOD
+    pending = 0
     local progress = elapsedTotal / PERIOD
     for glow in pairs(visible) do
         UpdateGlow(glow, progress)
