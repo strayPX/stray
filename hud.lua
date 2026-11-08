@@ -1568,6 +1568,39 @@ parking:Hide()
 local parked = {}
 local bagsBarFaded = false
 
+-- Menüknöpfe NICHT umhängen: Jedes SetParent löst Blizzards MicroMenu:Layout aus, und das wirft
+-- (GetEdgeButton vergleicht nil-Positionen). Stattdessen den ganzen Container ausblenden;
+-- die sicheren stray-Knöpfe klicken die (versteckten) Blizzard-Knöpfe weiter an.
+local microHidden = false
+local microShowHooked = {}
+
+local function MicroContainers()
+    local list = {}
+    for _, name in ipairs({ "MicroMenuContainer", "MicroMenu" }) do
+        local f = _G[name]
+        if type(f) == "table" and f.Hide and not IsProtectedFrame(f) then table.insert(list, f) end
+    end
+    return list
+end
+
+local function HideMicroMenu()
+    microHidden = true
+    for _, f in ipairs(MicroContainers()) do
+        if not microShowHooked[f] then
+            microShowHooked[f] = true
+            pcall(f.HookScript, f, "OnShow", function(self)
+                if microHidden and not InCombat() then self:Hide() end
+            end)
+        end
+        pcall(f.Hide, f)
+    end
+end
+
+local function ShowMicroMenu()
+    microHidden = false
+    for _, f in ipairs(MicroContainers()) do pcall(f.Show, f) end
+end
+
 local function ParkBlizzard()
     if not BottomActive() then return end
     if InCombat() then
@@ -1586,7 +1619,7 @@ local function ParkBlizzard()
         pcall(b.SetParent, b, parking)
     end
     for _, name in ipairs(BLIZZARD_BAGS) do park(name) end
-    for _, name in ipairs(MicroNames()) do park(name) end
+    HideMicroMenu()
     -- Trennstriche der Taschenleiste sind Kinder von BagsBar und hängen an den Taschenknöpfen
     local bagsBar = _G.BagsBar
     if type(bagsBar) == "table" and bagsBar.SetAlpha then
@@ -1604,6 +1637,7 @@ local function UnparkBlizzard()
         return
     end
     pending.bottomPark = nil
+    ShowMicroMenu()
     for b, info in pairs(parked) do
         pcall(function()
             if b:GetParent() == parking then b:SetParent(info.parent or UIParent) end
