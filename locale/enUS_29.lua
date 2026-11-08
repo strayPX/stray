@@ -1,0 +1,3 @@
+-- stray – englische Texte (Teil 29), Schlüssel = deutscher Originaltext
+local _, ns = ...
+local E = ns.LocaleEN

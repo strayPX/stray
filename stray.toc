@@ -54,6 +54,11 @@ profiles.lua
 camera.lua
 xptracker.lua
 interface.lua
+automation.lua
+hidetext.lua
+tooltip.lua
+character.lua
+system.lua
 social.lua
 vendor.lua
 triage.lua
