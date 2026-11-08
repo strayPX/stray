@@ -1,6 +1,6 @@
 # stray
 
-Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Minimap-Knopf öffnet das Einstellungsfenster: oben die Stichwort-Suche, links die Seiten (Zentrale, Oberfläche, Spielhilfen, System) und die Profil-Auswahl, rechts die Optionen mit Reitern, Zahlenfeldern und Position X/Y. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Beim Schließen übernimmst du Änderungen mit „Neu laden“ oder nimmst sie mit „Verwerfen“ zurück. Auf deutschen Clients ist stray deutsch, sonst englisch – umstellbar unter System → Sprache. Alle Optionen sind anfangs aus (außer dem Minimap-Knopf).
+Komfort-Addon für **World of Warcraft: Forever**: viele kleine Verbesserungen (Automatik bei Quests und Händlern, Chat, Tooltips, Ausblenden störender Anzeigen …) sowie ein **DMG-Meter** und eine **Bedrohungsliste**. stray bringt keine eigene Oberfläche mit (keine Leisten, Minimap, Taschen oder Gruppenrahmen), Blizzards Oberfläche bleibt. `/stray` öffnet das Einstellungsfenster: oben die Stichwort-Suche, links die Seiten (Übersicht, Automation, Sozial & Chat, Interface, Kampf, Welt, stray) und die Profil-Auswahl, rechts die Optionen mit Reitern, Zahlenfeldern und Position X/Y. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Beim Schließen übernimmst du Änderungen mit „Neu laden“ oder nimmst sie mit „Verwerfen“ zurück. Auf deutschen Clients ist stray deutsch, sonst englisch – umstellbar unter stray → Allgemein. Alle Optionen sind anfangs aus.
 
 ## Optionen
 
@@ -25,9 +25,6 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Min
 - **Questgegenstände markieren:** Gegenstände, die eine Quest im Questlog braucht (z. B. „Leinenstoff: 3/10“), bekommen einen goldenen Rahmen mit „!“.
 - **Freie Taschenplätze:** Zahl auf dem Rucksack-Knopf, rot bei vollen Taschen.
 - **Hilfe bei vollen Taschen:** markiert den billigsten Gegenstand als Löschkandidaten, Goldmünze an wertvollerer Beute. Gelöscht wird nichts automatisch.
-
-**Vorrat**
-- **Vorrats-Erinnerung:** Symbole nur, wenn Reagenzien, Munition, Essen/Wasser oder eigene Buffs fehlen; Warnschwelle einstellbar; die Symbole haben einen laufenden Rand.
 
 **Chat**
 - **Links kopierbar:** Webadressen im Chat werden anklickbar und öffnen ein Feld zum Kopieren.
@@ -69,31 +66,16 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 - **Mouseover-Zauber:** schaltet Blizzards Einstellung um – Zauber gehen auf das Ziel unter der Maus.
 - **Veralteten Zauberrang zeigen:** Pfeil auf stray-Leistenknöpfen, wenn du einen höheren Rang kennst.
 
-**Gruppenrahmen**
-- **Gruppenrahmen anzeigen:** 5er-Gruppe als senkrechte Spalte mit Leben, Mana, entfernbaren Schwächungen und Reichweite; Breite, Höhe, Abstand per Schieberegler.
-- **Begleiter anzeigen:** Tiere und Dämonen links neben ihrem Besitzer, mit Lebensbalken und Mouseover-Heilen.
-- **Blizzards Gruppenrahmen ausblenden.**
-- **Heilvorhersage, Schilde, „Geschwächte Seele“:** immer Teil der Gruppenrahmen – laufende Heilung hellgrün, Schilde gestreift, Symbol mit Restzeit.
-
 **System**
 - **Bearbeitungsmodus:** alle eingeschalteten Anzeigen auf einmal verschieben (Raster, Einrasten, Shift + Rechtsklick setzt zurück, Zurück-Knopf / Strg + Z) – Knopf oben im stray-Fenster oder `/stray edit`. Klick auf eine Anzeige öffnet ein Fenster für Position, Größe in Prozent und, wo möglich, Breite/Höhe; Pfeiltasten verschieben pixelgenau.
 - **Profile:** Einstellungen als Text exportieren und importieren.
 
-**stray-Oberfläche** (ein Hauptschalter, jeder Teil einzeln abschaltbar)
-- **Eigene Aktionsleisten**, **Taschenleiste unten rechts** (Porträt-Knopf, eine Tasche mit Füllbalken, Menüsymbole optional), **eckige Minimap**, **Menü per Mittelklick** auf die Minimap, **Minimap-Knopfspalte**, **Uhrzeit und FPS**, **Erfahrungsleiste oben**.
-
 **Erfahrung**
-- **EP-Leiste:** Stufe, Erholt und Quest-EP gut lesbar; Breite, Höhe, Schrift einstellbar.
 - **EP-Tracker:** EP pro Stunde, Zeit bis Levelaufstieg, Zeit je Stufe, Gesamtspielzeit, Verlauf – optional als Tabelle.
-
-**Aktionsleisten / Abklingzeiten**
-- **Eigene Aktionsleisten** (Teil der stray-Oberfläche): bis zu 5 × 12 Knöpfe, schlicht, Tasten bleiben; jede Leiste einzeln an/aus, mit eigener Knopfgröße und Knöpfen pro Reihe.
-- **Abklingzeiten über den Leisten:** Blizzards Cooldown-Manager im stray-Stil.
 
 **Kamera & Karte**
 - **Maximale Kamera-Entfernung:** so weit herauszoomen, wie das Spiel erlaubt.
 - **Minimap mit Mausrad zoomen:** Mausrad zoomt die Minimap, die Plus-/Minus-Knöpfe verschwinden.
-- **Minimap-Knopf anzeigen:** runder stray-Knopf (blaues S) am Minimap-Rand; Linksklick öffnet das Fenster, Ziehen verschiebt ihn. Anfangs an.
 - **Flugzeit-Balken:** misst jede Flugstrecke beim ersten Flug und zeigt danach die Restzeit.
 
 **Interface**
@@ -102,6 +84,7 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 - **Würfelfenster verschiebbar:** das Bedarf/Gier-Fenster folgt einem verschiebbaren Platzhalter.
 
 **Sozial**
+- **Freundschaftsanfragen, Haustierduelle, geteilte Quests blockieren; Einladung per Flüstern („inv“, „invite“ oder „einladen“).**
 - **Duelle ablehnen:** Anfragen werden sofort abgelehnt.
 - **Wiederbelebung annehmen:** automatisch, nicht solange der Wiederbelebende im Kampf ist.
 - **Beschwörung annehmen:** automatisch, nicht wenn du im Kampf bist.
@@ -112,8 +95,20 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 - **Twink-Übersicht:** Stufe, Gold, erholte EP und Spielzeit aller Charaktere – auch per `/stray alts`.
 - **Interface-Einstellungen für alle Charaktere:** übernimmt charakterbezogene Interface-Einstellungen beim Wechsel.
 
-**Tastenbelegung**
-- **Tasten belegen:** über einen Knopf der stray-Leisten fahren und Taste drücken (mit Shift/Strg/Alt, Maustasten, Mausrad) – `/stray keys`.
+**Automatisch**
+- **Geist im Schlachtfeld automatisch freigeben**, **automatisch aufstehen/absteigen**, **Beute-Bindung bestätigen**, **Taschen nicht automatisch öffnen** (Händler, Bank, Post).
+
+**Chat (mehr)**
+- Chatfenster frei verschieben und größer ziehen, Eingabezeile oben, kein klebender Kanal, Pfeiltasten, kein Verblassen, Klassenfarben, Raid in Gruppenfarbe, Verlauf 4096 Zeilen, Chat nach Neuladen wiederherstellen, kopierbarer Verlauf (`/stray chat`, Strg+Klick auf den Reiter), Spam-Filter, Kampflog-Reiter und Chat-Knöpfe ausblenden.
+
+**Ausblenden & Text**
+- Zonentext, Zahlen im Porträt, Tasten-/Makrotext auf den Leisten, Talking Head, Alerts, Boss-Banner, Greifen, Ruhe-Animation, Raid-Gruppentitel; Mail-, Quest- und Buchtext größer.
+
+**Tooltip & Charakter**
+- Klassenfarbe, Ziel-Zeile, Gildenrang, Tooltip am Mauszeiger, Skalierung, IDs; Lautstärkeregler, Helm/Umhang-Kästchen, Anprobe-Knöpfe und Wowhead-Link im Charakterfenster und Questlog.
+
+**Grafik & Ton**
+- Bildschirmglühen und -effekte aus, Wetterdichte, Sound folgt dem Systemgerät.
 
 **Andere Addons**
 - Bevor du etwas einschaltest, das sich mit einem installierten Addon beißt, warnt stray und sagt, was dort auszuschalten ist.
@@ -140,6 +135,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 2.0.0 – stray wird ein reines Komfort-Addon: eigene Oberfläche (Aktionsleisten, Abklingzeiten, Taschen, Taschenleiste, Minimap, Gruppenrahmen, Menü, EP-Leiste, Vorrat, Schwungtimer) entfernt; neu ca. 50 Optionen (Automation, Chat, Ausblenden, Tooltip, Charakter, Grafik & Ton); Einstellungsfenster neu geordnet
 - 1.1.0 – Oberflächen-Art „Forever UI“ (Bronze-Gold, Schiefer), durchsichtiges DMG-Meter mit Symbol-Kopfzeile, Einstellungsfenster neu geordnet (Übersicht mit Bildschirmkarte, Alle Anzeigen), Taschenfenster und Taschen-/Menüleiste im neuen Stil, Taschenplätze standardmäßig an, Shift+Klick verschiebt ohne Auslösen, weniger Last beim laufenden Rand; stray-Questtracker entfernt
 - 1.0.0 – Erste stabile Version: enthält 0.20 bis 0.23 (neues stray-Fenster, DMG-Meter-Fenster, eigener Questtracker mit Berufsreagenzien, Tasten belegen, Anheft-Leiste, Konflikt-Warnung, Verfolgungs-Knopf an der Minimap, englische Übersetzung, Chat-Hinweis nach Updates: /reload reicht oder WoW neu starten, abschaltbar unter System → Allgemein)
 - 0.23.0-alpha – Neues stray-Fenster (Seiten, Reiter, Zahlenfelder, Position), DMG-Meter bis 5 Fenster per „+“, eigener Questtracker mit Questgegenstand-Knöpfen, Tasten belegen per Mouseover, Anheft-Leiste (5 Plätze), Taschenplätze und Tasche tauschen, neues Taschensymbol, Warnung bei Konflikten mit anderen Addons

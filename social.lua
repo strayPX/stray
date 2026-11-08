@@ -6,6 +6,12 @@ local L = ns.L
 
 ns.defaults.inviteAcceptFriends = false
 ns.defaults.inviteDeclineStrangers = false
+ns.defaults.declineFriendRequests = false
+ns.defaults.declinePetDuels = false
+ns.defaults.declineSharedQuests = false
+ns.defaults.declineSharedQuestsStrangers = false
+ns.defaults.whisperInvite = false
+ns.defaults.whisperInviteWord = "inv"
 
 ns.AddOption(3, "Sozial", {
     key = "declineDuels",
@@ -205,5 +211,153 @@ ns.On("PARTY_INVITE_REQUEST", function(name, isTank, isHealer, isDamage, _, _, i
             if not ok or ns.IsSecret(listed) or listed then return end
         end
         Decline(name)
+    end
+end)
+
+---------------------------------------------------------------------------
+-- Weitere Sozial-Optionen (Phase 2): Freundschaftsanfragen, Haustierkampf-Duelle,
+-- geteilte Quests, Einladung per Flüstern
+---------------------------------------------------------------------------
+
+ns.AddOption(3, "Sozial", {
+    key = "declineFriendRequests",
+    label = L["Freundschaftsanfragen ablehnen"],
+    tooltip = L["Neue Battle.net-Freundschaftsanfragen (BattleTag und Real-ID) werden automatisch abgelehnt. Im Chat steht, dass eine Anfrage abgelehnt wurde.\nBereits offene Anfragen vom Login bleiben unberührt."],
+    keywords = { "freundschaft", "freundschaftsanfrage", "battletag", "real-id", "realid", "freund", "ablehnen", "blockieren", "friend", "request", "decline", "block", "battle.net" },
+})
+
+ns.AddOption(3, "Sozial", {
+    key = "declinePetDuels",
+    label = L["Haustierkampf-Duelle ablehnen"],
+    tooltip = L["Herausforderungen zu einem Haustierkampf (PvP-Duell) werden sofort abgelehnt. Im Chat steht, wer dich herausgefordert hat."],
+    keywords = { "haustier", "haustierkampf", "duell", "pvp", "ablehnen", "blockieren", "pet", "battle", "duel", "decline", "block" },
+})
+
+ns.AddOption(3, "Sozial", {
+    key = "declineSharedQuests",
+    label = L["Geteilte Quests ablehnen"],
+    tooltip = L["Quests, die dir jemand aus seinem Questlog teilt, werden nicht angeboten. Im Chat steht, wer und welche Quest.\nDas gilt für alle, auch für Freunde und Gildenmitglieder."],
+    keywords = { "quest", "geteilt", "teilen", "weitergabe", "ablehnen", "share", "shared", "sharing", "decline", "push" },
+})
+
+ns.AddOption(3, "Sozial", {
+    key = "declineSharedQuestsStrangers",
+    label = L["Geteilte Quests von Fremden ablehnen"],
+    tooltip = L["Wie „Geteilte Quests ablehnen“, aber nur für Spieler, die weder Freund noch in deiner Gilde sind. Quests von Freunden und Gildenmitgliedern werden weiter angeboten."],
+    keywords = { "quest", "geteilt", "teilen", "fremde", "ablehnen", "share", "shared", "stranger", "decline", "push" },
+    isEnabled = function() return not (ns.db and ns.db.declineSharedQuests) end,
+    disabledHint = L["Schon durch „Geteilte Quests ablehnen“ (direkt darüber) abgedeckt."],
+})
+
+ns.AddOption(3, "Sozial", {
+    key = "whisperInvite",
+    label = L["Per Flüstern einladen"],
+    tooltip = L["Wer dir das Schlüsselwort flüstert (ganze Nachricht, Groß-/Kleinschreibung egal), wird in deine Gruppe eingeladen.\nNur, wenn du einladen darfst, nicht in Instanzen, nicht in Warteschlangen oder der Gruppensuche und nicht öfter als einmal alle 10 Sekunden pro Spieler."],
+    keywords = { "flüstern", "einladen", "einladung", "inv", "invite", "whisper", "keyword", "schlüsselwort", "gruppe", "group" },
+})
+
+ns.AddOption(3, "Sozial", {
+    key = "whisperInviteWord",
+    type = "choice",
+    values = { "inv", "invite", "einladen" },
+    labels = { "inv", "invite", "einladen" },
+    label = L["Schlüsselwort zum Einladen"],
+    tooltip = L["Dieses Wort, geflüstert, lädt den Absender ein."],
+    keywords = { "schlüsselwort", "flüstern", "einladen", "inv", "keyword", "whisper", "invite" },
+    isEnabled = function() return ns.db and ns.db.whisperInvite end,
+    disabledHint = L["Erst „Per Flüstern einladen“ einschalten (direkt darüber)."],
+})
+
+-- Freundschaftsanfragen (Battle.net)
+ns.On("BN_FRIEND_INVITE_ADDED", function()
+    if not ns.db or not ns.db.declineFriendRequests then return end
+    C_Timer.After(0.2, function()
+        if not ns.db or not ns.db.declineFriendRequests then return end
+        if not BNGetNumFriendInvites or not BNDeclineFriendInvite then return end
+        local ok, count = pcall(BNGetNumFriendInvites)
+        if not ok or ns.IsSecret(count) or type(count) ~= "number" then return end
+        local declined = 0
+        for i = count, 1, -1 do
+            local info = SafeCall(C_BattleNet and C_BattleNet.GetFriendInviteInfo, i)
+            local id = type(info) == "table" and ns.Public(info.inviteID) or nil
+            if type(id) == "number" and pcall(BNDeclineFriendInvite, id) then declined = declined + 1 end
+        end
+        if declined > 0 then ns.Print(L("Freundschaftsanfragen abgelehnt: %d", declined)) end
+    end)
+end)
+
+-- Haustierkampf-Duelle
+ns.On("PET_BATTLE_PVP_DUEL_REQUESTED", function(name)
+    if not ns.db or not ns.db.declinePetDuels then return end
+    name = ns.Public(name)
+    if C_PetBattles and C_PetBattles.CancelPVPDuel then pcall(C_PetBattles.CancelPVPDuel) end
+    HidePopups("PET_BATTLE_PVP_DUEL_REQUESTED")
+    C_Timer.After(0, function() HidePopups("PET_BATTLE_PVP_DUEL_REQUESTED") end)
+    ns.Print(L("Haustierkampf-Duell von %s abgelehnt.", type(name) == "string" and name or "?"))
+end)
+
+-- Geteilte Quests (nur das Angebot wegklicken; der Teilende bekommt keine Zusage)
+ns.On("QUEST_ACCEPT_CONFIRM", function(name, questTitle)
+    if not ns.db or not (ns.db.declineSharedQuests or ns.db.declineSharedQuestsStrangers) then return end
+    name, questTitle = ns.Public(name), ns.Public(questTitle)
+    if type(name) ~= "string" then name = nil end
+    if not ns.db.declineSharedQuests then
+        -- Nur Fremde: ohne bekannten Namen oder bei Freund/Gilde nichts tun
+        if not name or IsFriendOrGuild(name, nil) then return end
+    end
+    HidePopups("QUEST_ACCEPT", "QUEST_ACCEPT_LOG_FULL")
+    C_Timer.After(0, function() HidePopups("QUEST_ACCEPT", "QUEST_ACCEPT_LOG_FULL") end)
+    ns.Print(L("Geteilte Quest „%s“ von %s abgelehnt.", type(questTitle) == "string" and questTitle or "?", name or "?"))
+end)
+
+-- Einladung per Flüstern
+local WHISPER_WORDS = { inv = true, invite = true, einladen = true }
+local lastWhisperInvite = {}
+
+local function QueuedOrListed()
+    -- Gruppensuche, Dungeon-/Raid-Warteschlange, Schlachtfeld-Warteschlange
+    if C_LFGList and C_LFGList.HasActiveEntryInfo then
+        local ok, listed = pcall(C_LFGList.HasActiveEntryInfo)
+        if not ok or ns.IsSecret(listed) or listed then return true end
+    end
+    if GetLFGMode and LE_LFG_CATEGORY_LFD then
+        for category = 1, 6 do
+            local ok, mode = pcall(GetLFGMode, category)
+            if ok and not ns.IsSecret(mode) and mode then return true end
+        end
+    end
+    if GetBattlefieldStatus then
+        for i = 1, 6 do
+            local ok, status = pcall(GetBattlefieldStatus, i)
+            if ok and not ns.IsSecret(status) and (status == "queued" or status == "confirm") then return true end
+        end
+    end
+    return false
+end
+
+ns.On("CHAT_MSG_WHISPER", function(text, sender)
+    if not ns.db or not ns.db.whisperInvite then return end
+    text, sender = ns.Public(text), ns.Public(sender)
+    if type(text) ~= "string" or type(sender) ~= "string" or sender == "" then return end
+    local word = ns.db.whisperInviteWord
+    if not WHISPER_WORDS[word] then word = "inv" end
+    local msg = text:gsub("^%s+", ""):gsub("%s+$", ""):lower()
+    if msg ~= word then return end
+    local ok, inInstance = pcall(IsInInstance)
+    if not ok or ns.IsSecret(inInstance) or inInstance then return end
+    if UnitAffectingCombat("player") then return end
+    if C_PartyInfo and C_PartyInfo.CanInvite then
+        local can = SafeCall(C_PartyInfo.CanInvite)
+        if not can then return end
+    end
+    if IsInGroup and LE_PARTY_CATEGORY_INSTANCE and IsInGroup(LE_PARTY_CATEGORY_INSTANCE) then return end
+    if QueuedOrListed() then return end
+    local now = GetTime()
+    if lastWhisperInvite[sender] and now - lastWhisperInvite[sender] < 10 then return end
+    lastWhisperInvite[sender] = now
+    local invite = C_PartyInfo and C_PartyInfo.InviteUnit or InviteUnit
+    if type(invite) ~= "function" then return end
+    if pcall(invite, sender) then
+        ns.Print(L("%s per Flüstern eingeladen.", sender))
     end
 end)

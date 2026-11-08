@@ -166,7 +166,7 @@ local PAGES = {
     { name = "Sozial & Chat", icon = "map-2", tabs = {
         { name = "Sozial", sections = { "Sozial" } },
         { name = "Charaktere", sections = { "Charaktere" } },
-        { name = "Chat", sections = { "Chat" } },
+        { name = "Chat", sections = { "Chat", "Chat-Fenster" } },
     } },
     { name = "Interface", icon = "layout-grid", tabs = {
         { name = "Ausblenden", sections = { "Ausblenden" } },

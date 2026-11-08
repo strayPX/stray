@@ -1,3 +1,42 @@
 -- stray – englische Texte (Teil 28), Schlüssel = deutscher Originaltext
 local _, ns = ...
 local E = ns.LocaleEN
+
+-- Chat-Fenster und Chat-Komfort
+E["Chat-Fenster"] = "Chat windows"
+E["— Chat vor dem Neuladen —"] = "— Chat before the reload —"
+E["(Keine Chatzeilen gefunden.)"] = "(No chat lines found.)"
+E["Chatverlauf – %s"] = "Chat history – %s"
+E["Alles markieren mit Strg+A, kopieren mit Strg+C. Es erscheinen die letzten 1000 Zeilen."] = "Select all with Ctrl+A, copy with Ctrl+C. The last 1000 lines are shown."
+
+E["Chatfenster frei verschieben und größer ziehen"] = "Move chat windows freely and make them bigger"
+E["Das Chatfenster lässt sich über den Bildschirmrand hinaus schieben und größer aufziehen als bei Blizzard. Das Fenster „Allgemein“ stellst du im Bearbeitungsmodus von Blizzard ein.\nAus: Blizzards Grenzen gelten wieder."] = "Chat windows can be moved past the screen edge and resized larger than in Blizzard's UI. The \"General\" window is set up in Blizzard's Edit Mode.\nOff: Blizzard's limits apply again."
+E["Eingabezeile oben"] = "Input line on top"
+E["Die Zeile, in die du tippst, steht über dem Chatfenster statt darunter.\nAus: wieder unten."] = "The line you type into sits above the chat window instead of below it.\nOff: back at the bottom."
+E["Kein „klebender“ Chatkanal"] = "No \"sticky\" chat channel"
+E["Nach dem Senden springt die Eingabezeile wieder auf „Sagen“, statt im letzten Kanal (Gruppe, Gilde, Flüstern …) zu bleiben.\nAus: Blizzards Verhalten."] = "After sending, the input line returns to \"Say\" instead of staying in the last channel (party, guild, whisper ...).\nOff: Blizzard's behavior."
+E["Pfeiltasten in der Eingabezeile ohne Alt"] = "Arrow keys in the input line without Alt"
+E["Links und Rechts bewegen den Cursor in der Eingabezeile, Hoch und Runter holen frühere Eingaben – ohne dass du Alt halten musst.\nAus: Blizzards Verhalten (mit Alt)."] = "Left and Right move the cursor in the input line, Up and Down recall earlier entries – without holding Alt.\nOff: Blizzard's behavior (with Alt)."
+E["Chat verblasst nicht"] = "Chat does not fade"
+E["Chatzeilen bleiben sichtbar, statt nach einer Weile auszublenden.\nAus: Blizzards Ausblenden gilt wieder."] = "Chat lines stay visible instead of fading out after a while.\nOff: Blizzard's fading applies again."
+E["Chatverlauf auf 4096 Zeilen erhöhen"] = "Raise chat history to 4096 lines"
+E["Das Chatfenster merkt sich 4096 statt 128 Zeilen zum Zurückscrollen. Braucht etwas mehr Speicher.\nAus: wieder 128 Zeilen; ältere Zeilen gehen dabei verloren."] = "The chat window remembers 4096 instead of 128 lines for scrolling back. Uses a bit more memory.\nOff: back to 128 lines; older lines are lost."
+E["Kampflog-Reiter ausblenden"] = "Hide the combat log tab"
+E["Der Reiter „Kampflog“ wird unsichtbar und nicht mehr anklickbar. Die Lücke in der Reiterleiste bleibt.\nAus: Reiter erscheint wieder."] = "The \"Combat Log\" tab becomes invisible and can no longer be clicked. The gap in the tab bar stays.\nOff: the tab comes back."
+E["Chat-Knöpfe ausblenden"] = "Hide chat buttons"
+E["Blendet das Chat-Menü, den Kanal-/Social-Knopf (Schnellbeitritt) und die Scrollleiste samt „Nach unten“-Knopf aus. Scrollen mit dem Mausrad bleibt möglich.\nAus: alles wieder da."] = "Hides the chat menu, the channel/social button (quick join) and the scroll bar with its \"scroll to bottom\" button. Scrolling with the mouse wheel still works.\nOff: everything is back."
+
+E["Klassenfarben für Namen in allen Kanälen"] = "Class colors for names in all channels"
+E["Spielernamen im Chat erscheinen in der Klassenfarbe: Sagen, Rufen, Gruppe, Raid, Gilde, Flüstern, Instanz und Kanäle 1–10.\nAus: stray nimmt nur zurück, was es selbst eingeschaltet hat."] = "Player names in chat appear in their class color: say, yell, party, raid, guild, whisper, instance and channels 1–10.\nOff: stray only reverts what it turned on itself."
+E["Raid-Chat in der Gruppenfarbe"] = "Raid chat in the party color"
+E["Raid- und Raidleiter-Nachrichten haben dieselbe Farbe wie Gruppen- und Gruppenleiter-Nachrichten.\nAus: die vorherige Raid-Farbe kommt zurück."] = "Raid and raid leader messages use the same color as party and party leader messages.\nOff: the previous raid color comes back."
+E["Chat nach /reload wiederherstellen"] = "Restore chat after /reload"
+E["Nach /reload kommen die letzten Zeilen jedes Chatfensters zurück (bis zu 60, höchstens 10 Minuten alt). Nur normale Zeilen, nichts aus versiegelten Instanzen.\nGespeichert werden sie beim Neuladen und Abmelden."] = "After /reload the last lines of each chat window come back (up to 60, at most 10 minutes old). Only ordinary lines, nothing from sealed instances.\nThey are saved on reload and logout."
+E["Chatverlauf kopieren (Strg+Klick auf den Reiter)"] = "Copy chat history (Ctrl+click on the tab)"
+E["Strg+Klick auf einen Chat-Reiter öffnet ein Fenster mit den letzten 1000 Zeilen zum Markieren und Kopieren. Den Befehl /stray chat gibt es immer, auch bei „aus“."] = "Ctrl+click on a chat tab opens a window with the last 1000 lines to select and copy. The command /stray chat is always available, even when off."
+E["Zauber-Links von Fremden filtern"] = "Filter spell links from strangers"
+E["Nachrichten mit Zauber-Links von Spielern, die weder Freund noch Gildenmitglied noch in deiner Gruppe sind, erscheinen nicht in Sagen, Rufen und Kanälen."] = "Messages with spell links from players who are neither friends, guild members nor in your group do not appear in say, yell and channels."
+E["Duell-Meldungen filtern"] = "Filter duel messages"
+E["Blendet Meldungen über Duelle anderer Spieler aus („… hat … im Duell besiegt“). Deine eigenen Duelle bleiben sichtbar."] = "Hides messages about other players' duels (\"... has defeated ... in a duel\"). Your own duels stay visible."
+E["„Betrunken“-Meldungen filtern"] = "Filter \"drunk\" messages"
+E["Blendet die Meldungen aus, wenn andere Spieler betrunken werden oder sich übergeben. Deine eigenen bleiben sichtbar."] = "Hides the messages when other players get drunk or throw up. Your own stay visible."

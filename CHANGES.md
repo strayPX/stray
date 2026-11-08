@@ -1,3 +1,23 @@
+# stray 2.0.0
+
+**stray ist jetzt ein reines Komfort-Addon.** Alle eigenen Oberflächen-Elemente sind entfernt; Blizzards Oberfläche gilt wieder. Es bleiben DMG-Meter, Bedrohung, EP-Tracker und alle Komfort-Funktionen. Einstellungen der entfernten Teile werden beim ersten Start gelöscht (alle anderen bleiben).
+
+**Entfernt**
+- Eigene Aktionsleisten samt Tastenbelegung, Abklingzeiten über den Leisten, Taschenfenster, Taschen-/Menüleiste, eckige Minimap und Minimap-Knopf, Gruppenrahmen, Erfahrungsleiste, Uhr/FPS, Vorrats-Erinnerung und Schwungtimer.
+
+**Neu (alles standardmäßig aus)**
+- **Automation:** Geist im Schlachtfeld freigeben, automatisch aufstehen/absteigen, Beute-Bindung bestätigen, Taschen nicht automatisch öffnen.
+- **Sozial:** Freundschaftsanfragen, Haustierduelle und geteilte Quests blockieren, Einladung per Flüstern.
+- **Chat:** 14 neue Optionen (frei verschieben, Eingabezeile oben, kein Verblassen, Klassenfarben, Raid-Farbe, 4096 Zeilen, Wiederherstellen nach /reload, kopierbarer Verlauf, Spam-Filter, Kampflog- und Knöpfe ausblenden …).
+- **Ausblenden & Text:** Zonentext, Porträtzahlen, Tasten-/Makrotext, Talking Head, Alerts, Boss-Banner, Greifen, Ruhe-Animation, Raid-Titel; größere Mail-, Quest- und Buchtexte.
+- **Tooltip & Charakter:** Klassenfarbe, Ziel, Gildenrang, Maus-Anker, Skalierung, IDs; Lautstärkeregler, Helm/Umhang, Anprobe, Wowhead-Link.
+- **Grafik & Ton:** Bildschirmglühen und -effekte aus, Wetterdichte, Sound folgt dem Systemgerät.
+- **Einstellungsfenster neu geordnet:** Übersicht, Automation, Sozial & Chat, Interface, Kampf, Welt, stray.
+
+**Geändert**
+- EP-Tracker: ein Schalter für Tracking und Tabelle. DMG-Meter: Balkenhelligkeit fest.
+- Hilfe bei vollen Taschen markiert nur noch in Blizzards Taschen.
+
 # stray 1.1.0
 
 **Neu**
