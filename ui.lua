@@ -311,32 +311,48 @@ local scrollChild = CreateFrame("Frame", nil, scroll)
 scrollChild:SetSize(SCROLL_W, 10)
 scroll:SetScrollChild(scrollChild)
 
--- Schmaler Scrollbalken (nur Anzeige, scrollen per Mausrad)
-local scrollTrack = content:CreateTexture(nil, "ARTWORK")
-scrollTrack:SetPoint("TOPRIGHT", 0, -66)
-scrollTrack:SetPoint("BOTTOMRIGHT", 0, 44)
-scrollTrack:SetWidth(3)
-scrollTrack:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.6)
-local scrollThumb = content:CreateTexture(nil, "OVERLAY")
-scrollThumb:SetWidth(3)
-scrollThumb:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.9)
+-- Scrollbalken: Mausrad, Daumen ziehen oder in die Spur klicken
+-- (die Klickfläche ist breiter als die sichtbare Linie, damit man sie gut trifft)
+local scrollTrack = CreateFrame("Button", nil, content)
+scrollTrack:SetPoint("TOPRIGHT", 3, -66)
+scrollTrack:SetPoint("BOTTOMRIGHT", 3, 44)
+scrollTrack:SetWidth(12)
+scrollTrack:EnableMouseWheel(true)
+local trackLine = scrollTrack:CreateTexture(nil, "ARTWORK")
+trackLine:SetPoint("TOP")
+trackLine:SetPoint("BOTTOM")
+trackLine:SetWidth(4)
+trackLine:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.6)
+
+local scrollThumb = CreateFrame("Button", nil, scrollTrack)
+scrollThumb:SetWidth(12)
+scrollThumb:SetFrameLevel(scrollTrack:GetFrameLevel() + 2)
+local thumbLine = scrollThumb:CreateTexture(nil, "OVERLAY")
+thumbLine:SetPoint("TOP")
+thumbLine:SetPoint("BOTTOM")
+thumbLine:SetWidth(4)
+thumbLine:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.9)
+scrollThumb:SetScript("OnEnter", function() thumbLine:SetWidth(6) end)
+scrollThumb:SetScript("OnLeave", function(self) if not self.dragging then thumbLine:SetWidth(4) end end)
+
+local function MaxScroll()
+    return math.max(0, (scrollChild:GetHeight() or 0) - (scroll:GetHeight() or 0))
+end
 
 local function UpdateScrollBar()
     local view = scroll:GetHeight() or 0
     local total = scrollChild:GetHeight() or 0
     if view <= 0 or total <= view + 1 then
         scrollTrack:Hide()
-        scrollThumb:Hide()
         return
     end
     local thumbH = math.max(24, view * view / total)
     local maxScroll = total - view
     local offset = (scroll:GetVerticalScroll() or 0) / maxScroll * (view - thumbH)
     scrollThumb:ClearAllPoints()
-    scrollThumb:SetPoint("TOPRIGHT", scrollTrack, "TOPRIGHT", 0, -offset)
+    scrollThumb:SetPoint("TOP", scrollTrack, "TOP", 0, -offset)
     scrollThumb:SetHeight(thumbH)
     scrollTrack:Show()
-    scrollThumb:Show()
 end
 
 local preview -- weiter unten angelegt
@@ -350,6 +366,49 @@ end
 
 scroll:SetScript("OnMouseWheel", function(self, delta)
     SetScroll(self:GetVerticalScroll() - delta * ROW_H)
+end)
+scrollTrack:SetScript("OnMouseWheel", function(_, delta)
+    SetScroll(scroll:GetVerticalScroll() - delta * ROW_H)
+end)
+
+-- Cursor-Höhe in Fensterkoordinaten
+local function CursorY()
+    local _, y = GetCursorPosition()
+    return y / (scrollTrack:GetEffectiveScale() or 1)
+end
+
+-- Daumen ziehen: Mausbewegung in Scrollweg umrechnen
+scrollThumb:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" then return end
+    self.dragging = true
+    self.startY = CursorY()
+    self.startScroll = scroll:GetVerticalScroll() or 0
+    thumbLine:SetWidth(6)
+    self:SetScript("OnUpdate", function(thumb)
+        local free = (scrollTrack:GetHeight() or 0) - (thumb:GetHeight() or 0)
+        if free <= 0 then return end
+        local moved = thumb.startY - CursorY()
+        SetScroll(thumb.startScroll + moved / free * MaxScroll())
+    end)
+end)
+scrollThumb:SetScript("OnMouseUp", function(self)
+    self.dragging = false
+    self:SetScript("OnUpdate", nil)
+    if not self:IsMouseOver() then thumbLine:SetWidth(4) end
+end)
+scrollThumb:SetScript("OnHide", function(self)
+    self.dragging = false
+    self:SetScript("OnUpdate", nil)
+end)
+
+-- Klick in die Spur: Daumen springt dorthin
+scrollTrack:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" then return end
+    local top = self:GetTop()
+    local free = (self:GetHeight() or 0) - (scrollThumb:GetHeight() or 0)
+    if not top or free <= 0 then return end
+    local pos = top - CursorY() - (scrollThumb:GetHeight() or 0) / 2
+    SetScroll(math.max(0, math.min(free, pos)) / free * MaxScroll())
 end)
 
 local emptyText = Text(scrollChild, 12, C.textDim, FONT_BODY)
