@@ -67,10 +67,9 @@ local SIDE_PAD = 4
 local MAX_SESSIONS = 10
 local SNAP = 12 -- Andocken: so nah (in Pixeln) müssen die Kanten beim Loslassen sein
 
-local FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local FONT_BODY = "Fonts\\ARIALN.TTF"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
-local RESET_ICON = "Interface\\Buttons\\UI-RefreshButton"
+local ICONS = "Interface\\AddOns\\stray\\media\\icons\\"
 local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 local GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down"
 local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
@@ -121,6 +120,44 @@ function FX.Font()
     return FONT_BODY
 end
 
+-- Hintergrund-Deckkraft in Prozent: gespeicherter Wert, sonst Stilstandard (stray: heutiges Aussehen 85 %,
+-- Forever UI: 0 % = durchsichtig, nur Balken und Kopfzeile)
+function FX.BgPct()
+    local v = ns.db and tonumber(ns.db.dmBgAlpha)
+    if v then return math.max(0, math.min(100, v)) end
+    return FX.On() and 0 or 85
+end
+
+-- Klickt sich im stray-Fenster zur Seite „Kampf & Anzeigen“ → Reiter „DMG-Meter“ (ui.lua hat dafür
+-- keine eigene Funktion; ns.OpenConfig(seite, reiter) wird bevorzugt, falls es sie gibt)
+function FX.OpenConfig()
+    if type(ns.OpenConfig) == "function" then
+        if pcall(ns.OpenConfig, "Kampf & Anzeigen", "DMG-Meter") then return end
+    end
+    local f = _G.strayFrame
+    if not f then return end
+    if not f:IsShown() then f:Show() end
+    local PAGE = "Kampf & Anzeigen"
+    local function Find(frame, test, depth)
+        for _, child in ipairs({ frame:GetChildren() }) do
+            if test(child) then return child end
+            if depth > 0 then
+                local hit = Find(child, test, depth - 1)
+                if hit then return hit end
+            end
+        end
+    end
+    pcall(function()
+        local nav = Find(f, function(b) return type(b.page) == "table" and b.page.name == PAGE and b.GetScript end, 5)
+        if nav and nav:GetScript("OnClick") then nav:GetScript("OnClick")(nav) end
+        local label = L["DMG-Meter"]
+        local tab = Find(f, function(b)
+            return b.pageName == PAGE and b.text and b.text.GetText and b.text:GetText() == label and b:IsShown()
+        end, 6)
+        if tab and tab:GetScript("OnClick") then tab:GetScript("OnClick")(tab) end
+    end)
+end
+
 local function Border(frame, c, layer, sub)
     local lines = {}
     local function Edge(p1, p2, horizontal)
@@ -155,24 +192,36 @@ local function ShadowText(parent, size, c, font)
     return fs
 end
 
--- Kompakter Buchstaben-Knopf für den Umschalter S | H; aktiv = Akzent-Lila.
--- letter ist der deutsche Schlüssel, übersetzt wird beim Anzeigen (SetActive)
-local function LetterButton(parent, letter)
+-- Kleiner Symbol-Knopf für die Kopfzeile (Tabler-Linien-Symbol, weiß, per Vertexfarbe grau);
+-- mit :SetTip(fn) für Hover und Tooltip, :SetActive(on) für „aktiv = heller“. Farben immer live aus ns.Colors.
+local function IconButton(parent, file)
     local b = CreateFrame("Button", nil, parent)
-    b:SetSize(14, 16)
-    b.text = Text(b, 12, C.textSide, FONT_BODY)
-    b.text:SetPoint("CENTER", b, "CENTER", 0, 0)
-    b.text:SetJustifyH("CENTER")
-    b.text:SetText(L[letter])
-    local hover = b:CreateTexture(nil, "HIGHLIGHT")
-    hover:SetAllPoints()
-    hover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
-    b.hover = hover
-    function b:SetActive(on)
-        local c = on and C.accentText or C.textSide
-        self.text:SetText(L[letter])
-        self.text:SetTextColor(c[1], c[2], c[3], 1)
+    b:SetSize(14, 14)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetAllPoints()
+    b.icon:SetTexture(ICONS .. file)
+    function b:Paint()
+        local pal = ns.Colors or COLORS
+        local c = (self.hot or self.active) and pal.text or pal.textDim
+        self.icon:SetVertexColor(c[1], c[2], c[3], 1)
     end
+    function b:SetActive(on)
+        self.active = on and true or false
+        self:Paint()
+    end
+    function b:SetTip(fn)
+        self:SetScript("OnEnter", function(s)
+            s.hot = true
+            s:Paint()
+            fn(s)
+        end)
+        self:SetScript("OnLeave", function(s)
+            s.hot = false
+            s:Paint()
+            GameTooltip:Hide()
+        end)
+    end
+    b:Paint()
     return b
 end
 
@@ -727,6 +776,11 @@ local function CreateMeter(n)
     local mainBg = main:CreateTexture(nil, "BACKGROUND")
     mainBg:SetAllPoints()
     mainBg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4])
+    -- Bearbeitungsmodus / Shift-Ziehen: schwarz halbdurchsichtige Fläche, damit man das Fenster sieht und greift
+    local plate = main:CreateTexture(nil, "BACKGROUND", nil, 7)
+    plate:SetAllPoints()
+    plate:SetColorTexture(0, 0, 0, 0.5)
+    plate:Hide()
     win.lines = Border(main, C.border)
     -- 2-px-lila Kante oben (wie die Bedrohungsliste)
     local topEdge = main:CreateTexture(nil, "ARTWORK")
@@ -793,13 +847,17 @@ local function CreateMeter(n)
         local baseStop = main:GetScript("OnDragStop")
         main:SetScript("OnDragStart", function(self, ...)
             if sizing then return end
-            if IsShiftKeyDown() then moving = true end
+            if IsShiftKeyDown() then
+                moving = true
+                win.ApplyBg()
+            end
             if baseStart then baseStart(self, ...) end
         end)
         main:SetScript("OnDragStop", function(self, ...)
             if sizing then return end
             local wasMoving = moving
             moving = false
+            win.ApplyBg()
             -- Ohne Shift wurde nichts verschoben: keine (evtl. relative) Position speichern
             if not wasMoving then return end
             if baseStop then baseStop(self, ...) end
@@ -808,6 +866,7 @@ local function CreateMeter(n)
         main:HookScript("OnHide", function(self)
             if moving then
                 moving = false
+                win.ApplyBg()
                 if baseStop then pcall(baseStop, self) end
             end
         end)
@@ -832,7 +891,7 @@ local function CreateMeter(n)
         GameTooltip:SetText((n == 1) and L["DMG-Meter"] or L("DMG-Meter %d", n), a[1], a[2], a[3])
         GameTooltip:AddLine(L["Klick auf den Titel: Gesamt, aktueller Kampf oder ein einzelner Kampf."], t[1], t[2], t[3], true)
         GameTooltip:AddLine(L["Werte: gesamt (pro Sekunde). Die Daten kommen aus dem eingebauten Schadensmesser des Spiels."], d[1], d[2], d[3], true)
-        GameTooltip:AddLine(L["S || H oben rechts: Schaden oder Heilung."], d[1], d[2], d[3], true)
+        GameTooltip:AddLine(L["Schwerter und Herz oben rechts: Schaden oder Heilung."], d[1], d[2], d[3], true)
         GameTooltip:AddLine(L["„+“ im Kopf: weiteres Fenster (bis zu 5), dockt oben an."], d[1], d[2], d[3], true)
         GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], d[1], d[2], d[3])
         GameTooltip:AddLine(L["An die Ober- oder Unterkante eines anderen DMG-Meters ziehen: andocken. Wegziehen löst es wieder."], d[1], d[2], d[3], true)
@@ -847,88 +906,52 @@ local function CreateMeter(n)
     main:SetScript("OnEnter", function(self) MainTooltip(self) end)
     main:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Kopfzeile rechts: Schließen (nur Fenster 2–5), Zurücksetzen (Symbol), davor S | H und „+“
-    local closeButton = CreateFrame("Button", nil, main)
-    closeButton:SetSize(14, 16)
-    closeButton.text = Text(closeButton, 14, C.textSide, FONT_BODY)
-    closeButton.text:SetPoint("CENTER", closeButton, "CENTER", 0, 0)
-    closeButton.text:SetJustifyH("CENTER")
-    closeButton.text:SetText("×")
-    local closeHover = closeButton:CreateTexture(nil, "HIGHLIGHT")
-    closeHover:SetAllPoints()
-    closeHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
+    -- Kopfzeile: kleine graue Linien-Symbole (von links) + neues Fenster, Zurücksetzen, Schwerter/Herz
+    -- (Schaden/Heilung, das aktive heller), Zahnrad (Einstellungen), × (nur Fenster 2–5)
+    local plusButton = IconButton(main, "plus")
+    local resetButton = IconButton(main, "refresh")
+    local damageButton = IconButton(main, "swords")
+    local healingButton = IconButton(main, "heart")
+    local configButton = IconButton(main, "settings")
+    local closeButton = IconButton(main, "x")
     closeButton:Hide()
+    local headerIcons = { plusButton, resetButton, damageButton, healingButton, configButton, closeButton }
+    for _, b in ipairs(headerIcons) do ForwardDrag(b) end
 
-    local resetButton = CreateFrame("Button", nil, main)
-    resetButton:SetSize(14, 14)
-    resetButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", -4, -3)
-    resetButton.icon = resetButton:CreateTexture(nil, "ARTWORK")
-    resetButton.icon:SetAllPoints()
-    resetButton.text = Text(resetButton, 11, C.textSide, FONT)
-    resetButton.text:SetPoint("CENTER", resetButton, "CENTER", 0, 0)
-    resetButton.text:SetJustifyH("CENTER")
-    resetButton.text:SetText("R")
-    -- Symbol, falls die Textur da ist; sonst bleibt der Buchstabe „R“
-    if resetButton.icon:SetTexture(RESET_ICON) == false then
-        resetButton.icon:Hide()
-    else
-        resetButton.text:Hide()
-    end
-    local resetHover = resetButton:CreateTexture(nil, "HIGHLIGHT")
-    resetHover:SetAllPoints()
-    resetHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
+    damageButton:SetTip(function(self) ModeTooltip(self, "Schaden anzeigen") end)
+    healingButton:SetTip(function(self) ModeTooltip(self, "Heilung anzeigen") end)
 
-    local healingButton = LetterButton(main, "H")
-    healingButton:SetPoint("RIGHT", resetButton, "LEFT", -6, 0)
-    local modeSeparator = Text(main, 11, C.textDim, FONT)
-    modeSeparator:SetPoint("RIGHT", healingButton, "LEFT", 0, 0)
-    modeSeparator:SetText("||") -- „||“ = ein sichtbarer Strich (| ist WoWs Steuerzeichen)
-    local damageButton = LetterButton(main, "S")
-    damageButton:SetPoint("RIGHT", modeSeparator, "LEFT", 0, 0)
-
-    local plusButton = CreateFrame("Button", nil, main)
-    plusButton:SetSize(14, 16)
-    plusButton:SetPoint("RIGHT", damageButton, "LEFT", -6, 0)
-    plusButton.text = Text(plusButton, 14, C.textSide, FONT_BODY)
-    plusButton.text:SetPoint("CENTER", plusButton, "CENTER", 0, 0)
-    plusButton.text:SetJustifyH("CENTER")
-    plusButton.text:SetText("+")
-    local plusHover = plusButton:CreateTexture(nil, "HIGHLIGHT")
-    plusHover:SetAllPoints()
-    plusHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
-
-    ForwardDrag(damageButton)
-    ForwardDrag(healingButton)
-    ForwardDrag(resetButton)
-    ForwardDrag(plusButton)
-    ForwardDrag(closeButton)
-
-    damageButton:SetScript("OnEnter", function(self) ModeTooltip(self, "Schaden anzeigen") end)
-    damageButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    healingButton:SetScript("OnEnter", function(self) ModeTooltip(self, "Heilung anzeigen") end)
-    healingButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Titel links (klickbar: Ansicht wählen)
+    -- Titel links (klickbar: Ansicht wählen); weiße Schrift mit schwarzem Rand, ohne Hintergrund
     local titleButton = CreateFrame("Button", nil, main)
     titleButton:SetPoint("TOPLEFT", main, "TOPLEFT", 3, -2)
     titleButton:SetPoint("TOPRIGHT", plusButton, "TOPLEFT", -4, 0)
     titleButton:SetHeight(HEADER_H - 4)
     local titleHover = titleButton:CreateTexture(nil, "HIGHLIGHT")
     titleHover:SetAllPoints()
-    titleHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 0.6)
-    local title = Text(titleButton, 12, C.accentText, FONT_BODY)
-    title:SetShadowOffset(1, -1)
+    titleHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 0.35)
+    local title = Text(titleButton, 12, { 1, 1, 1, 1 }, FONT_BODY, "OUTLINE")
     title:SetPoint("LEFT", titleButton, "LEFT", 3, 0)
-    title:SetPoint("RIGHT", titleButton, "RIGHT", -12, 0)
-    local titleArrow = Text(titleButton, 10, C.textDim)
+    title:SetPoint("RIGHT", titleButton, "RIGHT", -14, 0)
+    local titleArrow = titleButton:CreateTexture(nil, "ARTWORK")
+    titleArrow:SetSize(10, 10)
     titleArrow:SetPoint("RIGHT", titleButton, "RIGHT", -2, 0)
-    titleArrow:SetText("v")
+    titleArrow:SetTexture(ICONS .. "chevron-down")
+    titleArrow:SetVertexColor(C.textDim[1], C.textDim[2], C.textDim[3], 1)
     ForwardDrag(titleButton)
     titleButton:SetScript("OnEnter", function(self) MainTooltip(self) end)
     titleButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+    -- Symbole mit den Palettenfarben neu einfärben (Palette erst nach dem Laden der Datei gültig)
+    function win.PaintHeader()
+        for _, b in ipairs(headerIcons) do b:Paint() end
+        local c = (ns.Colors or COLORS).textDim
+        titleArrow:SetVertexColor(c[1], c[2], c[3], 1)
+    end
+
     -- Hinweistext, wenn keine Balken da sind
     local emptyText = Text(main, 11, C.textDim)
+    emptyText:SetShadowColor(0, 0, 0, 1)
+    emptyText:SetShadowOffset(1, -1)
     emptyText:SetPoint("TOPLEFT", main, "TOPLEFT", SIDE_PAD + 2, -TOP_H - 2)
     emptyText:SetPoint("TOPRIGHT", main, "TOPRIGHT", -SIDE_PAD - 2, -TOP_H - 2)
     emptyText:Hide()
@@ -991,26 +1014,30 @@ local function CreateMeter(n)
     -- Leicht zurückgenommen, damit er den Wert der untersten Zeile kaum verdeckt
     grip:SetAlpha(0.5)
 
-    -- Griff, Schließen und Zurücksetzen passend zum Andock-Zustand setzen
+    -- Griff und Kopfsymbole passend zum Andock-Zustand setzen
     function win.LayoutGrip()
         local top = win.Docked() == "top"
         grip:ClearAllPoints()
-        resetButton:ClearAllPoints()
-        closeButton:ClearAllPoints()
-        local x = top and -20 or -4
         if top then
             -- Unterkante hängt an einem anderen Fenster: Höhe wächst nach oben, Griff sitzt oben rechts
             grip:SetPoint("TOPRIGHT", main, "TOPRIGHT", -1, -1)
         else
             grip:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", -1, 1)
         end
-        if n > 1 then
-            closeButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", x, -2)
-            closeButton:Show()
-            resetButton:SetPoint("RIGHT", closeButton, "LEFT", -4, 0)
-        else
-            closeButton:Hide()
-            resetButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", x, -3)
+        -- Symbole von rechts nach links ketten (oben angedockt: Platz für den Griff lassen)
+        local prev
+        for i = #headerIcons, 1, -1 do
+            local b = headerIcons[i]
+            b:ClearAllPoints()
+            if b == closeButton then b:SetShown(n > 1) end
+            if b ~= closeButton or n > 1 then
+                if prev then
+                    b:SetPoint("RIGHT", prev, "LEFT", -4, 0)
+                else
+                    b:SetPoint("TOPRIGHT", main, "TOPRIGHT", top and -20 or -4, -3)
+                end
+                prev = b
+            end
         end
         local textures = { grip:GetNormalTexture(), grip:GetPushedTexture(), grip:GetHighlightTexture() }
         for i = 1, 3 do
@@ -1181,18 +1208,21 @@ local function CreateMeter(n)
     -- Knöpfe der Kopfzeile
     -----------------------------------------------------------------------
 
+    local function Tip(owner, titleKey, bodyKey)
+        GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+        GameTooltip:SetText(L[titleKey], C.accentText[1], C.accentText[2], C.accentText[3])
+        if bodyKey then GameTooltip:AddLine(L[bodyKey], C.text[1], C.text[2], C.text[3], true) end
+        GameTooltip:Show()
+    end
+
     resetButton:SetScript("OnClick", function()
         Click()
         menu:Hide()
         OpenResetPopup()
     end)
-    resetButton:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(L["Zurücksetzen"], C.accentText[1], C.accentText[2], C.accentText[3])
-        GameTooltip:AddLine(L["Löscht alle Kämpfe in allen DMG-Meter-Fenstern – auch in Blizzards eigenem Schadensmesser. Geht nur außerhalb des Kampfes."], C.text[1], C.text[2], C.text[3], true)
-        GameTooltip:Show()
+    resetButton:SetTip(function(self)
+        Tip(self, "Zurücksetzen", "Löscht alle Kämpfe in allen DMG-Meter-Fenstern – auch in Blizzards eigenem Schadensmesser. Geht nur außerhalb des Kampfes.")
     end)
-    resetButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     plusButton:SetScript("OnClick", function()
         Click()
@@ -1200,26 +1230,29 @@ local function CreateMeter(n)
         GameTooltip:Hide()
         AddWindow(n)
     end)
-    plusButton:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(L["Weiteres Fenster"], C.accentText[1], C.accentText[2], C.accentText[3])
-        GameTooltip:AddLine(L["Öffnet eine Kopie dieses Fensters (gleiche Größe, gleicher Modus) und dockt sie oben an. Bis zu 5 Fenster."], C.text[1], C.text[2], C.text[3], true)
-        GameTooltip:Show()
+    plusButton:SetTip(function(self)
+        Tip(self, "Weiteres Fenster", "Öffnet eine Kopie dieses Fensters (gleiche Größe, gleicher Modus) und dockt sie oben an. Bis zu 5 Fenster.")
     end)
-    plusButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     closeButton:SetScript("OnClick", function()
         Click()
         GameTooltip:Hide()
         CloseWindow(n)
     end)
-    closeButton:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(L["Fenster schließen"], C.accentText[1], C.accentText[2], C.accentText[3])
-        GameTooltip:AddLine(L["Schließt dieses DMG-Meter-Fenster. Angedockte Fenster rücken nach."], C.text[1], C.text[2], C.text[3], true)
-        GameTooltip:Show()
+    closeButton:SetTip(function(self)
+        Tip(self, "Fenster schließen", "Schließt dieses DMG-Meter-Fenster. Angedockte Fenster rücken nach.")
     end)
-    closeButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    configButton:SetScript("OnClick", function()
+        Click()
+        menu:Hide()
+        GameTooltip:Hide()
+        if FX.SetSelected then FX.SetSelected(n) end
+        FX.OpenConfig()
+    end)
+    configButton:SetTip(function(self)
+        Tip(self, "DMG-Meter-Einstellungen", "Öffnet das stray-Fenster auf der Seite „DMG-Meter“.")
+    end)
 
     local function SetMode(mode)
         Click()
@@ -1234,6 +1267,37 @@ local function CreateMeter(n)
     -- Läuft einmal je Fenster; bei einem Fehler bleibt der Aufbau im Stil „stray“ stehen.
     -----------------------------------------------------------------------
 
+    -- Fläche, Rahmen und Linien nach „Hintergrund-Deckkraft“ (siehe FX.BgPct); 0 % = nichts davon
+    function win.ApplyBg()
+        local pct = FX.BgPct()
+        local show = pct > 0
+        local a = pct / 100
+        local made = win.fxMade
+        local la
+        if win.forever and made then
+            la = a
+            made.fill:SetShown(show)
+            made.deco:SetShown(show)
+            if show then
+                made.fill:SetAlpha(a)
+                made.deco:SetAlpha(a)
+            end
+        else
+            la = math.min(1, pct / 85)
+            mainBg:SetShown(show)
+            if show then mainBg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], a) end
+            topEdge:SetShown(show)
+            topEdge:SetAlpha(la)
+            for _, t in ipairs(win.lines) do
+                t:SetShown(show)
+                t:SetAlpha(la)
+            end
+        end
+        headerLine:SetShown(show)
+        headerLine:SetAlpha(la)
+        plate:SetShown(((ns.editMode or moving) and true) or false)
+    end
+
     function win.StyleForever()
         if win.forever or not FX.On() then return end
         local S = ns.Style
@@ -1247,7 +1311,6 @@ local function CreateMeter(n)
             made.deco = deco
             made.border = S.Border(deco, { size = 8, cornerSize = 16, cornerOffset = 3 })
             made.fill = S.Fill(main, "window")
-            made.fill:SetAlpha(0.92)
             -- Auswahlmenü: Schiefer-Fläche, dünner Rahmen ohne Eckwinkel
             local mdeco = CreateFrame("Frame", nil, menu)
             mdeco:SetPoint("TOPLEFT", menu, "TOPLEFT", -3, 3)
@@ -1266,6 +1329,7 @@ local function CreateMeter(n)
             return
         end
         win.forever = true
+        win.fxMade = made
         mainBg:Hide()
         topEdge:Hide()
         for _, t in ipairs(win.lines) do t:Hide() end
@@ -1277,19 +1341,13 @@ local function CreateMeter(n)
 
         -- Texte und Hover mit der Forever-Palette (beim Laden von Fenster 1 noch Stil-stray-Werte)
         local dim = Cs.textDim
-        for _, fs in ipairs({ closeButton.text, resetButton.text, plusButton.text, modeSeparator, titleArrow, emptyText }) do
-            fs:SetTextColor(dim[1], dim[2], dim[3], 1)
-        end
+        emptyText:SetTextColor(dim[1], dim[2], dim[3], 1)
+        win.PaintHeader()
         local h = Cs.hover
-        for _, tex in ipairs({ closeHover, resetHover, plusHover, damageButton.hover, healingButton.hover }) do
-            tex:SetColorTexture(h[1], h[2], h[3], 1)
-        end
-        titleHover:SetColorTexture(h[1], h[2], h[3], 0.6)
+        titleHover:SetColorTexture(h[1], h[2], h[3], 0.35)
         emptyText:SetFont(S.Font(), 11, "")
         pcall(function()
-            title:SetFont(S.FontTitle(), 12, "")
-            local g = Cs.gold or Cs.accentText
-            title:SetTextColor(g[1], g[2], g[3], 1)
+            title:SetFont(S.FontTitle(), 12, "OUTLINE")
             local bl = Cs.bronzeLight or Cs.text
             for _, tex in ipairs({ grip:GetNormalTexture(), grip:GetPushedTexture() }) do
                 tex:SetVertexColor(bl[1], bl[2], bl[3], 1)
@@ -1297,8 +1355,10 @@ local function CreateMeter(n)
             grip:SetAlpha(0.7)
         end)
         for i = 1, #rows do FX.Row(rows[i]) end
+        win.ApplyBg()
     end
     win.StyleForever()
+    win.ApplyBg()
 
     -----------------------------------------------------------------------
     -- Anzeige
@@ -1339,6 +1399,8 @@ local function CreateMeter(n)
             resetButton:Disable()
             resetButton:SetAlpha(0.4)
         end
+        win.PaintHeader()
+        win.ApplyBg()
     end
 
     -- cache: gemeinsame Abfragen dieser Aktualisierung (siehe Query)
@@ -1398,6 +1460,7 @@ local function CreateMeter(n)
         ns.db[win.heightKey] = Clamp(ns.db[win.heightKey], MIN_H, MAX_H, DEFAULT_H)
         main:SetSize(ns.db[win.widthKey], ns.db[win.heightKey])
         ns.RestorePosition(main) -- der Haken unten dockt bei Bedarf an
+        win.ApplyBg()
     end
 
     -----------------------------------------------------------------------
@@ -1446,6 +1509,7 @@ local function CreateMeter(n)
         if ns.db then Decide(win, false) end
     end
 
+    win.LayoutGrip()
     windows[n] = win
     byFrame[main] = win
     return win
@@ -1683,6 +1747,7 @@ local function SetSelected(id)
     id = tonumber(id)
     if id and IsOpen(id) then selectedWin = id end
 end
+FX.SetSelected = SetSelected
 
 PublishInstances = function()
     if type(ns.RegisterInstances) ~= "function" or not ns.db then return end
@@ -1943,7 +2008,7 @@ end
 ns.AddOption(2, "DMG-Meter", {
     key = "dmShow",
     label = L["DMG-Meter anzeigen"],
-    tooltip = L["Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (so hell wie die Gruppenrahmen), dein eigener Balken hat links einen lila Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit S || H zwischen Schaden und Heilung um; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben."],
+    tooltip = L["Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (so hell wie die Gruppenrahmen), dein eigener Balken hat links einen lila Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit den Symbolen Schwerter und Herz zwischen Schaden und Heilung um, das Zahnrad öffnet diese Einstellungen; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("dmShow"),
@@ -1989,7 +2054,7 @@ ns.AddOption(2, "DMG-Meter", {
     values = { "damage", "healing" },
     labels = { L["Schaden"], L["Heilung"] },
     label = L["Modus"],
-    tooltip = L["Schaden oder Heilung im gewählten DMG-Meter-Fenster – dasselbe wie S || H im Fenster selbst."],
+    tooltip = L["Schaden oder Heilung im gewählten DMG-Meter-Fenster – dasselbe wie Schwerter und Herz im Fenster selbst."],
     keywords = { "modus", "mode", "schaden", "damage", "heilung", "healing" },
     noExport = true,
     isEnabled = ShowEnabled,
@@ -1998,6 +2063,25 @@ ns.AddOption(2, "DMG-Meter", {
     set = function(value)
         if not ns.db then return end
         SetModeOf(GetSelected(), value)
+        Request()
+    end,
+})
+
+-- Hintergrund-Deckkraft (nil = Stilstandard: stray 85 %, Forever UI 0 %); der Regler zeigt den wirksamen Wert
+ns.AddOption(2, "DMG-Meter", {
+    key = "dmBgAlpha",
+    type = "slider",
+    min = 0, max = 100, step = 5, unit = "%",
+    label = L["Hintergrund-Deckkraft"],
+    tooltip = L["Deckkraft der Fläche hinter den Balken (alle DMG-Meter-Fenster). 0 = komplett durchsichtig, nur Balken und Kopfzeile sind zu sehen, ohne Rahmen. Standard: „stray“ 85, „Forever UI“ 0. Im Bearbeitungsmodus und beim Verschieben liegt zusätzlich eine halbdurchsichtige schwarze Fläche dahinter."],
+    keywords = { "hintergrund", "deckkraft", "durchsichtig", "transparent", "background", "opacity", "alpha", "rahmen", "border", "damage", "meter" },
+    isEnabled = ShowEnabled,
+    disabledHint = L["Erst „DMG-Meter anzeigen“ einschalten (direkt darüber)."],
+    get = function() return FX.BgPct() end,
+    set = function(value)
+        if not ns.db then return end
+        ns.db.dmBgAlpha = Clamp(value, 0, 100, FX.BgPct())
+        for _, win in pairs(windows) do win.ApplyBg() end
         Request()
     end,
 })

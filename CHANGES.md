@@ -1,6 +1,7 @@
 # Nach 1.0.0 (nächste Version)
 
 **Neu**
+- **DMG-Meter durchsichtig mit Symbol-Kopfzeile:** neue Option „Hintergrund-Deckkraft“ (0–100 %, Standard je Stil: „stray“ wie bisher, „Forever UI“ 0 % ohne Rahmen). Kopfzeile ohne Hintergrund: Titel weiß mit schwarzem Rand, rechts kleine graue Symbole statt Textknöpfen (Plus, Zurücksetzen, Schwerter/Herz für Schaden/Heilung, Zahnrad öffnet die DMG-Meter-Einstellungen, × bei Zusatzfenstern). Im Bearbeitungsmodus und beim Verschieben liegt eine halbdurchsichtige schwarze Fläche hinter dem Fenster.
 - **Oberflächen-Art „Forever UI“** (System → Allgemein, wirkt nach dem Neuladen): Bronze-Gold-Rahmen, dunkler Schiefer, goldene Überschriften in Friz Quadrata, trapezförmige Reiter, rot-bronzene Hauptknöpfe. Gilt für das stray-Fenster, die DMG-Meter-Fenster, die Bedrohungsliste, die Aktionsleisten-Knöpfe und die Bearbeitungsleiste. Die bisherige Art „stray“ (lila, flach) bleibt Standard und unverändert.
 - **Hinweis im Chat nach einem Update:** stray sagt, ob nach dem Update ein `/reload` reicht oder WoW komplett neu gestartet werden muss (abschaltbar).
 - Aktionsleisten: **Shift+Klick zum Verschieben** löst die Aktion nicht mehr aus (gesperrte Leisten).

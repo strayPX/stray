@@ -30,6 +30,7 @@ locale\enUS_18.lua
 locale\enUS_19.lua
 locale\enUS_20.lua
 locale\enUS_21.lua
+locale\enUS_22.lua
 stray.lua
 style.lua
 glow.lua

@@ -2478,6 +2478,13 @@ function S.Navigate(pageName, tabName)
     Refresh()
 end
 
+-- Öffnet das stray-Fenster auf einer Seite (und Reiter), z. B. aus dem Zahnrad des DMG-Meters
+function ns.OpenConfig(pageName, tabName)
+    if not strayFrame then return end
+    if not strayFrame:IsShown() then strayFrame:Show() end
+    S.Navigate(pageName, tabName)
+end
+
 local function BuildNav()
     local side = CreateFrame("Frame", nil, frame)
     side:SetPoint("TOPLEFT", P, -M.TOP_H - 1)

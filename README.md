@@ -58,6 +58,7 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 
 **DMG-Meter**
 - **DMG-Meter anzeigen:** Schaden oder Heilung, gesamt und pro Sekunde – für alles, den aktuellen Kampf oder einzelne Kämpfe; mit Zurücksetzen.
+- **Durchsichtig mit Symbol-Kopfzeile:** Titel mit schwarzem Rand und kleine graue Symbole (Plus, Zurücksetzen, Schwerter/Herz für Schaden/Heilung, Zahnrad für die Einstellungen, × bei Zusatzfenstern). **Hintergrund-Deckkraft** 0–100 % (Standard: „stray“ wie bisher, „Forever UI“ komplett durchsichtig ohne Rahmen); im Bearbeitungsmodus und beim Verschieben liegt eine halbdurchsichtige schwarze Fläche dahinter.
 - **Nach Instanz zurücksetzen:** leert den Messer beim Verlassen eines Dungeons/Schlachtzugs.
 
 **Kampfhilfen**
