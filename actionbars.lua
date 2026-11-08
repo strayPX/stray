@@ -16,6 +16,9 @@
 
 local _, ns = ...
 
+-- Veralteter Zauberrang (Option im Bereich „Zaubern“), neu ab 0.19.0-alpha
+ns.defaults.abRankCheck = false
+
 local IsSecret = ns.IsSecret
 local Public = ns.Public
 
@@ -333,6 +336,141 @@ local function UpdateGlow(b)
     b.glow:SetShown(glow)
 end
 
+---------------------------------------------------------------------------
+-- Veralteter Zauberrang: Pfeil oben links, wenn ein höherer Rang bekannt ist
+-- (nur anzeigen, nie austauschen). Das Zauberbuch wird gedrosselt gelesen und
+-- als „Name → höchster Rang“ zwischengespeichert; je Knopf nur eine Nachschau.
+---------------------------------------------------------------------------
+
+local RANK_ARROW = "Interface\\Buttons\\Arrow-Up-Up"
+local PLAYER_BANK = Enum and Enum.SpellBookSpellBank and Enum.SpellBookSpellBank.Player
+local SPELL_ITEM = Enum and Enum.SpellBookItemType and Enum.SpellBookItemType.Spell
+
+local RANK_API = (C_SpellBook and C_SpellBook.GetNumSpellBookSkillLines and C_SpellBook.GetSpellBookSkillLineInfo
+    and C_SpellBook.GetSpellBookItemInfo and C_Spell and C_Spell.GetSpellName and PLAYER_BANK ~= nil) and true or false
+
+local topRank = {}    -- [Zaubername] = { id = höchster Rang, rank = Zahl oder nil }
+local rankCache = {}  -- [spellID] = Rangzahl des höheren Rangs, true (Zahl unbekannt) oder false
+local rankScanned = false
+
+local function RankCheckOn()
+    return RANK_API and Enabled() and ns.db and ns.db.abRankCheck and true or false
+end
+
+-- Lesbarer Wert eines Typs, sonst nil
+local function Plain(v, kind)
+    if IsSecret(v) or type(v) ~= kind then return nil end
+    return v
+end
+
+-- „Rang 4“ → 4 (Text des Clients, daher nur die Zahl herausziehen)
+local function RankNumber(text)
+    text = Plain(text, "string")
+    if not text then return nil end
+    return tonumber(text:match("(%d+)"))
+end
+
+local function SpellRank(id)
+    if not (C_Spell and C_Spell.GetSpellSubtext) then return nil end
+    local ok, sub = pcall(C_Spell.GetSpellSubtext, id)
+    return ok and RankNumber(sub) or nil
+end
+
+local function BookCall(fn, ...)
+    if type(fn) ~= "function" then return nil end
+    local ok, v = pcall(fn, ...)
+    if not ok or IsSecret(v) then return nil end
+    return v
+end
+
+-- Zauberbuch lesen: je Name der höchste bekannte Rang (keine passiven, keine der anderen Spezialisierung)
+local function ScanSpellBook()
+    wipe(topRank)
+    wipe(rankCache)
+    rankScanned = true
+    local lines = BookCall(C_SpellBook.GetNumSpellBookSkillLines)
+    if type(lines) ~= "number" then return end
+    for line = 1, lines do
+        local li = BookCall(C_SpellBook.GetSpellBookSkillLineInfo, line)
+        if type(li) == "table" and type(li.offSpecID) == "nil" then
+            local offset, count = Plain(li.itemIndexOffset, "number"), Plain(li.numSpellBookItems, "number")
+            if offset and count then
+                for slot = offset + 1, offset + count do
+                    local info = BookCall(C_SpellBook.GetSpellBookItemInfo, slot, PLAYER_BANK)
+                    if type(info) == "table" then
+                        local id, name = Plain(info.spellID, "number"), Plain(info.name, "string")
+                        local isSpell = SPELL_ITEM == nil or Plain(info.itemType, "number") == SPELL_ITEM
+                        local passive = Plain(info.isPassive, "boolean") == true
+                        local low = BookCall(C_SpellBook.IsSpellBookItemLowRank, slot, PLAYER_BANK) == true
+                        if id and name and isSpell and not passive and not low then
+                            local rank = RankNumber(info.subName) or SpellRank(id)
+                            local old = topRank[name]
+                            -- Zwei Einträge gleichen Namens: der höhere Rang gewinnt
+                            if not old or (rank and (not old.rank or rank > old.rank)) then
+                                topRank[name] = { id = id, rank = rank }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Höherer Rang für spellID? Gibt Rangzahl, true (höher, Zahl unbekannt) oder false zurück
+local function HigherRank(id)
+    local cached = rankCache[id]
+    if cached ~= nil then return cached end
+    local result = false
+    local okN, name = pcall(C_Spell.GetSpellName, id)
+    name = okN and Plain(name, "string") or nil
+    local top = name and topRank[name]
+    if top and top.id ~= id then
+        local mine = SpellRank(id)
+        if top.rank and mine then
+            if top.rank > mine then result = top.rank end
+        elseif C_SpellBook.FindSpellBookSlotForSpell and C_SpellBook.IsSpellBookItemLowRank then
+            -- Ränge nicht lesbar: Blizzards Kennzeichen „niedriger Rang“ im Zauberbuch nehmen
+            local okF, slot, bank = pcall(C_SpellBook.FindSpellBookSlotForSpell, id)
+            slot = okF and Plain(slot, "number") or nil
+            bank = okF and Plain(bank, "number") or nil
+            if slot and (bank == nil or bank == PLAYER_BANK)
+                and BookCall(C_SpellBook.IsSpellBookItemLowRank, slot, PLAYER_BANK) == true then
+                result = top.rank or true
+            end
+        end
+    end
+    rankCache[id] = result
+    return result
+end
+
+local function UpdateRank(b)
+    local higher = false
+    if b.hasAction and RankCheckOn() then
+        if not rankScanned then pcall(ScanSpellBook) end
+        local ok, kind, id = Call("GetActionInfo", b.action)
+        if ok and not IsSecret(kind) and not IsSecret(id) and kind == "spell" and type(id) == "number" then
+            higher = HigherRank(id)
+        end
+    end
+    b.rankUp = higher
+    b.rankArrow:SetShown(higher and true or false)
+end
+
+-- Zauberbuch geändert: gedrosselt neu lesen und alle Knöpfe nachziehen
+local rankQueued = false
+local function QueueRankScan()
+    rankScanned = false
+    wipe(rankCache)
+    if rankQueued or not built then return end
+    rankQueued = true
+    C_Timer.After(0.5, function()
+        rankQueued = false
+        if RankCheckOn() then pcall(ScanSpellBook) end
+        for _, b in ipairs(buttons) do pcall(UpdateRank, b) end
+    end)
+end
+
 local function UpdateHotkey(b)
     local text = ""
     if ns.db and ns.db.abKeybinds then
@@ -353,7 +491,10 @@ local function UpdateVisibility(b)
     b.hotkey:SetShown(show)
     b.count:SetShown(b.hasAction and true or false)
     b.highlight:SetAlpha(show and 1 or 0)
-    if not b.hasAction then b.glow:SetShown(false) end
+    if not b.hasAction then
+        b.glow:SetShown(false)
+        b.rankArrow:SetShown(false)
+    end
     -- Leere, unsichtbare Plätze sollen keine Mausklicks in die Welt abfangen
     if not InCombatLockdown() then
         pcall(b.EnableMouse, b, show and true or false)
@@ -379,6 +520,7 @@ local function UpdateButton(b)
     pcall(UpdateState, b)
     pcall(UpdateGlow, b)
     pcall(UpdateHotkey, b)
+    pcall(UpdateRank, b)
     UpdateVisibility(b)
 end
 
@@ -411,7 +553,17 @@ local function OnEnter(self)
     else
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     end
-    if pcall(GameTooltip.SetAction, GameTooltip, self.action) then GameTooltip:Show() end
+    if pcall(GameTooltip.SetAction, GameTooltip, self.action) then
+        local higher = self.rankUp
+        if higher and RankCheckOn() then
+            if type(higher) == "number" then
+                GameTooltip:AddLine(("stray: höherer Rang bekannt (Rang %d)"):format(higher), 0.4, 1, 0.4)
+            else
+                GameTooltip:AddLine("stray: höherer Rang bekannt", 0.4, 1, 0.4)
+            end
+        end
+        GameTooltip:Show()
+    end
 end
 
 local function ActionBarsLocked()
@@ -513,6 +665,21 @@ local function CreateButton(bar, l, i)
     b.glow = MakeEdges(top, "OVERLAY", 7)
     b.glow:SetColor(GLOW_COLOR[1], GLOW_COLOR[2], GLOW_COLOR[3], GLOW_COLOR[4])
     b.glow:SetShown(false)
+
+    -- Pfeil „höherer Rang bekannt“ oben links (auf dem nicht-sicheren Unterrahmen, keine Maus)
+    b.rankArrow = top:CreateTexture(nil, "OVERLAY", nil, 6)
+    b.rankArrow:SetSize(14, 14)
+    b.rankArrow:SetPoint("TOPLEFT", top, "TOPLEFT", 0, 1)
+    if b.rankArrow:SetTexture(RANK_ARROW) == false then
+        b.rankArrow:SetColorTexture(0.4, 1, 0.4, 0.9)
+        b.rankArrow:SetSize(6, 6)
+        b.rankArrow:SetPoint("TOPLEFT", top, "TOPLEFT", 2, -2)
+    else
+        pcall(b.rankArrow.SetDesaturated, b.rankArrow, true)
+        b.rankArrow:SetVertexColor(0.4, 1, 0.4)
+    end
+    b.rankArrow:Hide()
+    b.rankUp = false
 
     b.outOfRange, b.unusable, b.noMana, b.hasAction = false, false, false, false
     -- Schrift sofort setzen: SetText vor SetFont wäre ein Fehler
@@ -807,7 +974,7 @@ local EVENTS = {
     "PLAYER_ENTER_COMBAT", "PLAYER_LEAVE_COMBAT", "TRADE_SKILL_SHOW", "TRADE_SKILL_CLOSE",
     "SPELL_ACTIVATION_OVERLAY_GLOW_SHOW", "SPELL_ACTIVATION_OVERLAY_GLOW_HIDE",
     "UPDATE_MACROS", "LEARNED_SPELL_IN_TAB", "SPELLS_CHANGED", "CVAR_UPDATE",
-    "UNIT_POWER_FREQUENT", "UPDATE_SHAPESHIFT_FORMS",
+    "UNIT_POWER_FREQUENT", "UPDATE_SHAPESHIFT_FORMS", "LEARNED_SPELL_IN_SKILL_LINE",
 }
 
 local events = CreateFrame("Frame")
@@ -858,6 +1025,10 @@ events:SetScript("OnEvent", function(_, event, arg1)
         if type(name) == "string" and name:upper():gsub("_", ""):find("ACTIONBUTTONUSEKEYDOWN", 1, true) then
             if not RegisterClicks() then pending = true end
         end
+    elseif event == "SPELLS_CHANGED" or event == "LEARNED_SPELL_IN_TAB" or event == "LEARNED_SPELL_IN_SKILL_LINE" then
+        -- Neuer Rang gelernt o. Ä.: Zauberbuch gedrosselt neu lesen (Rang-Pfeile)
+        QueueRankScan()
+        RequestAll()
     else
         RequestAll()
     end
@@ -966,6 +1137,20 @@ end
 local function IsOn() return Enabled() end
 
 local DISABLED_HINT = "Erst „Eigene Aktionsleisten“ einschalten."
+
+-- Veralteter Zauberrang: Option im Bereich „Zaubern“ (der Bereich „Aktionsleisten“ ist voll)
+ns.AddOption(2, "Zaubern", {
+    key = "abRankCheck",
+    label = "Veralteten Zauberrang zeigen",
+    tooltip = "Markiert auf den stray-Aktionsleisten Zauber, von denen du schon einen höheren Rang kennst: kleiner grüner Pfeil oben links und im Tooltip die Zeile „stray: höherer Rang bekannt“ mit der Rangnummer.\n\nstray tauscht nichts aus – zieh den neuen Rang selbst aus dem Zauberbuch auf den Platz. Wer absichtlich einen niedrigen Rang nutzt (z. B. zum Manasparen), kann die Markierung einfach ignorieren.",
+    isEnabled = function() return RANK_API and Enabled() end,
+    disabledHint = RANK_API and DISABLED_HINT or "Diese Spielversion liefert die nötigen Zauberbuch-Daten nicht.",
+    set = function(value)
+        ns.db.abRankCheck = value
+        QueueRankScan()
+        if not value then ForEach(UpdateRank) end
+    end,
+})
 
 -- Gerade bearbeitete Leiste (nur für diese Sitzung, nicht in ns.db, nicht im Profil)
 local selectedBar = 1

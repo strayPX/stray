@@ -10,7 +10,7 @@ local _, ns = ...
 -- Maße und Farben
 ---------------------------------------------------------------------------
 
-local WIDTH, HEIGHT = 760, 680
+local WIDTH, HEIGHT = 760, 720
 local SIDE_W = 190
 local ROW_H = 48
 local MAX_ROWS = 7
@@ -40,10 +40,10 @@ local C = {
 
 -- Gruppen und Reihenfolge der Bereiche in der Seitenleiste
 local GROUPS = {
-    { name = "Komfort", sections = { "Beute", "Händler", "Taschen", "Quests", "Filmsequenzen", "Chat" } },
-    { name = "Kampf", sections = { "Bedrohung", "DMG-Meter", "Zaubern", "Aktionsleisten", "Abklingzeiten" } },
+    { name = "Komfort", sections = { "Beute", "Händler", "NPCs", "Taschen", "Vorrat", "Quests", "Filmsequenzen", "Chat" } },
+    { name = "Kampf", sections = { "Bedrohung", "DMG-Meter", "Kampfhilfen", "Zaubern", "Aktionsleisten", "Abklingzeiten" } },
     { name = "Gruppe", sections = { "Gruppenrahmen" } },
-    { name = "Oberfläche", sections = { "Kamera & Karte", "Leisten & Minimap", "Interface", "Sozial" } },
+    { name = "Oberfläche", sections = { "Kamera & Karte", "Leisten & Minimap", "Interface", "Sozial", "Charaktere" } },
     { name = "System", sections = { "Bearbeiten", "Profile" } },
 }
 
@@ -65,7 +65,11 @@ local SUBTITLES = {
     ["Profile"] = "Einstellungen exportieren und importieren.",
     ["Kamera & Karte"] = "Kamera, Minimap und der stray-Knopf.",
     ["Interface"] = "Weniger Meldungen, mehr Überblick.",
-    ["Sozial"] = "Duelle, Wiederbelebung und Beschwörung.",
+    ["Sozial"] = "Duelle, Einladungen, Wiederbelebung und Notizen zu Mitspielern.",
+    ["NPCs"] = "Post und Lehrer mit weniger Klicks.",
+    ["Vorrat"] = "Erinnert dich, wenn Reagenzien, Munition, Essen oder Buffs fehlen.",
+    ["Kampfhilfen"] = "Swing-Timer und Warnung vor gefährlichen Gegnern.",
+    ["Charaktere"] = "Twink-Übersicht und Einstellungen für alle Charaktere.",
 }
 
 ---------------------------------------------------------------------------
@@ -438,7 +442,7 @@ do
             y = y - 18
         end
         local b = CreateFrame("Button", nil, side)
-        b:SetSize(SIDE_W - 1, 23)
+        b:SetSize(SIDE_W - 1, 21)
         b:SetPoint("TOPLEFT", 0, y)
         b.section = entry.section
 
@@ -464,7 +468,7 @@ do
 
         b:SetScript("OnClick", function(self) SelectSection(self.section) end)
         table.insert(navButtons, b)
-        y = y - 23
+        y = y - 21
     end
 end
 
@@ -850,6 +854,10 @@ SlashCmdList["STRAY"] = function(msg)
         return
     end
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if (msg == "alts" or msg == "twinks") and ns.ToggleAlts then
+        ns.ToggleAlts()
+        return
+    end
     if (msg == "edit" or msg == "bearbeiten") and ns.EnterEditMode then
         ns.EnterEditMode()
         return

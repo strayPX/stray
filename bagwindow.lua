@@ -30,6 +30,7 @@ local C = {
     slot    = { 0.035, 0.047, 0.067, 1 },
     slotEdge = { 0.110, 0.165, 0.247, 1 },
     quest   = { 1, 0.82, 0, 1 },
+    triage  = { 1, 0.32, 0.22, 1 },
 }
 
 local SLOT, GAP = 34, 4
@@ -326,6 +327,30 @@ hintText:SetPoint("BOTTOMRIGHT", -12, 9)
 hintText:SetJustifyH("RIGHT")
 hintText:SetText("Alt+Rechtsklick: anheften")
 
+-- „Löschkandidat aufnehmen“ (nur sichtbar, wenn triage.lua einen Kandidaten meldet)
+local triageButton = CreateFrame("Button", nil, frame)
+triageButton:SetHeight(18)
+triageButton:SetPoint("RIGHT", hintText, "LEFT", -12, 0)
+Border(triageButton, { C.triage[1], C.triage[2], C.triage[3], 0.8 })
+local triageHover = triageButton:CreateTexture(nil, "HIGHLIGHT")
+triageHover:SetAllPoints()
+triageHover:SetColorTexture(1, 1, 1, 0.07)
+local triageLabel = Text(triageButton, 11, C.text, FONT_BODY)
+triageLabel:SetPoint("CENTER", 0, 0)
+triageLabel:SetText("Löschkandidat aufnehmen")
+triageButton:SetWidth(150)
+triageButton:SetScript("OnClick", function()
+    if ns.TriagePickup then ns.TriagePickup() end
+end)
+triageButton:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Löschkandidat aufnehmen")
+    GameTooltip:AddLine("Legt den rot markierten, billigsten Gegenstand auf den Mauszeiger. stray löscht nichts selbst – das Zerstören bestätigst du bei WoW.", 1, 1, 1, true)
+    GameTooltip:Show()
+end)
+triageButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+triageButton:Hide()
+
 ---------------------------------------------------------------------------
 -- Kategorien
 ---------------------------------------------------------------------------
@@ -449,6 +474,13 @@ local function StyleButton(b)
     b.strayNew:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.18)
     b.strayNew:Hide()
 
+    -- Löschkandidat (triage.lua): rötliche Fläche, Rand wird in Paint rot
+    b.strayTriage = holder:CreateTexture(nil, "OVERLAY", nil, 1)
+    b.strayTriage:SetPoint("TOPLEFT", 1, -1)
+    b.strayTriage:SetPoint("BOTTOMRIGHT", -1, 1)
+    b.strayTriage:SetColorTexture(C.triage[1], C.triage[2], C.triage[3], 0.22)
+    b.strayTriage:Hide()
+
     b.strayPin = holder:CreateTexture(nil, "OVERLAY", nil, 3)
     b.strayPin:SetSize(6, 6)
     b.strayPin:SetPoint("TOPLEFT", 2, -2)
@@ -480,6 +512,7 @@ local function TogglePin(b)
         ns.Print((d.link or "Gegenstand") .. " angeheftet.")
     end
     RequestUpdate(0)
+    if ns.TriageRefresh then pcall(ns.TriageRefresh) end
 end
 
 local function CreateItemButton(bag, slot)
@@ -636,8 +669,19 @@ local function SetCooldown(b, bag, slot, hasItem)
     end
 end
 
+-- Löschkandidat aus triage.lua (Tasche, Platz) oder nil
+local triageBag, triageSlot
+
+local function QuestMarksOn()
+    return ns.db and ns.db.questItemMarks and true or false
+end
+
 local function Paint(b, d, dimByCategory)
     local hasItem = d.icon or d.link or d.itemID
+    -- Questziele aus dem Questlog nur mit „Questgegenstände markieren“; Blizzards eigene
+    -- Questgegenstände und Questanfänge markiert WoW immer
+    local questNeeded = d.questNeeded and QuestMarksOn()
+    local isTriage = hasItem and b.strayBag == triageBag and b.straySlot == triageSlot
     if SetItemButtonTexture then
         pcall(SetItemButtonTexture, b, d.icon)
     elseif b.strayIcon then
@@ -665,8 +709,10 @@ local function Paint(b, d, dimByCategory)
         b.strayIcon:SetVertexColor(v, v, v)
     end
 
-    -- Rand: Quest gold, sonst Qualität (ab „selten“ farbig, Schrott grau)
-    if d.questItem or d.questNeeded or d.questStarter then
+    -- Rand: Löschkandidat rot, Quest gold, sonst Qualität (ab „selten“ farbig, Schrott grau)
+    if isTriage then
+        SetEdges(b, C.triage[1], C.triage[2], C.triage[3], 1)
+    elseif d.questItem or questNeeded or d.questStarter then
         SetEdges(b, C.quest[1], C.quest[2], C.quest[3], 1)
     elseif hasItem and type(d.quality) == "number" and d.quality >= 2 and QualityColor(d.quality) then
         local r, g, bl = QualityColor(d.quality)
@@ -680,7 +726,7 @@ local function Paint(b, d, dimByCategory)
     end
 
     if b.strayQuest then
-        if d.questStarter or d.questNeeded then
+        if d.questStarter or questNeeded then
             b.strayQuest:SetTexture(QUEST_BANG)
             b.strayQuest:Show()
         elseif d.questItem then
@@ -690,6 +736,7 @@ local function Paint(b, d, dimByCategory)
             b.strayQuest:Hide()
         end
     end
+    if b.strayTriage then b.strayTriage:SetShown(isTriage and true or false) end
     if b.strayNew then b.strayNew:SetShown(d.isNew) end
     if b.strayPin then b.strayPin:SetShown(d.pinned) end
 
@@ -799,6 +846,17 @@ function RequestUpdate(delay)
     if updatePending or not frame:IsShown() then return end
     updatePending = true
     C_Timer.After(delay or 0.05, Update)
+end
+
+-- Schnittstelle für triage.lua: Löschkandidat markieren (bag, slot) oder aufheben (nil)
+function ns.BagWindowSetTriage(bag, slot)
+    if IsSecret(bag) or IsSecret(slot) or type(bag) ~= "number" or type(slot) ~= "number" then
+        bag, slot = nil, nil
+    end
+    if bag == triageBag and slot == triageSlot then return end
+    triageBag, triageSlot = bag, slot
+    triageButton:SetShown(bag ~= nil)
+    RequestUpdate(0)
 end
 
 search:SetScript("OnTextChanged", function(self)
@@ -993,6 +1051,8 @@ ns.On("ITEM_LOCK_CHANGED", function() RequestUpdate(0.05) end)
 ns.On("BAG_UPDATE_COOLDOWN", function() RequestUpdate(0.1) end)
 ns.On("PLAYER_MONEY", function() if frame:IsShown() then UpdateHeader() end end)
 ns.On("QUEST_LOG_UPDATE", function() RequestUpdate(0.5) end)
+-- Optionen wie „Questgegenstände markieren“ wirken sofort, wenn das stray-Fenster auf/zu geht
+ns.OnConfig(function() RequestUpdate(0) end)
 
 -- Backstop zu den Hooks: Händler öffnet/schließt das Fenster
 ns.On("MERCHANT_SHOW", function() Request("openBy", "MerchantFrame") end)

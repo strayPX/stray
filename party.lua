@@ -551,6 +551,17 @@ end
 local function PaintPower(t, unit)
     local powerType, powerToken = UnitPowerType(unit)
     t.power:SetStatusBarColor(PowerColor(Public(powerType), Public(powerToken)))
+    -- Mana & Co. sind in der Gruppe versiegelt und dürfen nicht in SetMinMaxValues.
+    -- UnitPowerPercent rechnet im Spiel selbst und liefert 0–100 (Methode wie EllesmereUI).
+    -- type() ist auf versiegelten Werten erlaubt, ein Vergleich (auch mit nil) nicht.
+    if UnitPowerPercent and CurveConstants and CurveConstants.ScaleTo100 then
+        local ok, pct = pcall(UnitPowerPercent, unit, powerType, true, CurveConstants.ScaleTo100)
+        if ok and type(pct) == "number" then
+            t.power:SetMinMaxValues(0, 100)
+            pcall(t.power.SetValue, t.power, pct)
+            return
+        end
+    end
     pcall(t.power.SetMinMaxValues, t.power, 0, UnitPowerMax(unit))
     pcall(t.power.SetValue, t.power, UnitPower(unit))
 end

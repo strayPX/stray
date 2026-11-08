@@ -275,6 +275,6 @@ ns.AddOption(3, "Bearbeiten", {
     type = "button",
     label = "Anzeigen verschieben",
     buttonText = "Bearbeiten",
-    tooltip = "Blendet alle eingeschalteten stray-Anzeigen ein und macht sie frei verschiebbar – ohne Shift. Rechtsklick auf eine Anzeige setzt sie auf ihre Standardposition zurück, „Fertig“ beendet den Modus.\n\nBetrifft alle eingeschalteten stray-Anzeigen: Gruppenrahmen, Aktionsleisten, Abklingzeiten, Bedrohungsliste, DMG-Meter, Haltbarkeit, Erfahrungsleiste, Taschen- und Menüleiste, Taschenfenster und die Warntexte. Geht nur außerhalb des Kampfes. Auch per /stray edit.",
+    tooltip = "Blendet alle eingeschalteten stray-Anzeigen ein und macht sie frei verschiebbar – ohne Shift. Rechtsklick auf eine Anzeige setzt sie auf ihre Standardposition zurück, „Fertig“ beendet den Modus.\n\nBetrifft alle eingeschalteten stray-Anzeigen: Gruppenrahmen, Aktionsleisten, Abklingzeiten, Bedrohungsliste, DMG-Meter, Haltbarkeit, Erfahrungsleiste, Taschen- und Menüleiste, Taschenfenster, Swing-Timer, Vorrat, Flugzeit, Würfelfenster, Gefahr-Hinweis und die Warntexte. Geht nur außerhalb des Kampfes. Auch per /stray edit.",
     onClick = function() ns.EnterEditMode() end,
 })

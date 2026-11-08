@@ -1,6 +1,9 @@
--- stray – Quests: automatisch annehmen und abgeben
+-- stray – Quests: automatisch annehmen und abgeben,
+-- wertvollste Wahlbelohnung mit einer Goldmünze markieren
 
 local _, ns = ...
+
+ns.defaults.questRewardMark = false
 
 ns.AddOption(2, "Quests", {
     key = "questAccept",
@@ -119,3 +122,136 @@ ns.On("QUEST_COMPLETE", function()
 end)
 -- Einträge in „skipped“ bleiben bis zum nächsten /reload, damit dieselbe Quest
 -- nicht ständig erneut automatisch geöffnet wird.
+
+---------------------------------------------------------------------------
+-- Wertvollste Wahlbelohnung: Goldmünze an der Wahl mit dem höchsten Verkaufswert
+-- (Verkaufspreis × Anzahl). Blizzard ordnet die Knöpfe in QuestInfo_Display an
+-- (QuestInfoRewardsFrame.RewardButtons, Typ "choice"); wir lesen sie nur und
+-- legen eine eigene Textur darüber. Bei Gleichstand oder fehlenden Preisen nichts.
+---------------------------------------------------------------------------
+
+ns.AddOption(2, "Quests", {
+    key = "questRewardMark",
+    label = "Wertvollste Belohnung markieren",
+    tooltip = "Stehen bei der Abgabe mehrere Belohnungen zur Wahl, bekommt die mit dem höchsten Verkaufswert eine kleine Goldmünze. Gezählt wird Verkaufspreis mal Anzahl.\n\nBei Gleichstand oder wenn ein Preis fehlt, wird nichts markiert. Gewählt wird nie automatisch.",
+    set = function(value)
+        ns.db.questRewardMark = value
+        ns.UpdateRewardMark()
+    end,
+})
+
+local COIN_TEXTURE = "Interface\\MoneyFrame\\UI-GoldIcon"
+
+local coins = setmetatable({}, { __mode = "k" }) -- Belohnungsknopf → eigene Münz-Textur
+local markedIndex = nil                          -- Index der markierten Wahl (für den Tooltip)
+local waiting = false                            -- warten auf GET_ITEM_INFO_RECEIVED
+
+local function HideCoins()
+    for _, coin in pairs(coins) do coin:Hide() end
+    markedIndex = nil
+end
+
+local function Coin(button)
+    if coins[button] then return coins[button] end
+    -- Eigener Halter als Kind des Knopfs: verschwindet mit ihm, schreibt aber nichts auf ihn
+    local holder = CreateFrame("Frame", nil, button)
+    holder:SetAllPoints(button)
+    holder:SetFrameLevel(button:GetFrameLevel() + 3)
+    local coin = holder:CreateTexture(nil, "OVERLAY")
+    coin:SetTexture(COIN_TEXTURE)
+    coin:SetSize(14, 14)
+    coin:SetPoint("TOPLEFT", button, "TOPLEFT", -3, 3)
+    coin:Hide()
+    coins[button] = coin
+    return coin
+end
+
+-- Verkaufswert einer Wahl: Preis × Anzahl, nil wenn (noch) unbekannt
+local function ChoiceValue(index)
+    if not GetQuestItemLink or not C_Item or not C_Item.GetItemInfo then return nil end
+    local okLink, link = pcall(GetQuestItemLink, "choice", index)
+    link = okLink and ns.Public(link)
+    if type(link) ~= "string" then return nil end
+    local okPrice, price = pcall(function() return select(11, C_Item.GetItemInfo(link)) end)
+    price = okPrice and ns.Public(price)
+    if type(price) ~= "number" then return nil end
+    local count = 1
+    if GetQuestItemInfo then
+        local okInfo, _, _, n = pcall(GetQuestItemInfo, "choice", index)
+        n = okInfo and ns.Public(n)
+        if type(n) == "number" and n > 0 then count = n end
+    end
+    return price * count
+end
+
+local waiter = CreateFrame("Frame")
+waiter:SetScript("OnEvent", function(self)
+    self:UnregisterAllEvents()
+    waiting = false
+    pcall(ns.UpdateRewardMark)
+end)
+
+function ns.UpdateRewardMark()
+    local info = QuestInfoFrame
+    -- Anzeige im Questlog (eigener Belohnungsrahmen): Münze im NPC-Fenster stehen lassen
+    if info and info.questLog and ns.db and ns.db.questRewardMark then return end
+    HideCoins()
+    if not (ns.db and ns.db.questRewardMark) then return end
+    -- Nur im Questfenster beim NPC, nicht im Questlog
+    if not info or info.questLog then return end
+    local rewards = info.rewardsFrame
+    local buttons = rewards and rewards.RewardButtons
+    if type(buttons) ~= "table" or not rewards:IsVisible() then return end
+    if not GetNumQuestChoices or (GetNumQuestChoices() or 0) < 2 then return end
+
+    local best, bestValue, tie, missing = nil, 0, false, false
+    for _, button in ipairs(buttons) do
+        if button:IsShown() and button.type == "choice" and button.objectType == "item" then
+            local value = ChoiceValue(button:GetID())
+            if value == nil then
+                missing = true
+            elseif value > bestValue then
+                best, bestValue, tie = button, value, false
+            elseif value == bestValue and value > 0 then
+                tie = true
+            end
+        end
+    end
+
+    if missing then
+        -- Gegenstand noch nicht im Cache: einmal nachladen und neu prüfen
+        if not waiting then
+            waiting = true
+            pcall(waiter.RegisterEvent, waiter, "GET_ITEM_INFO_RECEIVED")
+        end
+        return
+    end
+    if not best or tie or bestValue <= 0 then return end
+    Coin(best):Show()
+    markedIndex = best:GetID()
+end
+
+if hooksecurefunc and type(QuestInfo_Display) == "function" then
+    hooksecurefunc("QuestInfo_Display", function() pcall(ns.UpdateRewardMark) end)
+end
+
+-- Rückfall, falls QuestInfo_Display anders heißt: kurz nach dem Aufbau der Seite prüfen
+ns.On("QUEST_COMPLETE", function()
+    if ns.db and ns.db.questRewardMark then
+        C_Timer.After(0, function() pcall(ns.UpdateRewardMark) end)
+    end
+end)
+
+ns.On("QUEST_FINISHED", HideCoins)
+
+-- Tooltip-Hinweis an der markierten Wahl
+if hooksecurefunc and GameTooltip and GameTooltip.SetQuestItem then
+    hooksecurefunc(GameTooltip, "SetQuestItem", function(tooltip, kind, index)
+        if not (ns.db and ns.db.questRewardMark) or not markedIndex then return end
+        if ns.IsSecret(kind) or ns.IsSecret(index) then return end
+        if kind ~= "choice" or index ~= markedIndex then return end
+        if QuestInfoFrame and QuestInfoFrame.questLog then return end
+        tooltip:AddLine("stray: höchster Verkaufswert", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+        tooltip:Show()
+    end)
+end

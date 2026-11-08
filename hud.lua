@@ -19,7 +19,10 @@ local C = {
     textDim = { 0.435, 0.525, 0.651, 1 },
     xp      = { 0.557, 0.369, 0.929, 1 },   -- Lila
     rested  = { 0.353, 0.659, 1.000, 0.45 }, -- Blau, heller Bereich dahinter
+    questxp = { 1.000, 0.820, 0.000, 0.40 }, -- Gold, EP abgabebereiter Quests
 }
+
+ns.defaults.questXPBar = false
 
 local CELL = 24
 local CELL_GAP = 4
@@ -622,6 +625,7 @@ local MAP_ENTRIES = {
     { label = "Verfolgung", available = function() return TrackingButton() ~= nil or _G.MiniMapTrackingDropDown ~= nil end, run = OpenTracking },
     { label = "Kalender", available = function() return ToggleCalendar ~= nil or GameTimeFrame ~= nil end, run = OpenCalendar },
     { label = "Weltkarte", available = function() return ToggleWorldMap ~= nil or WorldMapFrame ~= nil end, run = OpenWorldMap },
+    { label = "Twinks", available = function() return ns.ToggleAlts ~= nil and ns.db and ns.db.alts and true or false end, run = function() ns.ToggleAlts() end },
 }
 
 local mapRows = {}
@@ -871,9 +875,19 @@ restBar:SetStatusBarColor(C.rested[1], C.rested[2], C.rested[3], C.rested[4])
 restBar:SetMinMaxValues(0, 1)
 restBar:SetValue(0)
 
+-- EP abgeschlossener, noch nicht abgegebener Quests: ab dem aktuellen EP-Stand, über dem Erholt-Bereich
+local questBar = CreateFrame("StatusBar", nil, xpBar)
+questBar:SetAllPoints(restBar)
+questBar:SetFrameLevel(restBar:GetFrameLevel() + 1)
+questBar:SetStatusBarTexture(WHITE)
+questBar:SetStatusBarColor(C.questxp[1], C.questxp[2], C.questxp[3], C.questxp[4])
+questBar:SetMinMaxValues(0, 1)
+questBar:SetValue(0)
+questBar:Hide()
+
 local mainBar = CreateFrame("StatusBar", nil, xpBar)
 mainBar:SetAllPoints(restBar)
-mainBar:SetFrameLevel(restBar:GetFrameLevel() + 1)
+mainBar:SetFrameLevel(restBar:GetFrameLevel() + 2)
 mainBar:SetStatusBarTexture(WHITE)
 mainBar:SetStatusBarColor(C.xp[1], C.xp[2], C.xp[3], C.xp[4])
 mainBar:SetMinMaxValues(0, 1)
@@ -927,6 +941,35 @@ local function WatchedFaction()
     return nil
 end
 
+-- Summe der EP aller abgeschlossenen, noch nicht abgegebenen Quests im Questlog
+local function CompletedQuestXP()
+    if not GetQuestLogRewardXP or not C_QuestLog or not C_QuestLog.GetNumQuestLogEntries then return 0 end
+    local ok, entries = pcall(C_QuestLog.GetNumQuestLogEntries)
+    entries = ok and Number(entries)
+    if not entries then return 0 end
+    local total = 0
+    for i = 1, entries do
+        local questID
+        if C_QuestLog.GetQuestIDForLogIndex then
+            local okID, id = pcall(C_QuestLog.GetQuestIDForLogIndex, i)
+            questID = okID and Number(id)
+        elseif C_QuestLog.GetInfo then
+            local okInfo, info = pcall(C_QuestLog.GetInfo, i)
+            info = okInfo and ns.Public(info)
+            if type(info) == "table" and not ns.Public(info.isHeader) then questID = Number(info.questID) end
+        end
+        if questID and questID > 0 then
+            local okDone, done = pcall(C_QuestLog.IsComplete, questID)
+            if okDone and ns.Public(done) == true then
+                local okXP, xp = pcall(GetQuestLogRewardXP, questID)
+                xp = okXP and Number(xp)
+                if xp and xp > 0 then total = total + xp end
+            end
+        end
+    end
+    return total
+end
+
 local function UpdateXP()
     if not ns.db or not ns.db.hudXPBar then xpBar:Hide() return end
     if not AtMaxLevel() then
@@ -934,20 +977,34 @@ local function UpdateXP()
         local rested = GetXPExhaustion and Number(GetXPExhaustion()) or 0
         if cur and max and max > 0 then
             xpMode = "xp"
-            xpData = { cur = cur, max = max, rested = rested, level = Number(UnitLevel("player")) }
+            local questXP = 0
+            if ns.db.questXPBar then
+                local ok, sum = pcall(CompletedQuestXP)
+                questXP = ok and sum or 0
+            end
+            xpData = { cur = cur, max = max, rested = rested, quest = questXP, level = Number(UnitLevel("player")) }
             mainBar:SetStatusBarColor(C.xp[1], C.xp[2], C.xp[3], C.xp[4])
             mainBar:SetMinMaxValues(0, max)
             mainBar:SetValue(cur)
             restBar:SetMinMaxValues(0, max)
             restBar:SetValue(math.min(cur + rested, max))
             restBar:Show()
+            if questXP > 0 then
+                questBar:SetMinMaxValues(0, max)
+                questBar:SetValue(math.min(cur + questXP, max))
+                questBar:Show()
+            else
+                questBar:Hide()
+            end
             local text = Pct(cur / max * 100) .. " %"
             if rested > 0 then text = text .. "  (Erholt: " .. Pct(rested / max * 100) .. " %)" end
+            if questXP > 0 then text = text .. "  Quests: +" .. Num(questXP) .. " EP" end
             xpText:SetText(text)
             xpBar:Show()
             return
         end
     end
+    questBar:Hide()
     local name, reaction, value, span = WatchedFaction()
     if name then
         xpMode = "rep"
@@ -992,6 +1049,13 @@ xpBar:SetScript("OnEnter", function(self)
             GameTooltip:AddDoubleLine("Erholt", Num(xpData.rested) .. " (" .. Pct(xpData.rested / xpData.max * 100) .. " %)",
                 1, 1, 1, C.accent[1], C.accent[2], C.accent[3])
         end
+        if xpData.quest and xpData.quest > 0 then
+            GameTooltip:AddDoubleLine("Quests", "+" .. Num(xpData.quest) .. " EP (" .. Pct(xpData.quest / xpData.max * 100) .. " %)",
+                1, 1, 1, ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+            if xpData.cur + xpData.quest >= xpData.max then
+                GameTooltip:AddLine("Reicht für die nächste Stufe.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+            end
+        end
     elseif xpMode == "rep" and xpData.name then
         GameTooltip:AddLine(xpData.name)
         if xpData.label ~= "" then GameTooltip:AddLine(xpData.label, 1, 1, 1) end
@@ -1017,6 +1081,8 @@ local BLIZZARD_XP = {
     "StatusTrackingBarManager", "MainStatusTrackingBarContainer", "SecondaryStatusTrackingBarContainer",
 }
 
+local hookedXP = {} -- Blizzard-Rahmen, an denen schon ein OnShow-Hook hängt (keine Felder auf Blizzard-Frames)
+
 local function HideBlizzardXP()
     if not ns.db.hudXPBar then return end
     for _, name in ipairs(BLIZZARD_XP) do
@@ -1026,8 +1092,8 @@ local function HideBlizzardXP()
                 Defer("blizzardXP", HideBlizzardXP)
             else
                 pcall(f.Hide, f)
-                if not f.strayHudHooked and f.HookScript then
-                    f.strayHudHooked = true
+                if not hookedXP[f] and f.HookScript then
+                    hookedXP[f] = true
                     pcall(f.HookScript, f, "OnShow", function(self)
                         if not (ns.db and ns.db.hudXPBar) then return end
                         if InCombat() and IsProtectedFrame(self) then
@@ -1067,6 +1133,17 @@ for _, event in ipairs({ "PLAYER_XP_UPDATE", "UPDATE_EXHAUSTION", "PLAYER_LEVEL_
     "PLAYER_UPDATE_RESTING", "ENABLE_XP_GAIN", "DISABLE_XP_GAIN" }) do
     SafeOn(event, ScheduleXP)
 end
+
+-- QUEST_LOG_UPDATE kommt oft in Schüben: Quest-EP höchstens alle 0,5 s neu zählen
+local questXPTimer = false
+SafeOn("QUEST_LOG_UPDATE", function()
+    if questXPTimer or not (ns.db and ns.db.hudXPBar and ns.db.questXPBar) then return end
+    questXPTimer = true
+    C_Timer.After(0.5, function()
+        questXPTimer = false
+        pcall(UpdateXP)
+    end)
+end)
 
 ---------------------------------------------------------------------------
 -- 4) Taschen- und Menüleiste
@@ -1252,6 +1329,18 @@ ns.AddOption(3, SECTION, {
     set = function(value)
         ns.db.hudXPBar = value
         ApplyXP(true)
+    end,
+})
+
+ns.AddOption(2, "Quests", {
+    key = "questXPBar",
+    label = "Quest-EP auf der EP-Leiste",
+    tooltip = "Zeigt auf der stray-Erfahrungsleiste einen goldenen Bereich: so viele EP bringen alle abgeschlossenen Quests, die du noch nicht abgegeben hast. Er beginnt am aktuellen EP-Stand, die Summe steht in der Leiste und im Tooltip.\n\nBraucht die Option „Erfahrungsleiste oben“ (Leisten & Minimap).",
+    isEnabled = function() return ns.db and ns.db.hudXPBar and true or false end,
+    disabledHint = "Erst „Erfahrungsleiste oben“ unter Leisten & Minimap einschalten.",
+    set = function(value)
+        ns.db.questXPBar = value
+        if ns.db.hudXPBar then pcall(UpdateXP) end
     end,
 })
 

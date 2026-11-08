@@ -16,6 +16,8 @@ ns.AddOption(1, "Händler", {
 
 local GetNumSlots = (C_Container and C_Container.GetContainerNumSlots) or GetContainerNumSlots
 local UseItem = (C_Container and C_Container.UseContainerItem) or UseContainerItem
+-- Forever hat das alte globale GetItemInfo nicht mehr, nur C_Item.GetItemInfo
+local GetItemInfo = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 
 -- Liefert Verkaufswert und Sperrstatus, falls der Platz einen grauen, verkaufbaren Gegenstand enthält
 local function GetJunk(bag, slot)
