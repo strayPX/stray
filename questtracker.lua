@@ -26,6 +26,8 @@ ns.defaults.questTrackerHeight = 420      -- größte Höhe (Griff unten links)
 ns.defaults.questTrackerTop = 240         -- Abstand vom oberen Rand
 ns.defaults.questTrackerCollapsed = false
 ns.defaults.questTrackerShowAll = false
+ns.defaults.questTrackerRecipes = true    -- Abschnitt „Berufsreagenzien“ unter den Quests
+ns.defaults.questTrackerRecipesCollapsed = false
 ns.defaults.questTrackerZones = {}        -- [Gebietsname] = true (eingeklappt)
 
 local SECTION = "Questtracker"
@@ -579,6 +581,122 @@ do
 end
 
 ---------------------------------------------------------------------------
+-- Berufsreagenzien: verfolgte Rezepte (C_TradeSkillUI) mit Bestand / Bedarf je Reagenz
+---------------------------------------------------------------------------
+
+-- Bestand: Gegenstand (Taschen, Bank, Reagenzienbank, Kontobank) oder Währung
+function U.ReagentCount(r)
+    if type(r) ~= "table" then return 0 end
+    local id = U.Num(r.itemID)
+    if id and id ~= 0 then
+        if C_Item and C_Item.GetItemCount then
+            return U.Num(Call(C_Item.GetItemCount, id, true, false, true, true)) or 0
+        end
+        return U.Num(Call(GetItemCount, id, true)) or 0
+    end
+    local cur = U.Num(r.currencyID)
+    if cur and cur ~= 0 and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+        local info = Call(C_CurrencyInfo.GetCurrencyInfo, cur)
+        return type(info) == "table" and U.Num(info.quantity) or 0
+    end
+    return 0
+end
+
+function U.ReagentName(slot, r)
+    local id = U.Num(r.itemID)
+    if id and id ~= 0 then
+        local name = C_Item and C_Item.GetItemNameByID and U.Str(Call(C_Item.GetItemNameByID, id))
+        if not name then
+            if C_Item and C_Item.RequestLoadItemDataByID then Call(C_Item.RequestLoadItemDataByID, id) end
+            W.needItemInfo = true
+            return "…"
+        end
+        return name
+    end
+    local cur = U.Num(r.currencyID)
+    if cur and cur ~= 0 and C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo then
+        local info = Call(C_CurrencyInfo.GetCurrencyInfo, cur)
+        return type(info) == "table" and U.Str(info.name) or nil
+    end
+    if type(slot.slotInfo) == "table" then return U.Str(slot.slotInfo.slotText) end
+end
+
+-- Ein Rezept lesen: { id, recraft, name, lines = { { text, counter, done } }, done }
+function U.ReadRecipe(recipeID, recraft)
+    if not (C_TradeSkillUI and C_TradeSkillUI.GetRecipeSchematic) then return nil end
+    local schematic = Call(C_TradeSkillUI.GetRecipeSchematic, recipeID, recraft)
+    if type(schematic) ~= "table" then return nil end
+    local name = U.Str(schematic.name) or "?"
+    if recraft then name = L("Neu herstellen: %s", name) end
+    local rec = { id = recipeID, recraft = recraft, name = name, lines = {}, done = true }
+    local slots = {}
+    local list = type(schematic.reagentSlotSchematics) == "table" and schematic.reagentSlotSchematics or {}
+    for _, slot in ipairs(list) do
+        if type(slot) == "table" and slot.required == true and type(slot.reagents) == "table" then
+            -- Pflichtplätze zum Verändern (Modifying) zuerst, wie bei Blizzard
+            local modifying = Enum and Enum.CraftingReagentType and slot.reagentType == Enum.CraftingReagentType.Modifying
+            table.insert(slots, modifying and 1 or (#slots + 1), slot)
+        end
+    end
+    for _, slot in ipairs(slots) do
+        local first = slot.reagents[1]
+        local text = type(first) == "table" and U.ReagentName(slot, first)
+        if text then
+            local need = U.Num(slot.quantityRequired) or 1
+            local ranged
+            if type(slot.variableQuantities) == "table" and #slot.variableQuantities > 0 then
+                local lo, hi = math.huge, 0
+                for _, v in ipairs(slot.variableQuantities) do
+                    local n = type(v) == "table" and U.Num(v.quantity)
+                    if n then lo, hi = math.min(lo, n), math.max(hi, n) end
+                end
+                if hi > 0 then ranged = (lo == hi) and tostring(hi) or (lo .. "–" .. hi) end
+            end
+            if ranged then
+                -- Menge wählbar (Blizzard merkt sie sich nicht): nur den Bereich zeigen
+                rec.lines[#rec.lines + 1] = { text = text, counter = ranged, done = false }
+                rec.done = false
+            else
+                -- Qualitätsstufen und Ersatzgegenstände eines Platzes zählen zusammen
+                local have = 0
+                for _, r in ipairs(slot.reagents) do have = have + U.ReagentCount(r) end
+                local done = have >= need
+                rec.lines[#rec.lines + 1] = { text = text, counter = have .. " / " .. need, done = done }
+                if not done then rec.done = false end
+            end
+        end
+    end
+    return rec
+end
+
+-- Alle verfolgten Rezepte (normal, dann Wiederherstellen); leer, wenn die Option aus ist
+function U.BuildRecipes(sample)
+    local out = {}
+    W.needItemInfo = false
+    if not ns.db.questTrackerRecipes then return out end
+    if C_TradeSkillUI and C_TradeSkillUI.GetRecipesTracked then
+        for _, recraft in ipairs({ false, true }) do
+            local ids = Call(C_TradeSkillUI.GetRecipesTracked, recraft)
+            if type(ids) == "table" then
+                for _, id in ipairs(ids) do
+                    id = U.Num(id)
+                    local rec = id and U.ReadRecipe(id, recraft)
+                    if rec then out[#out + 1] = rec end
+                end
+            end
+        end
+    end
+    if #out == 0 and sample then
+        local rec = { sample = true, name = L["Beispiel: Verzauberung"], lines = {}, done = false }
+        for _, s in ipairs({ { "Magischer Staub", 3, 25 }, { "Seelensplitter", 8, 8 } }) do
+            rec.lines[#rec.lines + 1] = { text = L[s[1]], counter = s[2] .. " / " .. s[3], done = s[2] >= s[3] }
+        end
+        out[1] = rec
+    end
+    return out
+end
+
+---------------------------------------------------------------------------
 -- Pools (Text, Pfeile, Klickflächen) mit Zurücksetzen für „passt nicht mehr“
 ---------------------------------------------------------------------------
 
@@ -636,7 +754,7 @@ function P.Button(kind, top, height)
         P.btn[P.nbtn] = b
     end
     b:SetFrameLevel(tracker:GetFrameLevel() + 2)
-    b.kind, b.q, b.zone = kind, nil, nil
+    b.kind, b.q, b.zone, b.recipe = kind, nil, nil, nil
     b:ClearAllPoints()
     b:SetPoint("TOPLEFT", tracker, "TOPLEFT", S.pad / 2, -top)
     b:SetPoint("TOPRIGHT", tracker, "TOPRIGHT", -S.pad / 2, -top)
@@ -731,6 +849,53 @@ function U.DrawQuest(q, y, innerW)
     return y + S.gap
 end
 
+-- Überschrift „▾ BERUFSREAGENZIEN“ (wie eine Gebietszeile), eingeklappt mit Anzahl ganz rechts
+function U.DrawRecipesHead(count, collapsed, y, innerW)
+    local right = S.pad
+    if collapsed then
+        local n = P.FS(12, COLORS.textDim)
+        n:SetPoint("TOPRIGHT", tracker, "TOPRIGHT", -S.pad, -y - 1)
+        n:SetText(count)
+        right = right + n:GetStringWidth() + 8
+    end
+    local fs = P.FS(12, COLORS.text)
+    fs:SetPoint("TOPRIGHT", tracker, "TOPRIGHT", -right, -y - 1)
+    fs:SetText(U.Upper(L["Berufsreagenzien"]))
+    local maxW = innerW - (right - S.pad) - 16
+    if fs:GetStringWidth() > maxW then fs:SetWidth(maxW) end
+    local arrow = P.Arrow(not collapsed)
+    arrow:SetPoint("RIGHT", fs, "LEFT", -4, 0)
+    P.Button("recipes", y, S.zoneH)
+    return y + S.zoneH + 4
+end
+
+-- Rezeptblock: Rezeptname, darunter die Reagenzien mit „vorhanden / benötigt“ rechts
+function U.DrawRecipe(r, y, innerW)
+    local top = y
+    local title = P.FS(13, r.done and GREEN or COLORS.text)
+    title:SetWordWrap(true)
+    title:SetWidth(innerW)
+    title:SetPoint("TOPRIGHT", tracker, "TOPRIGHT", -S.pad, -y)
+    title:SetText(r.name)
+    y = y + math.ceil(title:GetStringHeight()) + 3
+    for _, o in ipairs(r.lines) do
+        local cw = 0
+        local c = P.FS(12, o.done and GREEN or COLORS.text)
+        c:SetPoint("TOPRIGHT", tracker, "TOPRIGHT", -S.pad, -y)
+        c:SetText(o.counter)
+        cw = c:GetStringWidth() + S.counterGap
+        local fs = P.FS(12, o.done and GREEN or { 0.82, 0.82, 0.86 })
+        fs:SetWordWrap(true)
+        fs:SetWidth(math.max(40, innerW - cw - 10))
+        fs:SetPoint("TOPRIGHT", tracker, "TOPRIGHT", -S.pad - cw, -y)
+        fs:SetText((o.done and CHECK or "") .. o.text)
+        y = y + math.max(13, math.ceil(fs:GetStringHeight())) + 2
+    end
+    local b = P.Button("recipe", top - 2, y - top + 2)
+    b.recipe = r
+    return y + S.gap
+end
+
 -- Zeile unten rechts: „+ n weitere Quests ▾“ bzw. „Weniger anzeigen ▴“
 function U.DrawMore(y, text, down)
     local arrow = P.Arrow(down)
@@ -813,9 +978,39 @@ function U.Layout()
         end
         y = ny
     end
+    -- Berufsreagenzien unter den Quests (nur wenn alle Quests Platz hatten)
+    local recipes = data.recipes
+    local recipeRest = 0
+    if not stopped and type(recipes) == "table" and #recipes > 0 then
+        local shut = ns.db.questTrackerRecipesCollapsed and true or false
+        local start = y + 4
+        local mark = P.Mark()
+        local ny = U.DrawRecipesHead(#recipes, shut, start, innerW)
+        if ny > maxH - S.bottom and y > S.header + 8 then
+            P.Rollback(mark)
+            recipeRest = #recipes
+        else
+            y = ny
+            if not shut then
+                for i, r in ipairs(recipes) do
+                    local rmark = P.Mark()
+                    local ry = U.DrawRecipe(r, y, innerW)
+                    local rlimit = maxH - S.bottom - (i == #recipes and 0 or (S.moreH + 2))
+                    if ry > rlimit and i > 1 then
+                        P.Rollback(rmark)
+                        recipeRest = #recipes - i + 1
+                        break
+                    end
+                    y = ry
+                end
+            end
+        end
+    end
     local rest = (data.total or 0) - drawn - hiddenByZone
     if stopped and rest > 0 then
         y = U.DrawMore(y + 2, L("+ %d weitere Quests", rest), true)
+    elseif recipeRest > 0 then
+        y = U.DrawMore(y + 2, L("+ %d weitere Rezepte", recipeRest), true)
     elseif ns.db.questTrackerShowAll and y > normalMax then
         y = U.DrawMore(y + 2, L["Weniger anzeigen"], false)
     end
@@ -855,6 +1050,31 @@ function U.OnRowClick(self, button)
     elseif self.kind == "more" then
         ns.db.questTrackerShowAll = not ns.db.questTrackerShowAll
         U.Refresh()
+    elseif self.kind == "recipes" then
+        ns.db.questTrackerRecipesCollapsed = not ns.db.questTrackerRecipesCollapsed
+        U.Refresh()
+    elseif self.kind == "recipe" then
+        local r = self.recipe
+        if not r or not r.id then return end
+        if button == "RightButton" then
+            -- Rezept nicht mehr verfolgen (Blizzard schickt danach TRACKED_RECIPE_UPDATE)
+            if C_TradeSkillUI and C_TradeSkillUI.SetRecipeTracked then
+                Call(C_TradeSkillUI.SetRecipeTracked, r.id, false, r.recraft)
+            end
+        elseif IsModifiedClick and IsModifiedClick("CHATLINK") then
+            local link = C_TradeSkillUI and C_TradeSkillUI.GetRecipeLink and U.Str(Call(C_TradeSkillUI.GetRecipeLink, r.id))
+            if link and ChatFrameUtil and ChatFrameUtil.InsertLink then
+                Call(ChatFrameUtil.InsertLink, link)
+            elseif link and ChatEdit_InsertLink then
+                Call(ChatEdit_InsertLink, link)
+            end
+        elseif r.recraft then
+            return
+        elseif InCombatLockdown() then
+            ns.Print(L["Im Kampf lässt sich das Rezept nicht öffnen."])
+        elseif C_TradeSkillUI and C_TradeSkillUI.OpenRecipe then
+            Call(C_TradeSkillUI.OpenRecipe, r.id)
+        end
     elseif self.kind == "quest" then
         local q = self.q
         if not q or not q.id then return end
@@ -872,6 +1092,16 @@ function U.OnRowEnter(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     if self.kind == "zone" then
         GameTooltip:AddLine(L["Klick: Gebiet ein- oder ausklappen"], 1, 1, 1)
+    elseif self.kind == "recipes" then
+        GameTooltip:AddLine(L["Klick: Berufsreagenzien ein- oder ausklappen"], 1, 1, 1)
+    elseif self.kind == "recipe" then
+        if not self.recipe then return end
+        GameTooltip:AddLine(self.recipe.name, 1, 1, 1, true)
+        if self.recipe.id then
+            if not self.recipe.recraft then GameTooltip:AddLine(L["Klick: Rezept öffnen"], 0.8, 0.8, 0.8) end
+            GameTooltip:AddLine(L["Rechtsklick: nicht mehr verfolgen"], 0.8, 0.8, 0.8)
+            GameTooltip:AddLine(L["Shift-Klick: Rezeptlink in den Chat"], 0.8, 0.8, 0.8)
+        end
     elseif self.kind == "more" then
         GameTooltip:AddLine(ns.db.questTrackerShowAll and L["Klick: weniger Quests anzeigen"]
             or L["Klick: alle Quests anzeigen"], 1, 1, 1)
@@ -1109,8 +1339,9 @@ function U.Refresh()
         U.SyncItems()
         return
     end
-    local elements, numQuests, total = U.BuildData()
-    W.data = { elements = elements, numQuests = numQuests, total = total }
+    local elements, numQuests, total, sample = U.BuildData()
+    W.data = { elements = elements, numQuests = numQuests, total = total,
+        recipes = U.BuildRecipes(sample or (#elements == 0 and ns.IsConfigOpen())) }
     U.Layout()
     U.SyncItems()
 end
@@ -1131,6 +1362,7 @@ local EVENTS = {
     "QUEST_LOG_UPDATE", "QUEST_WATCH_UPDATE", "QUEST_ACCEPTED", "QUEST_REMOVED", "QUEST_TURNED_IN",
     "UNIT_QUEST_LOG_CHANGED", "PLAYER_LEVEL_UP", "ZONE_CHANGED_NEW_AREA", "BAG_UPDATE_DELAYED",
     "BAG_UPDATE_COOLDOWN", "UI_SCALE_CHANGED", "DISPLAY_SIZE_CHANGED",
+    "TRACKED_RECIPE_UPDATE", "CURRENCY_DISPLAY_UPDATE", "GET_ITEM_INFO_RECEIVED",
 }
 
 ev:SetScript("OnEvent", function(_, event, arg1)
@@ -1141,6 +1373,11 @@ ev:SetScript("OnEvent", function(_, event, arg1)
         if arg1 ~= "player" then return end
     elseif event == "BAG_UPDATE_DELAYED" then
         bagDirty = true
+    elseif event == "CURRENCY_DISPLAY_UPDATE" or event == "TRACKED_RECIPE_UPDATE" then
+        if not ns.db.questTrackerRecipes then return end
+    elseif event == "GET_ITEM_INFO_RECEIVED" then
+        -- nur, wenn ein Reagenzname noch fehlt (sonst feuert das Ereignis ständig)
+        if not (W.needItemInfo and ns.db.questTrackerRecipes) then return end
     elseif event == "BAG_UPDATE_COOLDOWN" then
         for _, b in ipairs(itemButtons) do
             if b:IsShown() then pcall(U.ItemVisual, b) end
@@ -1219,10 +1456,19 @@ ns.AddOption(2, SECTION, {
 ns.AddOption(2, SECTION, {
     key = "questTrackerHideBlizzard",
     label = L["Blizzard-Questverfolgung ausblenden"],
-    tooltip = L["Blendet Blizzards eigene Questverfolgung aus, solange der stray-Questtracker an ist. Im Kampf wird sie nur durchsichtig und erst danach ganz ausgeblendet."],
+    tooltip = L["Blendet Blizzards eigene Questverfolgung aus, solange der stray-Questtracker an ist. Im Kampf wird sie nur durchsichtig und erst danach ganz ausgeblendet. Dabei verschwindet auch Blizzards Liste „Berufsreagenzien“; stray zeigt sie selbst unter den Quests."],
     keywords = { "blizzard", "objective tracker", "questverfolgung", "verstecken", "hide" },
     isEnabled = function() return ns.db.questTracker end,
     set = function(v) ns.db.questTrackerHideBlizzard = v; B.Apply() end,
+})
+
+ns.AddOption(2, SECTION, {
+    key = "questTrackerRecipes",
+    label = L["Berufsreagenzien anzeigen"],
+    tooltip = L["Zeigt unter den Quests deine verfolgten Berufsrezepte mit den benötigten Reagenzien (vorhanden / benötigt, Taschen und Bank). Erledigte Reagenzien werden grün. Klick auf ein Rezept öffnet es, Rechtsklick beendet die Verfolgung, Shift-Klick schreibt den Link in den Chat."],
+    keywords = { "berufe", "reagenzien", "rezepte", "professions", "reagents", "recipes", "crafting", "tracker" },
+    isEnabled = function() return ns.db.questTracker end,
+    set = function(v) ns.db.questTrackerRecipes = v; U.Refresh() end,
 })
 
 ns.AddOption(2, SECTION, {

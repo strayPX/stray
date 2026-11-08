@@ -50,6 +50,7 @@ ns.defaults.bottomMicroButtons = false
 ns.defaults.bottomBarSize = 28
 -- Neu ab 0.22.0-alpha: Hauptoption, eigener Schalter für die Taschenleiste, EP-Leiste einstellbar
 ns.defaults.strayUI = false
+ns.defaults.hudTrackingButton = true -- Neu ab 1.1.0: Verfolgungs-Knopf an der eckigen Minimap
 ns.defaults.bottomBar = false
 ns.defaults.xpBarWidth = 560
 ns.defaults.xpBarHeight = 20
@@ -1142,6 +1143,69 @@ function UpdateMapButton()
     local want = (UIOn("hudMinimapColumn") or square or middleFallback) and true or false
     mapButton:SetShown(want)
     if not want and menuOwner == mapButton then CloseMenu() end
+    if ns.HudUpdateTrackingButton then pcall(ns.HudUpdateTrackingButton) end
+end
+
+-- Verfolgungs-Knopf (Lupe) neben dem Kartenmenü-Knopf --------------------------------------
+-- Bei der eckigen Minimap fehlt Blizzards Verfolgungsknopf (Cluster ausgeblendet). Dieser Knopf
+-- öffnet dieselbe Liste mit Häkchen wie der Menüpunkt „Verfolgung“. Eigener Block, hält die
+-- Zahl der Datei-weiten locals unter Luas Grenze von 200.
+do
+    local TRACK_ICON = "Interface\\AddOns\\stray\\media\\icons\\search"
+    local trackButton = CreateFrame("Button", "strayTrackingButton", Minimap)
+    trackButton:SetSize(18, 18)
+    trackButton:SetFrameStrata("MEDIUM")
+    trackButton:SetFrameLevel(12)
+    trackButton:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 22, -2)
+    trackButton:SetAlpha(0.75)
+    trackButton:RegisterForClicks("LeftButtonUp")
+    Style(trackButton)
+    trackButton.icon = trackButton:CreateTexture(nil, "ARTWORK")
+    trackButton.icon:SetPoint("CENTER")
+    trackButton.icon:SetSize(12, 12)
+    if pcall(trackButton.icon.SetTexture, trackButton.icon, TRACK_ICON) then
+        trackButton.icon:SetVertexColor(ACCENT_TEXT[1], ACCENT_TEXT[2], ACCENT_TEXT[3], 1)
+    else
+        trackButton.icon:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.6)
+    end
+    trackButton:Hide()
+
+    -- Nur bei eckiger Minimap (die runde Karte hat Blizzards eigenen Knopf)
+    function ns.HudUpdateTrackingButton()
+        local square = ns.IsSquareMinimap and ns.IsSquareMinimap() or false
+        trackButton:SetShown(square and ns.db and ns.db.hudTrackingButton and true or false)
+    end
+
+    trackButton:SetScript("OnClick", function(self)
+        pcall(OpenTrackingMenu, self)
+    end)
+    trackButton:SetScript("OnEnter", function(self)
+        self:SetAlpha(1)
+        SetBorder(self, C.accent)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
+        GameTooltip:AddLine(L["Verfolgung"])
+        local okList, list = pcall(TrackingList)
+        local any = false
+        if okList and type(list) == "table" then
+            for _, t in ipairs(list) do
+                local okSel, active = pcall(t.isSelected)
+                if okSel and active then
+                    GameTooltip:AddLine(t.name, C.text[1], C.text[2], C.text[3])
+                    any = true
+                end
+            end
+        end
+        if not any then
+            GameTooltip:AddLine(L["Nichts aktiv"], C.textDim[1], C.textDim[2], C.textDim[3])
+        end
+        GoldLine(L["Linksklick: Verfolgung wählen"])
+        GameTooltip:Show()
+    end)
+    trackButton:SetScript("OnLeave", function(self)
+        self:SetAlpha(0.75)
+        SetBorder(self, C.border)
+        GameTooltip:Hide()
+    end)
 end
 
 -- Aufbau der Spalte ----------------------------------------------------------
@@ -2465,6 +2529,19 @@ ns.AddOption(3, SECTION, {
     set = function(v)
         ns.db.squareMinimapSize = math.max(140, math.min(260, math.floor((tonumber(v) or 200) + 0.5)))
         if UIOn("squareMinimap") and ns.ApplySquareMinimap then pcall(ns.ApplySquareMinimap) end
+    end,
+})
+
+ns.AddOption(3, SECTION, {
+    key = "hudTrackingButton",
+    label = L["Verfolgungs-Knopf an der Minimap"],
+    keywords = { "verfolgung", "tracking", "lupe", "fernglas", "minimap", "kräuter", "erze", "herbs", "ore", "knopf" },
+    tooltip = L["Kleiner Lupen-Knopf oben links in der eckigen Minimap, neben dem Kartenmenü-Knopf. Linksklick öffnet Blizzards Verfolgungsliste mit Häkchen (Kräuter, Erze, Fallen …); der Tooltip zeigt, was gerade verfolgt wird. Blizzards eigener Verfolgungsknopf ist bei der eckigen Minimap ausgeblendet."],
+    isEnabled = function() return UIOn("squareMinimap") end,
+    disabledHint = L["Erst „Eckige Minimap oben rechts“ einschalten (direkt darüber)."],
+    set = function(value)
+        ns.db.hudTrackingButton = value and true or false
+        if ns.HudUpdateTrackingButton then pcall(ns.HudUpdateTrackingButton) end
     end,
 })
 

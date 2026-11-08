@@ -1,3 +1,9 @@
+# Nach 0.23.0-alpha (im Release 1.0.0 enthalten)
+
+**Neu**
+- **Verfolgungs-Knopf an der eckigen Minimap:** kleine Lupe oben links neben dem Kartenmenü-Knopf. Klick öffnet die Verfolgungsliste (Briefkasten, Kräuter, Erze …) mit Häkchen, der Tooltip zeigt die aktive Verfolgung. Abschaltbar unter Minimap.
+- **Berufsreagenzien im Questtracker:** verfolgte Rezepte erscheinen als eigener Abschnitt unter den Quests mit den Reagenzien als „vorhanden / benötigt“ (Taschen, Bank, Reagenzienbank). Einklappbar, abschaltbar. Blizzards eigene Liste überlappt den Tracker damit nicht mehr, wenn „Blizzard-Questverfolgung ausblenden“ an ist.
+
 # stray 0.23.0-alpha
 
 Diese Version enthält auch 0.22.0-alpha, 0.21.0-alpha und 0.20.0-alpha, die nie einzeln veröffentlicht wurden (siehe unten).
