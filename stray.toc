@@ -4,7 +4,7 @@
 ## Notes: All-in-one quality-of-life addon for WoW Forever – type /stray.
 ## Notes-deDE: Komfort-Optionen per /stray – Beute, Händler, Taschen, Chat, Quests, Filmsequenzen, Bedrohung, Kamera, Interface, Sozial.
 ## Author: stray
-## Version: 0.23.0-alpha
+## Version: 1.0.0
 ## SavedVariables: strayDB
 ## X-Curse-Project-ID: 1790666
 

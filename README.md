@@ -142,6 +142,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 1.0.0 – Erste stabile Version: enthält 0.20 bis 0.23 (neues stray-Fenster, DMG-Meter-Fenster, eigener Questtracker mit Berufsreagenzien, Tasten belegen, Anheft-Leiste, Konflikt-Warnung, Verfolgungs-Knopf an der Minimap, englische Übersetzung)
 - 0.23.0-alpha – Neues stray-Fenster (Seiten, Reiter, Zahlenfelder, Position), DMG-Meter bis 5 Fenster per „+“, eigener Questtracker mit Questgegenstand-Knöpfen, Tasten belegen per Mouseover, Anheft-Leiste (5 Plätze), Taschenplätze und Tasche tauschen, neues Taschensymbol, Warnung bei Konflikten mit anderen Addons
 - 0.22.0-alpha – Neues stray-Fenster (Zentrale, Stichwort-Suche, Neu laden/Verwerfen), Hauptschalter stray-Oberfläche, Mittelklick ohne Ping, neue Taschenleiste, lesbare EP-Leiste + EP-Tracker, Begleiter am Gruppenrahmen, Bearbeitungsmodus mit Fenster je Anzeige und Pfeiltasten, laufender Rand beim Vorrat, englische Übersetzung; Nachtrag: Sprache umschaltbar, Logo Siegel, Fenster in der Größe ziehbar, Sammlung/Abenteuerführer, Begleiter-Position, Anheft-Leiste im Taschenfenster, Rückgängig im Bearbeitungsmodus, lila Look überall
 - 0.21.0-alpha – Taschenfenster (Größe ziehen, blättern, sortieren, Quest-Kategorie), zweites DMG-Meter-Fenster zum Andocken, neue Bearbeiten-Leiste (Einrasten, Esc), leere Aktionsplätze dauerhaft, neue Taschenleiste, eckige Minimap, Menü per mittlerer Maustaste
