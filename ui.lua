@@ -1,7 +1,9 @@
 -- stray – Einstellungsfenster (seit 0.23.0-alpha nach Leons Vorlage)
 -- Kopf über die ganze Breite: Logo + „stray“ links, breites Suchfeld, Knopf „Bearbeitungsmodus“ und
--- Schließen rechts. Links die Navigation: Zentrale, dann OBERFLÄCHE / SPIELHILFEN / SYSTEM mit
--- schlichten Liniensymbolen (gewählt = lila Strich links + helle Fläche), unten die Profil-Auswahl.
+-- Schließen rechts. Links die Navigation nach dem Ort im Spiel: Übersicht (Bildschirmkarte, zuletzt
+-- geändert, Module), Leisten & Menü, Karte & Gruppe, Taschen & Handel, Kampf, Welt & Quests, stray
+-- (System) und Alle Anzeigen, mit schlichten Liniensymbolen (gewählt = lila Strich links + helle
+-- Fläche), unten die Profil-Auswahl. Frühere Seitennamen (V.LEGACY_PAGES) führen auf die neuen Seiten.
 -- Rechts je Seite ein großer Titel mit Häkchen „Aktiv“ (Hauptschalter des Moduls bzw. Reiters),
 -- darunter Reiter (die Bereiche der Seite). Inhalt einspaltig: Abschnitts-Überschriften in
 -- Großbuchstaben mit feiner Linie (ALLGEMEIN, ANORDNUNG, POSITION), Zeilen mit Name und Bedienelement
@@ -147,88 +149,126 @@ end
 -- dann Schlüssel nach Muster (prefix, ohne exclude), zuletzt ganze Bereiche (sections).
 -- master = Schlüssel des Hauptschalters („Aktiv“); am Reiter geht vor der Seite; "first" = erster
 -- Schalter des Reiters. Seiten- und Reiternamen sind deutsche Schlüssel (Anzeige über L).
+-- Die Seiten ordnen nach dem Ort im Spiel (höchstens 6 Reiter je Seite); „Übersicht“ (home) und
+-- „Alle Anzeigen“ (displays) sind eigene Seiten ohne Reiter.
 local PAGES = {
-    { name = "Zentrale", icon = "home", home = true },
-    { group = "OBERFLÄCHE", name = "Aktionsleisten", icon = "layout-grid", master = "abEnabled", tabs = {
-        { name = "Leisten", keys = { "abEnabled" }, sections = { "Aktionsleisten" } },
-        { name = "Tastenbelegung", sections = { "Tastenbelegung" } },
+    { name = "Übersicht", icon = "home", home = true },
+    { name = "Leisten & Menü", icon = "layout-grid", tabs = {
+        { name = "Aktionsleisten", keys = { "abEnabled" }, sections = { "Aktionsleisten" }, master = "abEnabled" },
+        { name = "Tastenbelegung", sections = { "Tastenbelegung" }, master = "abEnabled" },
         { name = "Abklingzeiten", sections = { "Abklingzeiten" }, master = "cdManager" },
-        { name = "Taschenleiste", keys = { "bottomBar", "bottomMicroButtons", "bottomBarSize" }, master = "bottomBar" },
+        { name = "Taschen- & Menüleiste", keys = { "bottomBar", "bottomMicroButtons", "bottomBarSize" }, master = "bottomBar" },
+        { name = "EP-Leiste", keys = { "hudXPBar", "questXPBar", "xpBarWidth", "xpBarHeight", "xpBarFontSize" },
+            master = "hudXPBar" },
     } },
-    { group = "OBERFLÄCHE", name = "Einheiten", icon = "user", master = "partyFrames", tabs = {
-        { name = "Gruppenrahmen", sections = { "Gruppenrahmen" } },
+    { name = "Karte & Gruppe", icon = "map-2", tabs = {
+        { name = "Minimap", keys = { "squareMinimap", "squareMinimapSize", "minimapMiddleMenu", "hudMinimapColumn",
+            "hudClock", "hudTrackingButton", "minimapWheel", "minimapButton" }, sections = { "Leisten & Minimap" }, master = "squareMinimap" },
+        { name = "Gruppenrahmen", sections = { "Gruppenrahmen" }, master = "partyFrames" },
         { name = "Begleiter", prefix = "^partyPet", master = "partyPets" },
+        { name = "Chat", sections = { "Chat" } },
+        { name = "Sozial", sections = { "Sozial" } },
+        { name = "Charaktere", sections = { "Charaktere" } },
     } },
-    { group = "OBERFLÄCHE", name = "Taschen & Minimap", icon = "backpack", tabs = {
+    { name = "Taschen & Handel", icon = "backpack", tabs = {
         { name = "Taschen", sections = { "Taschen" } },
         { name = "Taschenfenster", keys = { "bagWindow", "bagColumns" }, prefix = "^bag",
             exclude = { bagTriage = true }, master = "bagWindow" },
         { name = "Vorrat", sections = { "Vorrat" }, master = "supplies" },
-        { name = "Minimap", keys = { "squareMinimap", "squareMinimapSize", "minimapMiddleMenu", "hudMinimapColumn",
-            "hudClock", "hudTrackingButton", "minimapWheel", "minimapButton" }, sections = { "Leisten & Minimap" }, master = "squareMinimap" },
-        { name = "EP-Leiste", keys = { "hudXPBar", "questXPBar", "xpBarWidth", "xpBarHeight", "xpBarFontSize" },
-            master = "hudXPBar" },
+        { name = "Beute", sections = { "Beute" } },
+        { name = "Händler", sections = { "Händler" } },
     } },
-    { group = "SPIELHILFEN", name = "Kampf & Anzeigen", icon = "swords", tabs = {
+    { name = "Kampf", icon = "swords", tabs = {
         { name = "Bedrohung", sections = { "Bedrohung" } },
         { name = "DMG-Meter", sections = { "DMG-Meter" }, master = "dmShow" },
         { name = "Kampfhilfen", sections = { "Kampfhilfen" } },
         { name = "Zaubern", sections = { "Zaubern" } },
         { name = "Swing", prefix = "^swing", master = "swingTimer" },
-        { name = "EP-Tracker", prefix = "^xpTracker", sections = { "Erfahrung" }, master = "xpTracker" },
-        { name = "Flugzeit", prefix = "^flight", master = "flightBar" },
+        { name = "Würfelfenster", keys = { "rollsMove" }, master = "rollsMove" },
     } },
-    { group = "SPIELHILFEN", name = "Komfort", icon = "meditation", tabs = {
-        { name = "Beute", sections = { "Beute" } },
-        { name = "Händler", sections = { "Händler" } },
-        { name = "NPCs", sections = { "NPCs" } },
+    { name = "Welt & Quests", icon = "exclamation-circle", tabs = {
         { name = "Quests", sections = { "Quests" } },
+        { name = "NPCs", sections = { "NPCs" } },
         { name = "Filmsequenzen", sections = { "Filmsequenzen" } },
-        { name = "Chat", sections = { "Chat" } },
-        { name = "Sozial", sections = { "Sozial" } },
-        { name = "Charaktere", sections = { "Charaktere" } },
+        { name = "Flugzeit", prefix = "^flight", master = "flightBar" },
+        { name = "EP-Tracker", prefix = "^xpTracker", sections = { "Erfahrung" }, master = "xpTracker" },
+        { name = "Kamera", sections = { "Kamera & Karte" } },
     } },
-    { group = "SYSTEM", name = "Profile", icon = "stack-2", tabs = {
+    { name = "stray", icon = "settings", tabs = {
         { name = "Profile", sections = { "Profile" } },
-    } },
-    { group = "SYSTEM", name = "Sprache & System", icon = "settings", tabs = {
         { name = "Allgemein", keys = { "language", "uiStyle", "updateNotice", "strayUI" }, sections = { "stray-Oberfläche" } },
         { name = "Bearbeiten", sections = { "Bearbeiten" } },
         { name = "Interface", sections = { "Interface" } },
-        { name = "Kamera", sections = { "Kamera & Karte" } },
     } },
+    { name = "Alle Anzeigen", icon = "stack-2", displays = true },
 }
 
--- Verschiebbare Anzeigen (Label aus ns.RegisterMovable, Anfang genügt) → Seite, Reiter
+-- Verschiebbare Anzeigen (Label aus ns.RegisterMovable, Anfang genügt) → Seite, Reiter, optional Schlüssel
+-- des Schalters, der die Anzeige ein- und ausschaltet (sonst gilt der Hauptschalter des Reiters)
 local MOVABLE_TABS = {
-    { "Aktionsleiste", "Aktionsleisten", "Leisten" },
-    { "Abklingzeiten", "Aktionsleisten", "Abklingzeiten" },
-    { "Taschen und Menü", "Aktionsleisten", "Taschenleiste" },
-    { "Gruppenrahmen", "Einheiten", "Gruppenrahmen" },
-    { "Begleiter", "Einheiten", "Begleiter" },
-    { "Taschenfenster", "Taschen & Minimap", "Taschenfenster" },
-    { "Vorrat", "Taschen & Minimap", "Vorrat" },
-    { "Erfahrungsleiste", "Taschen & Minimap", "EP-Leiste" },
-    { "Minimap", "Taschen & Minimap", "Minimap" },
-    { "Bedrohungsliste", "Kampf & Anzeigen", "Bedrohung" },
-    { "Tank-Warnung", "Kampf & Anzeigen", "Bedrohung" },
-    { "Aggro-Warnung", "Kampf & Anzeigen", "Bedrohung" },
-    { "DMG-Meter", "Kampf & Anzeigen", "DMG-Meter" },
-    { "Gefahr-Hinweis", "Kampf & Anzeigen", "Kampfhilfen" },
-    { "Swing", "Kampf & Anzeigen", "Swing" },
-    { "EP-Tracker", "Kampf & Anzeigen", "EP-Tracker" },
-    { "Flugzeit", "Kampf & Anzeigen", "Flugzeit" },
-    { "Haltbarkeit", "Sprache & System", "Interface" },
-    { "Würfelfenster", "Sprache & System", "Interface" },
+    { "Aktionsleiste", "Leisten & Menü", "Aktionsleisten" },
+    { "Abklingzeiten", "Leisten & Menü", "Abklingzeiten" },
+    { "Taschen und Menü", "Leisten & Menü", "Taschen- & Menüleiste" },
+    { "Erfahrungsleiste", "Leisten & Menü", "EP-Leiste" },
+    { "Gruppenrahmen", "Karte & Gruppe", "Gruppenrahmen" },
+    { "Begleiter", "Karte & Gruppe", "Begleiter" },
+    { "Minimap", "Karte & Gruppe", "Minimap" },
+    { "Taschenfenster", "Taschen & Handel", "Taschenfenster" },
+    { "Vorrat", "Taschen & Handel", "Vorrat" },
+    { "Bedrohungsliste", "Kampf", "Bedrohung", "threatList" },
+    { "Tank-Warnung", "Kampf", "Bedrohung", "threatTankWarn" },
+    { "Aggro-Warnung", "Kampf", "Bedrohung", "threatAggroWarn" },
+    { "DMG-Meter", "Kampf", "DMG-Meter" },
+    { "Gefahr-Hinweis", "Kampf", "Kampfhilfen", "dangerWarn" },
+    { "Swing", "Kampf", "Swing" },
+    { "Würfelfenster", "Kampf", "Würfelfenster" },
+    { "EP-Tracker", "Welt & Quests", "EP-Tracker" },
+    { "Flugzeit", "Welt & Quests", "Flugzeit" },
+    { "Haltbarkeit", "stray", "Interface", "durability" },
 }
 
--- Zentrale: Module mit An/Aus („@Bereich“ = erster Schalter dieses Bereichs)
+-- Übersicht: Module mit An/Aus, nach Ort gruppiert (Überschrift = Seitenname)
 local HOME = {
-    { label = "OBERFLÄCHE", keys = { "strayUI", "abEnabled", "bottomBar", "cdManager", "partyFrames", "bagWindow",
-        "squareMinimap", "hudXPBar" } },
-    { label = "SPIELHILFEN", keys = { "threatList", "dmShow", "swingTimer", "xpTracker", "flightBar", "dangerWarn",
-        "supplies", "questAccept", "autoSell", "playerNotes", "alts" } },
+    { label = "Leisten & Menü", keys = { "abEnabled", "bottomBar", "cdManager", "hudXPBar" } },
+    { label = "Karte & Gruppe", keys = { "squareMinimap", "partyFrames", "playerNotes", "alts" } },
+    { label = "Taschen & Handel", keys = { "bagWindow", "supplies", "autoSell" } },
+    { label = "Kampf", keys = { "threatList", "dmShow", "swingTimer", "dangerWarn" } },
+    { label = "Welt & Quests", keys = { "questAccept", "xpTracker", "flightBar" } },
+    { label = "stray", keys = { "strayUI" } },
 }
+
+-- Weitere Bausteine der Seiten (gebündelt, um lokale Namen zu sparen): V.MAP = Bildschirmkarte der
+-- Übersicht mit Fläche (x, y, w, h als Anteil des Spielfensters), Beschriftung, Name, Schlüsseln der
+-- Schalter (aktiv, wenn einer an ist) und Ziel (Seite, Reiter)
+local V = {}
+V.MAP = {
+    { label = "Minimap", name = "Minimap", x = 0.835, y = 0.04, w = 0.145, h = 0.26, keys = { "squareMinimap" },
+        page = "Karte & Gruppe", tab = "Minimap" },
+    { label = "EP-Leiste", name = "EP-Leiste", x = 0.30, y = 0.03, w = 0.40, h = 0.07, keys = { "hudXPBar" },
+        page = "Leisten & Menü", tab = "EP-Leiste" },
+    { label = "Gruppe", name = "Gruppenrahmen", x = 0.03, y = 0.17, w = 0.12, h = 0.30, keys = { "partyFrames" },
+        page = "Karte & Gruppe", tab = "Gruppenrahmen" },
+    { label = "Bedrohung", name = "Bedrohungsliste", x = 0.03, y = 0.50, w = 0.12, h = 0.17, keys = { "threatList" },
+        page = "Kampf", tab = "Bedrohung" },
+    { label = "Chat", name = "Chat", x = 0.03, y = 0.71, w = 0.26, h = 0.25, keys = { "chatLinks", "chatCoords" },
+        page = "Karte & Gruppe", tab = "Chat" },
+    { label = "Aktionsleisten", name = "Aktionsleisten", x = 0.33, y = 0.84, w = 0.34, h = 0.12, keys = { "abEnabled" },
+        page = "Leisten & Menü", tab = "Aktionsleisten" },
+    { label = "Taschen & Menü", name = "Taschen- & Menüleiste", x = 0.72, y = 0.90, w = 0.25, h = 0.07,
+        keys = { "bottomBar" }, page = "Leisten & Menü", tab = "Taschen- & Menüleiste" },
+    { label = "Taschenfenster", name = "Taschenfenster", x = 0.74, y = 0.58, w = 0.23, h = 0.29, keys = { "bagWindow" },
+        page = "Taschen & Handel", tab = "Taschenfenster" },
+    { label = "DMG-Meter", name = "DMG-Meter", x = 0.80, y = 0.34, w = 0.17, h = 0.20, keys = { "dmShow" },
+        page = "Kampf", tab = "DMG-Meter" },
+}
+
+-- Frühere Seiten- und Reiternamen (für ns.OpenConfig anderer Module)
+V.LEGACY_PAGES = {
+    ["Zentrale"] = "Übersicht", ["Aktionsleisten"] = "Leisten & Menü", ["Einheiten"] = "Karte & Gruppe",
+    ["Taschen & Minimap"] = "Taschen & Handel", ["Kampf & Anzeigen"] = "Kampf", ["Komfort"] = "Welt & Quests",
+    ["Profile"] = "stray", ["Sprache & System"] = "stray",
+}
+V.LEGACY_TABS = { ["Taschenleiste"] = "Taschen- & Menüleiste", ["Leisten"] = "Aktionsleisten" }
 
 -- Beim Einschalten zuerst auch diesen Schalter einschalten (eigene Leisten gehören zur stray-Oberfläche)
 local MASTER_REQUIRES = { abEnabled = "strayUI" }
@@ -1334,7 +1374,7 @@ local function CollectOptions()
     local byKey, rules, bySection = {}, {}, {}
     local pageList = {}
     for _, def in ipairs(PAGES) do
-        local page = { name = def.name, icon = def.icon, group = def.group, home = def.home, master = def.master, tabs = {} }
+        local page = { name = def.name, icon = def.icon, home = def.home, displays = def.displays, master = def.master, tabs = {} }
         table.insert(pageList, page)
         for _, tdef in ipairs(def.tabs or {}) do
             local tab = { name = tdef.name, master = tdef.master, options = {} }
@@ -1362,7 +1402,7 @@ local function CollectOptions()
         tab = tab or bySection[section]
         if not tab then
             if not other then
-                other = { name = "Weitere", icon = "adjustments", group = "SYSTEM", tabs = {} }
+                other = { name = "Weitere", icon = "adjustments", tabs = {} }
                 table.insert(pageList, other)
             end
             for _, t in ipairs(other.tabs) do
@@ -1378,14 +1418,14 @@ local function CollectOptions()
         R.tabOf[option] = tab
     end
 
-    -- Nur Reiter mit Optionen, nur Seiten mit Reitern (die Zentrale immer)
+    -- Nur Reiter mit Optionen, nur Seiten mit Reitern (Übersicht und Alle Anzeigen immer)
     for _, page in ipairs(pageList) do
         local tabs = {}
         for _, tab in ipairs(page.tabs) do
             if #tab.options > 0 then table.insert(tabs, tab) end
         end
         page.tabs = tabs
-        if page.home or #tabs > 0 then table.insert(R.pages, page) end
+        if page.home or page.displays or #tabs > 0 then table.insert(R.pages, page) end
     end
 end
 
@@ -1412,6 +1452,23 @@ local function FindTab(pageName, tabName)
     for i, tab in ipairs(page.tabs) do
         if tab.name == tabName then return page, tab, i end
     end
+end
+
+-- Seite und Reiter zu einem Ziel auflösen; frühere Namen (V.LEGACY_*) und Reiter auf anderer Seite
+-- werden auf die neue Seite abgebildet. Gibt (Seite, Reiter-Name) oder nil zurück.
+function V.Resolve(pageName, tabName)
+    if tabName == nil and pageName == "Profile" then tabName = "Profile" end
+    local page = FindPage(pageName) or FindPage(V.LEGACY_PAGES[pageName])
+    local wanted = tabName and (V.LEGACY_TABS[tabName] or tabName)
+    if wanted and not (page and FindTab(page.name, wanted)) then
+        for _, p in ipairs(R.pages) do
+            if FindTab(p.name, wanted) then
+                page = p
+                break
+            end
+        end
+    end
+    if page then return page, wanted end
 end
 
 -- Schalter-Option zu einem Schlüssel („@Bereich“ = erster Schalter dieses Bereichs)
@@ -1441,7 +1498,7 @@ local function TabMaster(page, tab)
 end
 
 local function CurrentTab(page)
-    if not page or page.home or #page.tabs == 0 then return nil, 0 end
+    if not page or page.home or page.displays or #page.tabs == 0 then return nil, 0 end
     local i = S.selectedTabs[page.name] or 1
     if i > #page.tabs then i = 1 end
     return page.tabs[i], i
@@ -1454,7 +1511,7 @@ end
 -- Laufende Daten (keine Einstellungen): zählen nicht als Änderung und werden nie zurückgesetzt
 local DATA_KEYS = {
     point = true, uiSize = true, altData = true, accountCVarData = true, flightRouteTimes = true,
-    mailAltList = true, playerNoteData = true, xpHistory = true,
+    mailAltList = true, playerNoteData = true, xpHistory = true, recentChanges = true,
 }
 local function IsDataKey(key)
     if DATA_KEYS[key] then return true end
@@ -1683,6 +1740,30 @@ function Changed()
     if Refresh then Refresh() end
 end
 
+-- Die letzten 5 geänderten Einstellungen (Schlüssel) in ns.db.recentChanges; Laufdaten, kein Profilwert
+local function RecordChange(option)
+    local key = option and option.key
+    if type(key) ~= "string" or not ns.db then return end
+    local list = ns.db.recentChanges
+    if type(list) ~= "table" then
+        list = {}
+        ns.db.recentChanges = list
+    end
+    if list[1] == key then return end
+    -- Auf der Übersicht bleibt die Reihenfolge stehen: sonst springt die Zeile unter der Maus (Regler beim Ziehen)
+    local current = FindPage(S.selected) or R.pages[1]
+    if current and current.home then
+        for _, k in ipairs(list) do
+            if k == key then return end
+        end
+    end
+    for i = #list, 1, -1 do
+        if list[i] == key then table.remove(list, i) end
+    end
+    table.insert(list, 1, key)
+    while #list > 5 do table.remove(list) end
+end
+
 local function SetOptionValue(option, value)
     local done = false
     local function apply()
@@ -1694,6 +1775,7 @@ local function SetOptionValue(option, value)
         end
         local ok, err = pcall(option.set, value)
         if not ok then geterrorhandler()(err) end
+        RecordChange(option)
         Changed()
     end
     if value == true and option.key and ns.ConfirmOption then
@@ -1727,6 +1809,7 @@ local function SetSliderValue(option, v)
     if step >= 1 then v = RoundInt(v) else v = tonumber(string.format("%.4f", v)) end
     if SafeGet(option) ~= v then
         option.set(v)
+        RecordChange(option)
         Changed()
     end
 end
@@ -1785,7 +1868,7 @@ end
 -- Elemente des Inhalts (Pools je Art)
 ---------------------------------------------------------------------------
 
-local pools = { option = {}, heading = {}, hint = {}, position = {}, instance = {}, quick = {} }
+local pools = { option = {}, heading = {}, hint = {}, position = {}, instance = {}, quick = {}, map = {}, display = {} }
 local used = {}
 
 local function Take(kind, create)
@@ -2016,6 +2099,7 @@ local function FillOptionRow(row, option, width, item)
         row.drop:SetItems(ChoiceItems(option), SafeGet(option), function(value)
             if OptionEnabled(option) then
                 option.set(value)
+                RecordChange(option)
                 Changed()
             end
         end, enabled)
@@ -2172,7 +2256,7 @@ local function InstanceFor(page, tab)
     local inst = (tab and S.instances[tab.name]) or (page and S.instances[page.name])
     if inst then return inst end
     -- Aktionsleisten ohne eigene Anmeldung: die Auswahl „Leiste bearbeiten“ (abEdit) als Liste oben
-    local option = tab and tab.name == "Leisten" and R.byKey.abEdit and R.byKey.abEdit[1]
+    local option = tab and tab.name == "Aktionsleisten" and R.byKey.abEdit and R.byKey.abEdit[1]
     if option then
         S.abInst = S.abInst or {
             option = option,
@@ -2203,7 +2287,7 @@ end
 local function MovableTab(label)
     if type(label) ~= "string" then return end
     for _, m in ipairs(MOVABLE_TABS) do
-        if label:sub(1, #m[1]) == m[1] then return m[2], m[3] end
+        if label:sub(1, #m[1]) == m[1] then return m[2], m[3], m[4] end
     end
 end
 
@@ -2231,6 +2315,179 @@ local function MovablesFor(page, tab)
         end
     end
     return list
+end
+
+---------------------------------------------------------------------------
+-- Übersicht: Bildschirmkarte; Alle Anzeigen: Zeilen
+---------------------------------------------------------------------------
+
+-- Kleines 16:9-Abbild des Spielfensters mit klickbaren Flächen (V.MAP). Farben aus ns.Colors/ns.Style;
+-- ausgeschaltete Module sind gedimmt, Hover = lila Akzent und Tooltip, Klick = Seite und Reiter öffnen.
+local function CreateMapRow()
+    local row = CreateFrame("Frame", nil, scrollChild)
+    local box = CreateFrame("Frame", nil, row)
+    row.box = box
+    local fx1 = FX("Fill", box, "inset")
+    local fx2 = FX("Border", box, { size = 6, corners = false })
+    if not (fx1 and fx2) then
+        local r, g, b, a = 0.055, 0.055, 0.070, 1
+        if ns.Style and ns.Style.FillColor then
+            local ok, r2, g2, b2, a2 = pcall(ns.Style.FillColor, "inset")
+            if ok and r2 then r, g, b, a = r2, g2, b2, a2 or 1 end
+        end
+        Panel(box, 6, { r, g, b, a }, C.line, "BACKGROUND")
+    end
+    row.caption = Text(row, 11, C.grey)
+    row.caption:SetPoint("BOTTOM", row, "BOTTOM", 0, 2)
+    row.areas = {}
+    local edgeColor = FOREVER and ns.Colors.bronze or C.line
+    for _, def in ipairs(V.MAP) do
+        local a = CreateFrame("Button", nil, box)
+        a:RegisterForClicks("LeftButtonUp")
+        a.def = def
+        a.fill = a:CreateTexture(nil, "BACKGROUND")
+        a.fill:SetAllPoints()
+        a.edges = {}
+        local function Edge(p1, x1, y1, p2, x2, y2, horizontal)
+            local t = Line(a, edgeColor, "BORDER")
+            t:SetPoint(p1, a, p1, x1, y1)
+            t:SetPoint(p2, a, p2, x2, y2)
+            if horizontal then t:SetHeight(1) else t:SetWidth(1) end
+            table.insert(a.edges, t)
+        end
+        Edge("TOPLEFT", 0, 0, "TOPRIGHT", 0, 0, true)
+        Edge("BOTTOMLEFT", 0, 0, "BOTTOMRIGHT", 0, 0, true)
+        Edge("TOPLEFT", 0, 0, "BOTTOMLEFT", 0, 0, false)
+        Edge("TOPRIGHT", 0, 0, "BOTTOMRIGHT", 0, 0, false)
+        a.text = Text(a, 10, C.text)
+        a.text:SetPoint("CENTER", 0, 0)
+        a.text:SetJustifyH("CENTER")
+        a.text:SetWordWrap(false)
+        function a:Paint()
+            local hov = self.hover
+            local c = hov and { C.accent[1], C.accent[2], C.accent[3], 0.32 } or C.card
+            self.fill:SetColorTexture(c[1], c[2], c[3], c[4] or 1)
+            local e = hov and C.accent or edgeColor
+            for _, t in ipairs(self.edges) do t:SetColorTexture(e[1], e[2], e[3], e[4] or 1) end
+            SetTextColor(self.text, hov and C.hi or (self.active and C.text or C.faint))
+            self:SetAlpha(self.active and 1 or 0.55)
+        end
+        a:SetScript("OnEnter", function(self)
+            self.hover = true
+            self:Paint()
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(L[self.def.name], 1, 1, 1)
+            local tc = self.active and C.accentT or C.grey
+            GameTooltip:AddLine(self.active and L["aktiv"] or L["aus"], tc[1], tc[2], tc[3])
+            GameTooltip:AddLine(L["Klick: Einstellungen"], C.grey[1], C.grey[2], C.grey[3])
+            GameTooltip:Show()
+        end)
+        a:SetScript("OnLeave", function(self)
+            self.hover = false
+            self:Paint()
+            GameTooltip:Hide()
+        end)
+        a:SetScript("OnClick", function(self)
+            S.Navigate(self.def.page, self.def.tab)
+        end)
+        table.insert(row.areas, a)
+    end
+    -- Größe und Zustand der Flächen aktualisieren; gibt die Zeilenhöhe zurück
+    function row:Update(width)
+        local w = math.floor(math.min(480, width - 8))
+        local h = math.floor(w * 9 / 16)
+        self.box:ClearAllPoints()
+        self.box:SetPoint("TOP", self, "TOP", 0, -2)
+        self.box:SetSize(w, h)
+        local pad = FOREVER and 8 or 4
+        for _, a in ipairs(self.areas) do
+            local d = a.def
+            if FindTab(d.page, d.tab) then
+                local on = false
+                for _, key in ipairs(d.keys) do
+                    local option = SwitchOption(key)
+                    if option and SafeGet(option) then on = true break end
+                end
+                a.active = on
+                local aw, ah = math.max(10, math.floor(d.w * w)), math.max(10, math.floor(d.h * h))
+                a:ClearAllPoints()
+                a:SetPoint("TOPLEFT", self.box, "TOPLEFT", math.max(pad, math.floor(d.x * w)),
+                    -math.max(pad, math.floor(d.y * h)))
+                a:SetSize(aw, ah)
+                a.text:SetText(L[d.label])
+                a.text:SetWidth(aw - 4)
+                a.hover = a:IsMouseOver() and true or false
+                a:Paint()
+                a:Show()
+            else
+                a:Hide()
+            end
+        end
+        self.caption:SetText(L["Klick auf eine Fläche öffnet ihre Einstellungen."])
+        return h + 26
+    end
+    return row
+end
+
+-- Zeile der Seite „Alle Anzeigen“: Name · Ort · Sichtbar/Aus; Klick springt zur Einstellung
+local function CreateDisplayRow()
+    local row = CreateFrame("Button", nil, scrollChild)
+    row:RegisterForClicks("LeftButtonUp")
+    row.hl = RoundRect(row, 6, { C.hover[1], C.hover[2], C.hover[3], 0.6 }, "BACKGROUND")
+    row.hl:SetShown(false)
+    row.label = Text(row, 14, C.text)
+    row.label:SetPoint("LEFT", 12, 0)
+    row.label:SetWordWrap(false)
+    row.state = Text(row, 13, C.grey)
+    row.state:SetPoint("RIGHT", -14, 0)
+    row.state:SetWidth(90)
+    row.state:SetJustifyH("RIGHT")
+    row.sub = Text(row, 12, C.grey)
+    row.sub:SetWordWrap(false)
+    function row:Fill(item, width)
+        local nameW = math.floor(width * (FOREVER and 0.36 or 0.32))
+        self.label:SetWidth(nameW)
+        self.label:SetText(item.text)
+        self.sub:ClearAllPoints()
+        self.sub:SetPoint("LEFT", self, "LEFT", 12 + nameW + 8, 0)
+        self.sub:SetPoint("RIGHT", self.state, "LEFT", -8, 0)
+        self.sub:SetText(item.sub or "")
+        self.state:SetText(item.active and L["Sichtbar"] or L["Aus"])
+        SetTextColor(self.state, item.active and C.accentT or C.faint)
+        SetTextColor(self.label, item.active and C.text or C.grey)
+        self.nav = item.nav
+    end
+    row:SetScript("OnEnter", function(self)
+        self.hl:SetShown(true)
+        if self.nav then
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:SetText(self.label:GetText() or "", 1, 1, 1)
+            GameTooltip:AddLine(L["Klick: Einstellungen"], C.grey[1], C.grey[2], C.grey[3])
+            GameTooltip:Show()
+        end
+    end)
+    row:SetScript("OnLeave", function(self)
+        self.hl:SetShown(false)
+        GameTooltip:Hide()
+    end)
+    row:SetScript("OnClick", function(self)
+        local nav = self.nav
+        if not nav then return end
+        S.Navigate(nav.page, nav.tab)
+        -- Bei mehreren gleichen Anzeigen (Aktionsleiste 2, DMG-Meter 3) gleich die richtige wählen
+        local page, tab = FindTab(nav.page, nav.tab)
+        local inst = page and InstanceFor(page, tab)
+        if inst and inst.set and nav.key then
+            for _, e in ipairs(InstanceList(inst)) do
+                if InstanceMatches(e, nav.key) then
+                    pcall(inst.set, e.id)
+                    break
+                end
+            end
+            Refresh()
+        end
+    end)
+    return row
 end
 
 ---------------------------------------------------------------------------
@@ -2323,6 +2580,13 @@ local function Layout(items)
             end
             for bi = #item.buttons + 1, #el.buttons do el.buttons[bi]:Hide() end
             h = 44
+        elseif item.kind == "map" then
+            el = Take("map", CreateMapRow)
+            h = el:Update(width)
+        elseif item.kind == "display" then
+            el = Take("display", CreateDisplayRow)
+            el:Fill(item, width)
+            h = M.ROW_H - 4
         end
         if el then
             el:ClearAllPoints()
@@ -2461,8 +2725,10 @@ local navButtons = {}
 
 -- Seite (und optional Reiter) wählen
 function S.Navigate(pageName, tabName)
-    local page = FindPage(pageName)
+    local page
+    page, tabName = V.Resolve(pageName, tabName)
     if not page then return end
+    pageName = page.name
     if S.selected ~= pageName or W.search:GetText() ~= "" then SetScroll(0) end
     S.selected = pageName
     if tabName then
@@ -2493,16 +2759,7 @@ local function BuildNav()
     FX("Fill", side, "inset") -- Forever: dunkler Schiefer hinter der Navigation
 
     local y = -12
-    local lastGroup
     for _, page in ipairs(R.pages) do
-        if page.group and page.group ~= lastGroup then
-            y = y - 10
-            local g = Text(side, 11, FOREVER and C.rest or C.faint)
-            g:SetPoint("TOPLEFT", 22, y - 4)
-            g:SetText(L[page.group])
-            y = y - 24
-            lastGroup = page.group
-        end
         local b = CreateFrame("Button", nil, side)
         b:SetSize(M.SIDE_W - 16 - P, M.NAV_H)
         b:SetPoint("TOPLEFT", 8, y)
@@ -2579,7 +2836,7 @@ local function ProfileMenu()
             end })
         end
     end
-    table.insert(items, { value = "page", label = L["Profile verwalten"], onClick = function() S.Navigate("Profile") end })
+    table.insert(items, { value = "page", label = L["Profile verwalten"], onClick = function() S.Navigate("stray", "Profile") end })
     return items, current, label, api
 end
 
@@ -2766,6 +3023,8 @@ local function KeybindStarter()
 end
 
 local function HomeItems(items)
+    table.insert(items, { kind = "heading", text = L["BILDSCHIRM"] })
+    table.insert(items, { kind = "map" })
     local quick = {
         { label = L["Bearbeitungsmodus"], enabled = not InCombat(),
             tip = L["Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein."],
@@ -2778,9 +3037,27 @@ local function HomeItems(items)
             onClick = function() if not InCombat() then pcall(keys) end end })
     end
     table.insert(quick, { label = L["Profile"], tip = L["Profile exportieren und importieren."],
-        onClick = function() S.Navigate("Profile") end })
+        onClick = function() S.Navigate("stray", "Profile") end })
     table.insert(items, { kind = "heading", text = L["SCHNELLZUGRIFF"] })
     table.insert(items, { kind = "quick", buttons = quick })
+
+    -- Zuletzt geänderte Einstellungen (ns.db.recentChanges, neueste zuerst); Klick öffnet die Einstellung
+    local recent = {}
+    for _, key in ipairs(ns.db and ns.db.recentChanges or {}) do
+        local option = R.byKey[key] and R.byKey[key][1]
+        local tab = option and R.tabOf[option]
+        local page = tab and R.pageOfTab[tab]
+        if option and page and #recent < 5 then
+            -- Regler haben in der Zeile keinen Platz für den Ort
+            local sub = option.type ~= "slider" and (L[page.name] .. " · " .. L[tab.name]) or nil
+            table.insert(recent, { kind = "option", option = option, sub = sub,
+                nav = { page = page.name, tab = tab.name } })
+        end
+    end
+    if #recent > 0 then
+        table.insert(items, { kind = "heading", text = L["ZULETZT GEÄNDERT"] })
+        for _, row in ipairs(recent) do table.insert(items, row) end
+    end
 
     for _, group in ipairs(HOME) do
         local rows = {}
@@ -2789,17 +3066,52 @@ local function HomeItems(items)
             local tab = option and R.tabOf[option]
             local page = tab and R.pageOfTab[tab]
             if option and page then
-                local sub = L[page.name]
-                if #page.tabs > 1 then sub = sub .. " · " .. L[tab.name] end
-                table.insert(rows, { kind = "option", option = option, sub = sub,
+                -- Überschrift = Seite, Zeile zeigt den Reiter
+                table.insert(rows, { kind = "option", option = option, sub = L[tab.name],
                     nav = { page = page.name, tab = tab.name } })
             end
         end
         if #rows > 0 then
-            table.insert(items, { kind = "heading", text = L[group.label] })
+            table.insert(items, { kind = "heading", text = Upper(L[group.label]) })
             for _, row in ipairs(rows) do table.insert(items, row) end
         end
     end
+end
+
+-- Alle Anzeigen: Knopf zum Bearbeitungsmodus, darunter jede verschiebbare Anzeige mit Ort und Zustand
+local function DisplaysItems(items)
+    table.insert(items, { kind = "quick", buttons = { {
+        label = L["Bearbeitungsmodus starten"], enabled = not InCombat(),
+        tip = L["Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein."],
+        onClick = function() if not InCombat() and ns.EnterEditMode then ns.EnterEditMode() end end,
+    } } })
+    local rows = {}
+    for n, entry in ipairs(ns.movables or {}) do
+        local mf = entry.frame
+        if mf and mf.strayKey then
+            local pageName, tabName, switchKey = MovableTab(entry.label)
+            local page, tab, index = FindTab(pageName, tabName)
+            -- Zustand: eigener Schalter, sonst Hauptschalter des Reiters, sonst ob die Anzeige gerade steht
+            local option = switchKey and SwitchOption(switchKey) or (page and TabMaster(page, tab))
+            local active
+            if option then active = SafeGet(option) and true or false else active = mf:IsShown() and true or false end
+            local order = 1000 + n
+            if page then
+                for pi, p in ipairs(R.pages) do
+                    if p == page then order = pi * 100 + index break end
+                end
+            end
+            table.insert(rows, { kind = "display", text = LabelText(entry.label), active = active, order = order, n = n,
+                sub = page and (L[page.name] .. " · " .. L[tab.name]) or nil,
+                nav = page and { page = page.name, tab = tab.name, key = mf.strayKey } or nil })
+        end
+    end
+    table.sort(rows, function(a, b)
+        if a.order ~= b.order then return a.order < b.order end
+        return a.n < b.n
+    end)
+    table.insert(items, { kind = "heading", text = L["ANZEIGEN"] })
+    for _, row in ipairs(rows) do table.insert(items, row) end
 end
 
 function Refresh()
@@ -2844,6 +3156,12 @@ function Refresh()
             W.tabBar:Hide()
             top = 80
             HomeItems(items)
+        elseif page.displays then
+            W.info:SetText(L["Alle verschiebbaren Anzeigen – Klick auf eine Zeile öffnet ihre Einstellung."])
+            W.info:Show()
+            W.tabBar:Hide()
+            top = 80
+            DisplaysItems(items)
         else
             W.info:Hide()
             local tab, index = CurrentTab(page)

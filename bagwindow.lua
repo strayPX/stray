@@ -22,6 +22,33 @@ ns.defaults.bagSlotsBar = false -- Taschenplätze unten in der Seitenleiste
 
 local IsSecret = ns.IsSecret
 
+-- Stil „forever“ (Forever UI): alles hinter FX.On(); im Stil „stray“ bleibt alles wie bisher.
+-- Das Fenster entsteht beim Laden der Datei (Einstellungen noch nicht da), der Stil wird deshalb
+-- bei PLAYER_LOGIN aufgesetzt (FX.Apply, weiter unten). Hier werden die stray-Teile nur gemerkt.
+local FX = { stray = {}, lines = {}, btns = {} }
+
+function FX.On()
+    local S = ns.Style
+    if not (S and S.IsForever) then return false end
+    local ok, v = pcall(S.IsForever)
+    return ok and v == true
+end
+
+-- Merkt Textur oder Textur-Liste der stray-Optik (wird im Stil „forever“ ausgeblendet)
+function FX.Stray(x)
+    FX.stray[#FX.stray + 1] = x
+    return x
+end
+
+local function FXHide(o)
+    if type(o) ~= "table" then return end
+    if o.Hide then
+        pcall(o.Hide, o)
+    else
+        for _, v in pairs(o) do FXHide(v) end
+    end
+end
+
 ---------------------------------------------------------------------------
 -- Maße und Farben (lila stray-Look aus ns.Colors, Ersatzwerte falls es sie nicht gibt)
 ---------------------------------------------------------------------------
@@ -399,8 +426,12 @@ frame:SetToplevel(true)
 frame:Hide()
 tinsert(UISpecialFrames, "strayBagFrame") -- Esc schließt
 
-Tex(frame, "BACKGROUND", C.bg):SetAllPoints()
-Border(frame, C.border)
+do
+    local winBg = Tex(frame, "BACKGROUND", C.bg)
+    winBg:SetAllPoints()
+    FX.Stray(winBg)
+end
+FX.Stray(Border(frame, C.border))
 
 ns.MakeMovable(frame, "bagwindow", { "BOTTOMRIGHT", "BOTTOMRIGHT", -16, 96 })
 
@@ -444,6 +475,7 @@ end)
 do
     local headLine = Tex(frame, "BORDER", C.line)
     headLine:SetPoint("TOPLEFT", 1, -HEAD); headLine:SetPoint("TOPRIGHT", -1, -HEAD); headLine:SetHeight(1)
+    FX.lines[#FX.lines + 1] = headLine
 end
 
 local title = Text(head, 14, C.text)
@@ -455,7 +487,7 @@ slotsText:SetPoint("LEFT", title, "RIGHT", 10, -1)
 local close = CreateFrame("Button", nil, head)
 close:SetSize(22, 22)
 close:SetPoint("RIGHT", -8, 0)
-Border(close, C.border)
+FX.Stray(Border(close, C.border))
 do
     local closeText = Text(close, 12, C.textDim, FONT_BODY)
     closeText:SetPoint("CENTER", 1, 0)
@@ -463,6 +495,8 @@ do
     local closeHover = close:CreateTexture(nil, "HIGHLIGHT")
     closeHover:SetAllPoints()
     closeHover:SetColorTexture(1, 1, 1, 0.07)
+    FX.Stray(closeHover)
+    FX.btns[#FX.btns + 1] = { btn = close, text = closeText }
 end
 close:SetScript("OnClick", function() frame:Hide() end)
 
@@ -474,8 +508,12 @@ search:SetFont(FONT_BODY, 12, "")
 search:SetTextColor(C.text[1], C.text[2], C.text[3])
 search:SetTextInsets(8, 8, 0, 0)
 search:SetMaxLetters(40)
-Tex(search, "BACKGROUND", C.field):SetAllPoints()
-Border(search, C.line)
+do
+    local searchBg = Tex(search, "BACKGROUND", C.field)
+    searchBg:SetAllPoints()
+    FX.Stray(searchBg)
+end
+FX.Stray(Border(search, C.line))
 local placeholder = Text(search, 12, C.textFaint, FONT_BODY)
 placeholder:SetPoint("LEFT", 8, 0)
 search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
@@ -489,8 +527,8 @@ local SORT_ATLAS = "bags-button-autosort-up"
 local sortButton = CreateFrame("Button", nil, head)
 sortButton:SetSize(22, 22)
 sortButton:SetPoint("RIGHT", search, "LEFT", -6, 0)
-Tex(sortButton, "BACKGROUND", C.field):SetAllPoints()
-Border(sortButton, C.border)
+FX.Stray(Tex(sortButton, "BACKGROUND", C.field)):SetAllPoints()
+FX.Stray(Border(sortButton, C.border))
 local sortIcon = sortButton:CreateTexture(nil, "ARTWORK")
 sortIcon:SetPoint("TOPLEFT", 2, -2)
 sortIcon:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -513,6 +551,8 @@ end
 local sortHover = sortButton:CreateTexture(nil, "HIGHLIGHT")
 sortHover:SetAllPoints()
 sortHover:SetColorTexture(1, 1, 1, 0.10)
+FX.Stray(sortHover)
+FX.btns[#FX.btns + 1] = { btn = sortButton }
 sortButton:SetScript("OnMouseDown", function() sortIcon:SetVertexColor(0.7, 0.7, 0.7) end)
 sortButton:SetScript("OnMouseUp", function() sortIcon:SetVertexColor(1, 1, 1) end)
 sortButton:SetScript("OnEnter", function(self)
@@ -543,10 +583,12 @@ local sideBg = Tex(frame, "BACKGROUND", C.side, 1)
 sideBg:SetPoint("TOPLEFT", 1, -HEAD - 1)
 sideBg:SetPoint("BOTTOMLEFT", 1, FOOT + 1)
 sideBg:SetWidth(SIDE_W - 1)
+FX.Stray(sideBg)
 local sideLine = Tex(frame, "BORDER", C.line)
 sideLine:SetPoint("TOPLEFT", SIDE_W, -HEAD - 1)
 sideLine:SetPoint("BOTTOMLEFT", SIDE_W, FOOT + 1)
 sideLine:SetWidth(1)
+FX.lines[#FX.lines + 1] = sideLine
 end
 
 -- Raster
@@ -572,6 +614,7 @@ do
     trackLine:SetPoint("BOTTOM")
     trackLine:SetWidth(4)
     trackLine:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.6)
+    FX.track = trackLine
 end
 scrollTrack:Hide()
 
@@ -611,6 +654,7 @@ UpdateResizeBounds()
 do
     local footLine = Tex(frame, "BORDER", C.line)
     footLine:SetPoint("BOTTOMLEFT", 1, FOOT); footLine:SetPoint("BOTTOMRIGHT", -1, FOOT); footLine:SetHeight(1)
+    FX.lines[#FX.lines + 1] = footLine
 end
 
 local moneyText = Text(frame, 12, C.text, FONT_BODY)
@@ -686,7 +730,7 @@ local function PaintCategories(counts)
         local on = b.key == selected
         b.bar:SetShown(on)
         b.sel:SetShown(on)
-        local c = on and C.accentText or C.text
+        local c = on and (FX.gold or C.accentText) or C.text
         b.label:SetTextColor(c[1], c[2], c[3])
         b.count:SetText(counts[b.key] or 0)
     end
@@ -766,8 +810,9 @@ for i = 1, MAX_PINS do
     s:SetPoint("TOPLEFT", (i - 1) * (SLOT + GAP), 0)
     s:SetFrameLevel(frame:GetFrameLevel() + 1) -- unter den Taschenknöpfen
     s.index = i
-    Tex(s, "BACKGROUND", C.slot):SetAllPoints()
-    Border(s, C.slotEdge)
+    s.bg = Tex(s, "BACKGROUND", C.slot)
+    s.bg:SetAllPoints()
+    s.edges = Border(s, C.slotEdge)
     s.icon = s:CreateTexture(nil, "ARTWORK")
     s.icon:SetPoint("TOPLEFT", 1, -1)
     s.icon:SetPoint("BOTTOMRIGHT", -1, 1)
@@ -1345,6 +1390,7 @@ bagSlotBox:Hide()
 
 local bagSlotTitle = Text(bagSlotBox, 10, C.textFaint, FONT_BODY)
 bagSlotTitle:SetPoint("TOPLEFT", 2, 0)
+FX.bagSlotTitle = bagSlotTitle
 
 local bagSlotButtons = {} -- [Index] = Knopf
 local hoverBag            -- Tasche, deren Plätze gerade hervorgehoben sind
@@ -2049,6 +2095,118 @@ end)
 end
 
 ---------------------------------------------------------------------------
+-- Stil „forever“: Bronze-Rahmen mit Eckwinkeln, Schiefer, Gold-Titel, Plätze als dunkle Felder mit
+-- Bronzerand (Qualitätsfarben der Gegenstände bleiben). Bei einem Fehler bleibt die stray-Optik.
+---------------------------------------------------------------------------
+
+function FX.Apply()
+    if FX.done or FX.failed or not FX.On() then return end
+    -- Nur außerhalb des Kampfes, solange geschützte Knöpfe am Fenster hängen
+    if InCombatLockdown() and AnyProtected() then
+        FX.retry = true
+        return
+    end
+    FX.retry = false
+    local S = ns.Style
+    local made = {}
+    local ok = pcall(function()
+        -- Rahmen: liegt größtenteils außerhalb des Fensters, damit der Inhalt unverändert bleibt
+        local deco = CreateFrame("Frame", nil, frame)
+        made[#made + 1] = deco
+        deco:SetPoint("TOPLEFT", frame, "TOPLEFT", -5, 5)
+        deco:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 5, -5)
+        deco:SetFrameLevel(frame:GetFrameLevel() + 1)
+        S.Border(deco, { size = 8, cornerSize = 16, cornerOffset = 3 })
+        made[#made + 1] = S.Fill(frame, "window")
+
+        -- Seitenleiste auf eigener Schieferfläche
+        local side = CreateFrame("Frame", nil, frame)
+        made[#made + 1] = side
+        side:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -HEAD - 1)
+        side:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 1, FOOT + 1)
+        side:SetWidth(SIDE_W - 1)
+        side:SetFrameLevel(frame:GetFrameLevel())
+        made[#made + 1] = S.Fill(side, "panel")
+
+        for _, item in ipairs(FX.btns) do
+            local obj = S.Button(item.btn, item.kind or "secondary")
+            made[#made + 1] = obj
+            item.obj = obj
+        end
+        made[#made + 1] = S.EditBox(search)
+    end)
+    if not ok then
+        for _, o in ipairs(made) do FXHide(o) end
+        FX.failed = true
+        return
+    end
+    FX.done = true
+
+    -- stray-Optik weg
+    for _, o in ipairs(FX.stray) do FXHide(o) end
+
+    -- Palette der Plätze und Felder (wirkt auch auf später gebaute Knöpfe)
+    local P = ns.Colors
+    local function Set(t, c, a)
+        t[1], t[2], t[3], t[4] = c[1], c[2], c[3], a or 1
+    end
+    Set(C.field, { 0.043, 0.043, 0.051 })
+    Set(C.slot, { 0.043, 0.043, 0.051 })
+    Set(C.slotEdge, { 0.33, 0.255, 0.125 })
+    Set(C.itemEdge, { 0.46, 0.36, 0.18 })
+    FX.gold = P.gold
+
+    local function Tint(fs, c)
+        if fs and c then fs:SetTextColor(c[1], c[2], c[3], c[4] or 1) end
+    end
+    local function Safe(fn, ...) pcall(fn, ...) end
+
+    -- Linien Bronze, Anheft-Trennlinie golden
+    local br = P.bronze or P.line
+    for _, t in ipairs(FX.lines) do t:SetColorTexture(br[1], br[2], br[3], 0.85) end
+    local gd = P.goldDim or P.accentText
+    pinLine:SetColorTexture(gd[1], gd[2], gd[3], 0.75)
+    if FX.track then FX.track:SetColorTexture(br[1], br[2], br[3], 0.5) end
+
+    -- Schrift: Titel Gold, übrige Texte aus der Forever-Palette
+    Safe(title.SetFont, title, S.FontTitle(), 15, "")
+    Tint(title, P.gold)
+    Tint(slotsText, P.textDim)
+    Tint(placeholder, P.textFaint)
+    Tint(emptyText, P.textDim)
+    Tint(moneyText, P.text)
+    Tint(hintText, P.textDim)
+    Tint(triageLabel, P.text)
+    Tint(FX.bagSlotTitle, gd)
+    search:SetTextColor(P.text[1], P.text[2], P.text[3])
+    for _, item in ipairs(FX.btns) do
+        if item.text and item.obj and item.obj.textColor then Tint(item.text, item.obj.textColor) end
+    end
+    local gc = P.gold or P.accentText
+    for _, b in ipairs(catButtons) do
+        Safe(b.label.SetFont, b.label, S.Font(), 11, "")
+        Tint(b.count, P.textDim)
+        b.sel:SetColorTexture(gc[1], gc[2], gc[3], 0.10)
+    end
+
+    -- Plätze der Anheft-Leiste
+    for _, s in ipairs(pinSlots) do
+        s.bg:SetColorTexture(C.slot[1], C.slot[2], C.slot[3], 1)
+        for _, e in ipairs(s.edges) do e:SetColorTexture(br[1], br[2], br[3], 1) end
+    end
+
+    -- Größen-Griff: in Bronze, etwas aus der Ecke gerückt (Eckwinkel)
+    grip:ClearAllPoints()
+    grip:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -4, 4)
+    local nt = grip.GetNormalTexture and grip:GetNormalTexture()
+    local bl = P.bronzeLight or br
+    if nt then Safe(nt.SetVertexColor, nt, bl[1], bl[2], bl[3]) end
+
+    -- Neu gezeichnet wird beim Öffnen; ist das Fenster schon offen, jetzt
+    if frame:IsShown() then RequestUpdate(0) end
+end
+
+---------------------------------------------------------------------------
 -- Öffnen und Schließen
 ---------------------------------------------------------------------------
 
@@ -2068,6 +2226,7 @@ end
 
 frame:SetScript("OnShow", function()
     updatePending = false
+    pcall(FX.Apply)
     pcall(RefreshTexts)
     Update()
 end)
@@ -2252,6 +2411,7 @@ ns.On("PLAYER_LOGIN", function()
     local h = tonumber(ns.db.bagHeight)
     ns.db.bagHeight = (h and h > 0) and math.max(MinH(), math.min(MAX_H, math.floor(h + 0.5))) or 0
     PinSlots() -- altes Anheft-Format umstellen, Ruhestein auf Platz 1, Plätze 6+ verwerfen
+    pcall(FX.Apply)
     UpdateResizeBounds()
     ns.RestorePosition(frame)
     pcall(InstallHooks)
@@ -2266,6 +2426,7 @@ end)
 
 ns.On("PLAYER_REGEN_ENABLED", function()
     combatNoted = false
+    if FX.retry then pcall(FX.Apply) end
     if pendingBuild and Enabled() then Build() end
     if pendingLayout or pendingBuild then RequestUpdate(0) end
 end)

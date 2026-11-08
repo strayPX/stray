@@ -6,6 +6,8 @@
 - **Hinweis im Chat nach einem Update:** stray sagt, ob nach dem Update ein `/reload` reicht oder WoW komplett neu gestartet werden muss (abschaltbar).
 - Aktionsleisten: **Shift+Klick zum Verschieben** löst die Aktion nicht mehr aus (gesperrte Leisten).
 - Der laufende Rand um fehlende Vorrats-Symbole braucht weniger Leistung.
+- **Einstellungsfenster neu geordnet:** 6 Seiten nach dem Ort im Spiel (Leisten & Menü, Karte & Gruppe, Taschen & Handel, Kampf, Welt & Quests, stray) plus **Übersicht** mit **Bildschirmkarte** (Klick auf einen Bereich öffnet dessen Einstellungen), „Zuletzt geändert“ und die Seite **Alle Anzeigen**. Alle Optionen sind noch da.
+- **Taschenfenster und Taschen-/Menüleiste** im Stil „Forever UI“.
 
 **Entfernt**
 - **stray-Questtracker** samt Berufsreagenzien-Abschnitt und Questgegenstand-Knöpfen. Blizzards Questverfolgung (oder Questie) zeigt wieder die Quests. Die Konfliktwarnung für Questie (Auto-Annehmen/Abgeben) bleibt.

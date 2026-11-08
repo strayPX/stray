@@ -1986,12 +1986,66 @@ local FILL_H = 3       -- Höhe des Füllbalkens unter dem Taschenknopf
 local bottomBar = CreateFrame("Frame", "strayMicroBar", UIParent)
 bottomBar:SetSize(200, 34)
 bottomBar:SetFrameStrata("MEDIUM")
-do
-    local strip = bottomBar:CreateTexture(nil, "BACKGROUND")
-    strip:SetAllPoints()
-    strip:SetColorTexture(0, 0, 0, 0.45)
-end
+local barStrip = bottomBar:CreateTexture(nil, "BACKGROUND")
+barStrip:SetAllPoints()
+barStrip:SetColorTexture(0, 0, 0, 0.45)
 bottomBar:Hide()
+
+-- Stil „forever“ (Gilded Dark): Bronzerahmen mit Eckwinkeln und Schieferfläche hinter der Leiste, Knöpfe als
+-- dunkle Felder mit feinem Bronzerand, Hover in Gold. Nur eigene Frames/Texturen, Blizzard-Knöpfe bleiben unberührt.
+-- Alles erst zur Anzeigezeit (ns.db fehlt beim Laden der Datei); im Stil „stray“ bleibt alles wie bisher.
+local Fv = { pad = BAR_PAD, inner = 0, barDone = false }
+function Fv.On()
+    local ok, v = pcall(function() return ns.Style and ns.Style.IsForever() end)
+    return ok and v and true or false
+end
+function Fv.Rim(parent, c, layer)
+    local edges = {}
+    local function Edge(p1, p2, horizontal)
+        local t = parent:CreateTexture(nil, layer)
+        t:SetColorTexture(c[1], c[2], c[3], 1)
+        t:SetPoint(p1, parent, p1, 0, 0)
+        t:SetPoint(p2, parent, p2, 0, 0)
+        if horizontal then t:SetHeight(1) else t:SetWidth(1) end
+        table.insert(edges, t)
+    end
+    Edge("TOPLEFT", "TOPRIGHT", true)
+    Edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
+    Edge("TOPLEFT", "BOTTOMLEFT", false)
+    Edge("TOPRIGHT", "BOTTOMRIGHT", false)
+    return edges
+end
+-- Knopf als dunkles Feld mit Bronzerand; Hover/Überfahren in Gold (idempotent)
+function Fv.StyleButton(b)
+    if not Fv.On() or b.fvRim then return end
+    local ok = pcall(function()
+        local K = ns.Colors
+        local r, g, bl = ns.Style.FillColor("inset")
+        b.fvField = b:CreateTexture(nil, "BACKGROUND")
+        b.fvField:SetAllPoints()
+        b.fvField:SetColorTexture(r, g, bl, 1)
+        b.fvRim = Fv.Rim(b, K.bronze, "BORDER")
+        local function Rim(c)
+            for _, t in ipairs(b.fvRim) do t:SetColorTexture(c[1], c[2], c[3], 1) end
+        end
+        b:HookScript("OnEnter", function() Rim(ns.Colors.gold) end)
+        b:HookScript("OnLeave", function() Rim(ns.Colors.bronze) end)
+        b.glow:SetVertexColor(ns.Colors.gold[1], ns.Colors.gold[2], ns.Colors.gold[3])
+    end)
+    if not ok then b.fvRim = nil end
+end
+-- Leiste: Schiefer + Bronzerahmen statt dunklem Streifen; setzt Abstände fürs Layout (einmalig)
+function Fv.StyleBar()
+    if Fv.barDone or not Fv.On() then return end
+    local ok = pcall(function()
+        barStrip:Hide()
+        ns.Style.Fill(bottomBar, "panel")
+        ns.Style.Border(bottomBar, { size = 6, cornerSize = 14, cornerOffset = 3 })
+        Fv.pad, Fv.inner = 9, 4
+    end)
+    Fv.barDone = true
+    if not ok then barStrip:Show() end
+end
 
 -- Schlüssel „microbar“ wie bisher: eine schon verschobene Leiste bleibt, wo sie war
 ns.MakeMovable(bottomBar, "microbar", { "BOTTOMRIGHT", "BOTTOMRIGHT", -4, 4 })
@@ -2052,6 +2106,7 @@ local function MakeBarButton(secureTarget, name)
         GameTooltip:Hide()
     end)
     b:Hide()
+    Fv.StyleButton(b)
     return b
 end
 
@@ -2265,13 +2320,16 @@ local function LayoutBottom()
         Defer("bottomLayout", LayoutBottom)
         return
     end
+    Fv.StyleBar()
+    Fv.StyleButton(bagButton)
     if ns.db.bottomMicroButtons then BuildMicroButtons() end
     local size = BarButtonSize()
-    local x = BAR_PAD
+    local pad, inner = Fv.pad, Fv.inner
+    local x = pad
     local function place(b, w)
         b:SetSize(w, size)
         b:ClearAllPoints()
-        b:SetPoint("BOTTOMLEFT", bottomBar, "BOTTOMLEFT", x, BAR_PAD)
+        b:SetPoint("BOTTOMLEFT", bottomBar, "BOTTOMLEFT", x, pad)
         b:Show()
         x = x + w + BAR_GAP
     end
@@ -2281,12 +2339,12 @@ local function LayoutBottom()
             local w
             if b == portraitButton then
                 w = size
-                b.icon:SetSize(size - 2, size - 2)
+                b.icon:SetSize(size - 2 - inner, size - 2 - inner)
             else
                 -- Blizzard kann das Symbol tauschen (z. B. Gilde): bei jedem Aufbau neu lesen
                 SetGlyph(b, MicroAtlas(b.entry), b.entry.icons)
                 w = math.max(8, math.floor(size * (b.aspect or 1) + 0.5))
-                b.icon:SetSize(w, size)
+                b.icon:SetSize(w - inner, size - inner)
             end
             place(b, w)
             anyMicro = true
@@ -2295,10 +2353,10 @@ local function LayoutBottom()
         end
     end
     if anyMicro then x = x + GROUP_GAP - BAR_GAP end
-    bagButton.icon:SetSize(size - FILL_H - 2, size - FILL_H - 2)
+    bagButton.icon:SetSize(size - FILL_H - 2 - inner, size - FILL_H - 2 - inner)
     bagButton.fill:SetSize(math.max(8, size - 6), FILL_H)
     place(bagButton, size)
-    bottomBar:SetSize(x - BAR_GAP + BAR_PAD, size + 2 * BAR_PAD)
+    bottomBar:SetSize(x - BAR_GAP + pad, size + 2 * pad)
     UpdateMicroState()
     UpdatePortrait()
 end

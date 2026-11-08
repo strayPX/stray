@@ -132,12 +132,12 @@ end
 -- keine eigene Funktion; ns.OpenConfig(seite, reiter) wird bevorzugt, falls es sie gibt)
 function FX.OpenConfig()
     if type(ns.OpenConfig) == "function" then
-        if pcall(ns.OpenConfig, "Kampf & Anzeigen", "DMG-Meter") then return end
+        if pcall(ns.OpenConfig, "Kampf", "DMG-Meter") then return end
     end
     local f = _G.strayFrame
     if not f then return end
     if not f:IsShown() then f:Show() end
-    local PAGE = "Kampf & Anzeigen"
+    local PAGE = "Kampf"
     local function Find(frame, test, depth)
         for _, child in ipairs({ frame:GetChildren() }) do
             if test(child) then return child end
