@@ -265,6 +265,13 @@ function ShowNextSold()
     if StaticPopup_Visible and StaticPopup_Visible("STRAY_QUESTITEM_SOLD") then return end
     local entry = table.remove(soldQueue, 1)
     if not entry then return end
+    -- Texte beim Anzeigen holen, damit sie der gewählten Sprache folgen
+    local dialog = StaticPopupDialogs["STRAY_QUESTITEM_SOLD"]
+    if dialog then
+        dialog.text = L["%s gehört zur Quest „%s“.\nZurückkaufen?"]
+        dialog.button1 = L["Zurückkaufen"]
+        dialog.button2 = L["Nein"]
+    end
     StaticPopup_Show("STRAY_QUESTITEM_SOLD", entry.link, entry.quest, entry.link)
     ns.Sound(SOUNDKIT.RAID_WARNING)
 end

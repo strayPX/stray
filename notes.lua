@@ -19,13 +19,22 @@ local FONT_BODY = "Fonts\\ARIALN.TTF"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local MAX_LETTERS = 200
 
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz gleicher Werte, falls die Tabelle fehlt)
+local PALETTE = type(ns.Colors) == "table" and ns.Colors or {}
+local function Col(key, fallback)
+    local c = PALETTE[key]
+    if type(c) == "table" and type(c[1]) == "number" then return c end
+    return fallback
+end
+
 local C = {
-    bg      = { 0.05, 0.067, 0.09, 0.95 },
-    field   = { 0.02, 0.03, 0.045, 1 },
-    border  = { 0.169, 0.290, 0.451, 1 },
-    accent  = { 0.353, 0.659, 1.0, 1 },
-    text    = { 0.89, 0.914, 0.953, 1 },
-    textDim = { 0.435, 0.525, 0.651, 1 },
+    bg      = Col("bg", { 0.078, 0.078, 0.098, 0.96 }),
+    field   = { 0.055, 0.055, 0.071, 1 },  -- Eingabefeld, etwas dunkler als das Fenster
+    border  = Col("line", { 0.149, 0.149, 0.184, 1 }),
+    accent  = Col("accent", { 0.545, 0.486, 0.965, 1 }),
+    accentText = Col("accentText", { 0.702, 0.659, 0.980, 1 }),
+    text    = Col("text", { 0.902, 0.902, 0.925, 1 }),
+    textDim = Col("textDim", { 0.545, 0.545, 0.600, 1 }),
 }
 
 ---------------------------------------------------------------------------
@@ -115,7 +124,8 @@ local function Button(parent, label, width)
     local lines = Border(b, C.border)
     b.text = Text(b, 12)
     b.text:SetPoint("CENTER")
-    b.text:SetText(label)
+    b.labelKey = label   -- deutscher Schlüssel, Text folgt beim Öffnen der gewählten Sprache
+    b.text:SetText(L[label])
     b:SetScript("OnEnter", function()
         for _, t in ipairs(lines) do Color(t, C.accent) end
     end)
@@ -146,14 +156,13 @@ do
     Border(editor, C.border)
 end
 
-local title = Text(editor, 13, C.accent)
+local title = Text(editor, 13, C.accentText)
 title:SetPoint("TOPLEFT", 10, -9)
 title:SetPoint("RIGHT", editor, "RIGHT", -10, 0)
 title:SetJustifyH("LEFT")
 
 local hint = Text(editor, 11, C.textDim)
 hint:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
-hint:SetText(L["Enter speichert, Esc schließt. Leer speichern löscht die Notiz."])
 
 local field = CreateFrame("Frame", nil, editor)
 field:SetPoint("TOPLEFT", 10, -46)
@@ -195,15 +204,15 @@ local function Save()
     editor:Hide()
 end
 
-local saveButton = Button(editor, L["Speichern"], 92)
+local saveButton = Button(editor, "Speichern", 92)
 saveButton:SetPoint("BOTTOMRIGHT", -10, 10)
 saveButton:SetScript("OnClick", Save)
 
-local cancelButton = Button(editor, L["Abbrechen"], 92)
+local cancelButton = Button(editor, "Abbrechen", 92)
 cancelButton:SetPoint("RIGHT", saveButton, "LEFT", -6, 0)
 cancelButton:SetScript("OnClick", function() editor:Hide() end)
 
-local deleteButton = Button(editor, L["Löschen"], 92)
+local deleteButton = Button(editor, "Löschen", 92)
 deleteButton:SetPoint("BOTTOMLEFT", 10, 10)
 deleteButton:SetScript("OnClick", function()
     box:SetText("")
@@ -221,6 +230,8 @@ local function OpenEditor(key, name)
     if not key then return end
     currentKey, currentName = key, name or key
     title:SetText(L("stray-Notiz: %s", currentName))
+    hint:SetText(L["Enter speichert, Esc schließt. Leer speichern löscht die Notiz."])
+    for _, b in ipairs({ saveButton, cancelButton, deleteButton }) do b.text:SetText(L[b.labelKey]) end
     box:SetText(Note(key) or "")
     deleteButton:SetShown(Note(key) ~= nil)
     editor:Show()
@@ -287,7 +298,7 @@ local function OnUnitTooltip(tooltip)
     local key = UnitKey(unit)
     local text = Note(key)
     if not text then return end
-    tooltip:AddLine(L("Notiz: %s", text), C.accent[1], C.accent[2], C.accent[3], true)
+    tooltip:AddLine(L("Notiz: %s", text), C.accentText[1], C.accentText[2], C.accentText[3], true)
     tooltip:Show()
 end
 

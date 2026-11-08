@@ -124,3 +124,7 @@ E["Elite-Gegner und Gegner, deren Stufe deutlich über deiner liegt (auch „??�
 E["Warnen ab Stufen darüber"] = "Warn from levels above"
 E["Ab wie vielen Stufen über deiner eigenen ein Gegner als gefährlich gilt. Elite-Gegner und „??“ zählen immer."] = "How many levels above your own an enemy counts as dangerous. Elite enemies and \"??\" always count."
 E["Erst „Gefährliche Gegner warnen“ einschalten (direkt darüber)."] = "First turn on \"Warn about dangerous enemies\" (directly above)."
+
+-- Nachtrag 0.22.0-alpha (Welle 2, W1): Tooltips des DMG-Meter-Umschalters
+E["Schaden anzeigen"] = "Show damage"
+E["Heilung anzeigen"] = "Show healing"

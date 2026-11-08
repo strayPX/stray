@@ -30,12 +30,20 @@ local TICK = 5              -- Takt für Zeile, Tabelle und OnChange
 local HISTORY_TOOLTIP = 5   -- so viele letzte Stufen im Tooltip
 local REQUEST_DELAY = 6     -- Sekunden nach dem Login (alts.lua fragt nach 4 s)
 
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz mit gleichen Werten, falls die Tabelle fehlt)
+local COLORS = ns.Colors or {
+    bg = { 0.078, 0.078, 0.098, 0.96 }, card = { 0.094, 0.094, 0.118, 1 }, hover = { 0.122, 0.122, 0.153, 1 },
+    line = { 0.149, 0.149, 0.184, 1 }, accent = { 0.545, 0.486, 0.965, 1 }, accentText = { 0.702, 0.659, 0.980, 1 },
+    text = { 0.902, 0.902, 0.925, 1 }, textDim = { 0.545, 0.545, 0.600, 1 }, textFaint = { 0.369, 0.369, 0.420, 1 },
+}
+
 local C = {
-    bg      = { 0.05, 0.067, 0.09, 0.95 },
-    border  = { 0.169, 0.290, 0.451, 1 },
-    accent  = { 0.353, 0.659, 1.0, 1 },
-    text    = { 0.89, 0.914, 0.953, 1 },
-    textDim = { 0.435, 0.525, 0.651, 1 },
+    bg         = COLORS.bg,
+    border     = COLORS.line,
+    accent     = COLORS.accent,
+    accentText = COLORS.accentText,
+    text       = COLORS.text,
+    textDim    = COLORS.textDim,
 }
 
 ---------------------------------------------------------------------------
@@ -385,7 +393,7 @@ end
 local function FillTooltip(tt)
     local entry = Entry()
     if not entry then return end
-    local acc, txt, dim = C.accent, C.text, C.textDim
+    local acc, txt, dim = C.accentText, C.text, C.textDim
     local function Row(label, value)
         tt:AddDoubleLine(label, value, dim[1], dim[2], dim[3], txt[1], txt[2], txt[3])
     end
@@ -423,12 +431,13 @@ end
 -- Kleine Tabelle
 ---------------------------------------------------------------------------
 
+-- label = deutscher Schlüssel, übersetzt wird beim Anzeigen
 local ROWS = {
-    { key = "session", label = L["EP/h Sitzung"] },
-    { key = "recent",  label = L["EP/h 10 min"] },
-    { key = "toLevel", label = L["Bis Level"] },
-    { key = "onLevel", label = L["Auf Stufe"] },
-    { key = "played",  label = L["Spielzeit"] },
+    { key = "session", label = "EP/h Sitzung" },
+    { key = "recent",  label = "EP/h 10 min" },
+    { key = "toLevel", label = "Bis Level" },
+    { key = "onLevel", label = "Auf Stufe" },
+    { key = "played",  label = "Spielzeit" },
 }
 local ROW_H = 15
 local WIDTH = 170
@@ -452,6 +461,10 @@ do
     lines[2]:SetPoint("BOTTOMLEFT"); lines[2]:SetPoint("BOTTOMRIGHT"); lines[2]:SetHeight(1)
     lines[3]:SetPoint("TOPLEFT"); lines[3]:SetPoint("BOTTOMLEFT"); lines[3]:SetWidth(1)
     lines[4]:SetPoint("TOPRIGHT"); lines[4]:SetPoint("BOTTOMRIGHT"); lines[4]:SetWidth(1)
+    -- 2-px-lila Kante oben (wie die Bedrohungsliste)
+    local top = panel:CreateTexture(nil, "ARTWORK")
+    top:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
+    top:SetPoint("TOPLEFT"); top:SetPoint("TOPRIGHT"); top:SetHeight(2)
 end
 
 local function MakeText(size, r, g, b)
@@ -464,16 +477,18 @@ local function MakeText(size, r, g, b)
     return fs
 end
 
-local title = MakeText(12, C.accent[1], C.accent[2], C.accent[3])
+local title = MakeText(12, C.accentText[1], C.accentText[2], C.accentText[3])
 title:SetPoint("TOPLEFT", 6, -5)
 title:SetText(L["EP-Tracker"])
 
 local cells = {}
+local labels = {}
 for i, row in ipairs(ROWS) do
     local y = -20 - (i - 1) * ROW_H
     local label = MakeText(11, C.textDim[1], C.textDim[2], C.textDim[3])
     label:SetPoint("TOPLEFT", 6, y)
-    label:SetText(row.label)
+    label:SetText(L[row.label])
+    labels[row.key] = label
     local value = MakeText(11, C.text[1], C.text[2], C.text[3])
     value:SetPoint("TOPRIGHT", -6, y)
     value:SetJustifyH("RIGHT")
@@ -485,17 +500,19 @@ ns.MakeMovable(panel, "xptracker", { "TOP", "TOP", 0, -60 })
 panel:SetScript("OnEnter", function(self)
     if not GameTooltip then return end
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine(L["EP-Tracker"])
+    GameTooltip:AddLine(L["EP-Tracker"], C.accentText[1], C.accentText[2], C.accentText[3])
     GameTooltip:AddLine(L["Shift + Ziehen verschiebt die Tabelle."], C.textDim[1], C.textDim[2], C.textDim[3])
     ns.XPTracker.AddTooltip(GameTooltip)
     GameTooltip:Show()
 end)
 panel:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
 
-local SAMPLE = { session = "84k", recent = "92k", toLevel = "1h 42m", onLevel = "38m", played = L["2T 7h"] }
+-- „2T 7h“ ist ein deutscher Schlüssel, übersetzt wird beim Anzeigen
+local SAMPLE = { session = "84k", recent = "92k", toLevel = "1h 42m", onLevel = "38m", played = "2T 7h" }
 
 local function UpdatePanel()
     if not Enabled() or not ns.db.xpTrackerTable then panel:Hide() return end
+    title:SetText(L["EP-Tracker"]) -- zur Anzeigezeit, damit die gewählte Sprache greift
     local entry = Entry()
     local values = {}
     local maxed = AtMaxLevel()
@@ -513,9 +530,10 @@ local function UpdatePanel()
     local preview = ns.IsConfigOpen()
     for key, cell in pairs(cells) do
         local v = values[key]
-        if not v and preview then v = SAMPLE[key] end
+        if not v and preview then v = SAMPLE[key] and L[SAMPLE[key]] end
         cell:SetText(v or "–")
     end
+    for _, row in ipairs(ROWS) do labels[row.key]:SetText(L[row.label]) end
     title:SetText(preview and L["EP-Tracker · Beispiel"] or L["EP-Tracker"])
     panel:Show()
 end

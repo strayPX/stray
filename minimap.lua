@@ -19,16 +19,25 @@ local function SquareWanted()
     return ns.db and ns.db.strayUI and ns.db.squareMinimap and true or false
 end
 
-local ICON = "Interface\\AddOns\\stray\\media\\minimap_icon"
+-- Logo C „Siegel“ (Sechseck-Wappen); das alte Symbol nur als Ersatz, falls die Datei fehlt
+local ICON = "Interface\\AddOns\\stray\\media\\minimap_icon" -- kräftigere kleine Siegel-Variante (bei 20 px lesbar)
+local ICON_FALLBACK = "Interface\\AddOns\\stray\\media\\minimap_icon"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 local FONT_BODY = "Fonts\\ARIALN.TTF"
 
+-- Farben aus der gemeinsamen Tabelle ns.Colors (stray.lua, lila Look); Ersatzwerte, falls sie fehlt
+local function Col(key, fallback)
+    local c = type(ns.Colors) == "table" and ns.Colors[key]
+    if type(c) == "table" and c[1] then return c end
+    return fallback
+end
+
 local C = {
-    bg     = { 0.051, 0.067, 0.090, 0.92 },
-    border = { 0.169, 0.290, 0.451, 1 },
-    accent = { 0.353, 0.659, 1.000, 1 },
-    text   = { 0.890, 0.914, 0.953, 1 },
-    dim    = { 0.435, 0.525, 0.651, 1 },
+    bg     = Col("bg", { 0.078, 0.078, 0.098, 0.96 }),
+    border = Col("line", { 0.149, 0.149, 0.184, 1 }),
+    accent = Col("accent", { 0.545, 0.486, 0.965, 1 }),
+    text   = Col("text", { 0.902, 0.902, 0.925, 1 }),
+    dim    = Col("textDim", { 0.545, 0.545, 0.600, 1 }),
 }
 
 local function InCombat()
@@ -71,10 +80,16 @@ background:SetSize(24, 24)
 background:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -5)
 background:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
 
+local ICON_SIZE = 20
+local ICON_DOCKED = 20
+
 local icon = button:CreateTexture(nil, "ARTWORK")
-icon:SetSize(18, 18)
-icon:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -6)
-icon:SetTexture(ICON)
+icon:SetSize(ICON_SIZE, ICON_SIZE)
+icon:SetPoint("TOPLEFT", button, "TOPLEFT", 6, -5)
+do
+    local ok, result = pcall(icon.SetTexture, icon, ICON)
+    if not ok or result == false then pcall(icon.SetTexture, icon, ICON_FALLBACK) end
+end
 
 local border = button:CreateTexture(nil, "OVERLAY")
 border:SetSize(53, 53)
@@ -197,7 +212,7 @@ function ns.MinimapButtonDock(parent)
         border:Hide()
         icon:ClearAllPoints()
         icon:SetPoint("CENTER", button, "CENTER", 0, 0)
-        icon:SetSize(16, 16)
+        icon:SetSize(ICON_DOCKED, ICON_DOCKED)
         if highlight then highlight:SetAlpha(0) end
     end
     button:SetShown(ns.db and ns.db.minimapButton and true or false)
@@ -215,8 +230,8 @@ function ns.MinimapButtonUndock()
     background:Show()
     border:Show()
     icon:ClearAllPoints()
-    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -6)
-    icon:SetSize(18, 18)
+    icon:SetPoint("TOPLEFT", button, "TOPLEFT", 6, -5)
+    icon:SetSize(ICON_SIZE, ICON_SIZE)
     if highlight then highlight:SetAlpha(1) end
     if ns.db then Apply() end
 end

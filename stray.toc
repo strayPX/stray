@@ -14,6 +14,12 @@ locale\enUS_2.lua
 locale\enUS_3.lua
 locale\enUS_4.lua
 locale\enUS_5.lua
+locale\enUS_6.lua
+locale\enUS_7.lua
+locale\enUS_8.lua
+locale\enUS_9.lua
+locale\enUS_10.lua
+locale\enUS_11.lua
 stray.lua
 glow.lua
 loot.lua

@@ -13,7 +13,10 @@
 --               im Kampf versiegelt, darum nur außerhalb des Kampfes prüfen und den Stand vor
 --               dem Kampf behalten.
 --
--- Auf Wunsch laufen gelbe Striche um die Symbole (ns.Glow aus glow.lua).
+-- Um die Symbole laufen immer gelbe Striche (ns.Glow aus glow.lua), sobald die Erinnerung an ist.
+--
+-- Sichtbare Texte in den Tabellen stehen als deutsche Schlüssel und werden erst beim Anzeigen
+-- mit L übersetzt (die Sprache ist zur Ladezeit noch nicht gewählt).
 --
 -- Aktualisiert bei BAG_UPDATE_DELAYED, UNIT_AURA (player, gedrosselt, nicht im Kampf),
 -- PLAYER_REGEN_ENABLED, SPELLS_CHANGED und beim Wechsel der Ausrüstung.
@@ -29,18 +32,19 @@ ns.defaults.supAmmo = true
 ns.defaults.supFood = true
 ns.defaults.supBuffs = true
 ns.defaults.supThreshold = 10
-ns.defaults.supGlow = false -- laufender Rand um die Symbole (glow.lua)
 
 local AMMO_FACTOR = 20 -- Munition: Warnschwelle × 20 (bei 10 also 200 Schuss = ein Stapel)
 local MANA_CLASSES = { MAGE = true, PRIEST = true, WARLOCK = true, DRUID = true, SHAMAN = true, PALADIN = true, HUNTER = true }
 
 local FONT = "Fonts\\ARIALN.TTF"
+-- stray-Farben aus ns.Colors (stray.lua); Ersatzwerte, falls die Tabelle fehlt. Rot bleibt Warnfarbe.
+local COLORS = ns.Colors or {}
 local C = {
-    bg     = { 0.051, 0.067, 0.090, 0.95 },
-    border = { 0.169, 0.290, 0.451, 1 },
-    accent = { 0.353, 0.659, 1.000, 1 },
-    text   = { 0.890, 0.914, 0.953, 1 },
-    dim    = { 0.435, 0.525, 0.651, 1 },
+    bg     = COLORS.bg or { 0.078, 0.078, 0.098, 0.96 },
+    border = COLORS.line or { 0.149, 0.149, 0.184, 1 },
+    text   = COLORS.text or { 0.902, 0.902, 0.925, 1 },
+    dim    = COLORS.textDim or { 0.545, 0.545, 0.600, 1 },
+    faint  = COLORS.textFaint or { 0.369, 0.369, 0.420, 1 },
     warn   = { 1.000, 0.300, 0.300, 1 },
 }
 
@@ -56,20 +60,20 @@ local GAP = 4
 -- Zahl dabeihat. name ist der Ersatzname, solange der Gegenstand nicht im Cache ist.
 local REAGENTS = {
     PRIEST = {
-        { label = L["Gebet der Seelenstärke"], ranks = {
+        { label = "Gebet der Seelenstärke", ranks = {
             { 21562, 17028 }, -- Gebet der Seelenstärke R1 → Heilige Kerze
             { 21564, 17029 }, -- Gebet der Seelenstärke R2 → Geweihte Kerze
         } },
-        { label = L["Gebet der Willenskraft / des Schattenschutzes"], ranks = {
+        { label = "Gebet der Willenskraft / des Schattenschutzes", ranks = {
             { 27681, 17029 }, -- Gebet der Willenskraft → Geweihte Kerze
             { 27683, 17029 }, -- Gebet des Schattenschutzes → Geweihte Kerze
         } },
-        { label = L["Levitieren"], cap = 5, ranks = {
+        { label = "Levitieren", cap = 5, ranks = {
             { 1706, 17056 }, -- Levitieren → Leichte Feder
         } },
     },
     MAGE = {
-        { label = L["Teleportieren"], cap = 5, ranks = {
+        { label = "Teleportieren", cap = 5, ranks = {
             { 3561, 17031 }, -- Teleportieren: Sturmwind → Rune der Teleportation
             { 3562, 17031 }, -- Teleportieren: Eisenschmiede
             { 3565, 17031 }, -- Teleportieren: Darnassus
@@ -77,7 +81,7 @@ local REAGENTS = {
             { 3563, 17031 }, -- Teleportieren: Unterstadt
             { 3566, 17031 }, -- Teleportieren: Donnerfels
         } },
-        { label = L["Portale"], cap = 5, ranks = {
+        { label = "Portale", cap = 5, ranks = {
             { 10059, 17032 }, -- Portal: Sturmwind → Rune der Portale
             { 11416, 17032 }, -- Portal: Eisenschmiede
             { 11419, 17032 }, -- Portal: Darnassus
@@ -85,20 +89,20 @@ local REAGENTS = {
             { 11418, 17032 }, -- Portal: Unterstadt
             { 11420, 17032 }, -- Portal: Donnerfels
         } },
-        { label = L["Arkane Brillanz"], ranks = {
+        { label = "Arkane Brillanz", ranks = {
             { 23028, 17020 }, -- Arkane Brillanz → Arkanes Pulver
         } },
-        { label = L["Langsamer Fall"], cap = 5, ranks = {
+        { label = "Langsamer Fall", cap = 5, ranks = {
             { 130, 17056 }, -- Langsamer Fall → Leichte Feder
         } },
     },
     SHAMAN = {
-        { label = L["Reinkarnation"], cap = 2, ranks = {
+        { label = "Reinkarnation", cap = 2, ranks = {
             { 20608, 17030 }, -- Reinkarnation → Ankh
         } },
     },
     WARLOCK = {
-        { label = L["Seelensplitter-Zauber"], cap = 5, ranks = {
+        { label = "Seelensplitter-Zauber", cap = 5, ranks = {
             { 697, 6265 },  -- Leerwandler beschwören → Seelensplitter
             { 6201, 6265 }, -- Gesundheitsstein herstellen (schwach)
             { 693, 6265 },  -- Seelenstein herstellen (schwach)
@@ -106,20 +110,20 @@ local REAGENTS = {
         } },
     },
     DRUID = {
-        { label = L["Wiedergeburt"], cap = 3, ranks = {
+        { label = "Wiedergeburt", cap = 3, ranks = {
             { 20484, 17034 }, -- Wiedergeburt R1 → Ahornsamen
             { 20739, 17035 }, -- R2 → Schlingdornsamen
             { 20742, 17036 }, -- R3 → Eschenholzsamen
             { 20747, 17037 }, -- R4 → Hainbuchensamen
             { 20748, 17038 }, -- R5 → Eisenholzsamen
         } },
-        { label = L["Gabe der Wildnis"], ranks = {
+        { label = "Gabe der Wildnis", ranks = {
             { 21849, 17021 }, -- Gabe der Wildnis R1 → Wildbeeren
             { 21850, 17026 }, -- R2 → Wilddornrose
         } },
     },
     PALADIN = {
-        { label = L["Große Segen"], ranks = {
+        { label = "Große Segen", ranks = {
             { 25898, 21177 }, -- Großer Segen der Könige → Symbol der Könige
             { 25782, 21177 }, -- Großer Segen der Macht
             { 25894, 21177 }, -- Großer Segen der Weisheit
@@ -132,40 +136,40 @@ local REAGENTS = {
 }
 
 local ITEM_NAMES = {
-    [17028] = L["Heilige Kerze"], [17029] = L["Geweihte Kerze"], [17056] = L["Leichte Feder"],
-    [17031] = L["Rune der Teleportation"], [17032] = L["Rune der Portale"], [17020] = L["Arkanes Pulver"],
-    [17030] = L["Ankh"], [6265] = L["Seelensplitter"], [17034] = L["Ahornsamen"], [17035] = L["Schlingdornsamen"],
-    [17036] = L["Eschenholzsamen"], [17037] = L["Hainbuchensamen"], [17038] = L["Eisenholzsamen"],
-    [17021] = L["Wildbeeren"], [17026] = L["Wilddornrose"], [21177] = L["Symbol der Könige"],
+    [17028] = "Heilige Kerze", [17029] = "Geweihte Kerze", [17056] = "Leichte Feder",
+    [17031] = "Rune der Teleportation", [17032] = "Rune der Portale", [17020] = "Arkanes Pulver",
+    [17030] = "Ankh", [6265] = "Seelensplitter", [17034] = "Ahornsamen", [17035] = "Schlingdornsamen",
+    [17036] = "Eschenholzsamen", [17037] = "Hainbuchensamen", [17038] = "Eisenholzsamen",
+    [17021] = "Wildbeeren", [17026] = "Wilddornrose", [21177] = "Symbol der Könige",
 }
 
 -- Eigene Buffs: known = eine dieser Zauber gelernt → Buff erwartet;
 -- present = jeder dieser Zauber (per Name, also jeder Rang) zählt als vorhanden
 local BUFFS = {
     MAGE = {
-        { label = L["Rüstungszauber"], known = { 168, 7302, 6117 } }, -- Frost-, Eis-, Magische Rüstung
-        { label = L["Arkane Intelligenz"], known = { 1459 }, present = { 1459, 23028 } }, -- + Arkane Brillanz
+        { label = "Rüstungszauber", known = { 168, 7302, 6117 } }, -- Frost-, Eis-, Magische Rüstung
+        { label = "Arkane Intelligenz", known = { 1459 }, present = { 1459, 23028 } }, -- + Arkane Brillanz
     },
     PRIEST = {
-        { label = L["Inneres Feuer"], known = { 588 } },
-        { label = L["Machtwort: Seelenstärke"], known = { 1243 }, present = { 1243, 21562 } }, -- + Gebet
+        { label = "Inneres Feuer", known = { 588 } },
+        { label = "Machtwort: Seelenstärke", known = { 1243 }, present = { 1243, 21562 } }, -- + Gebet
     },
     WARLOCK = {
-        { label = L["Dämonenhaut / Dämonenrüstung"], known = { 687, 706 } },
+        { label = "Dämonenhaut / Dämonenrüstung", known = { 687, 706 } },
     },
     DRUID = {
-        { label = L["Mal der Wildnis"], known = { 1126 }, present = { 1126, 21849 } }, -- + Gabe der Wildnis
+        { label = "Mal der Wildnis", known = { 1126 }, present = { 1126, 21849 } }, -- + Gabe der Wildnis
     },
     PALADIN = {
         -- Andacht, Vergeltung, Konzentration, Schatten-, Frost-, Feuerwiderstand, Heiligkeit
-        { label = L["Aura"], known = { 465, 7294, 19746, 19876, 19888, 19891, 20218 } },
+        { label = "Aura", known = { 465, 7294, 19746, 19876, 19888, 19891, 20218 } },
     },
     HUNTER = {
         -- Falke, Affe, Gepard, Rudel, Wildnis, Wildtier
-        { label = L["Aspekt"], known = { 13165, 13163, 5118, 13159, 20043, 13161 } },
+        { label = "Aspekt", known = { 13165, 13163, 5118, 13159, 20043, 13161 } },
     },
     SHAMAN = {
-        { label = L["Blitzschlagschild"], known = { 324 } },
+        { label = "Blitzschlagschild", known = { 324 } },
     },
 }
 
@@ -222,7 +226,8 @@ local function ItemName(itemID)
         local ok, name = pcall(C_Item.GetItemNameByID, itemID)
         if ok and type(name) == "string" and name ~= "" then return name end
     end
-    return ITEM_NAMES[itemID] or L("Gegenstand %d", itemID)
+    if ITEM_NAMES[itemID] then return L[ITEM_NAMES[itemID]] end
+    return L("Gegenstand %d", itemID)
 end
 
 local function ItemIcon(itemID)
@@ -257,10 +262,10 @@ local function CheckReagents(out)
             local have = ItemCount(item)
             local entry = seen[item]
             if entry then
-                entry.uses[#entry.uses + 1] = spell.label
+                entry.uses[#entry.uses + 1] = L[spell.label]
                 if need > entry.need then entry.need = need end
             elseif have < need then
-                entry = { icon = ItemIcon(item), count = have, need = need, item = item, uses = { spell.label } }
+                entry = { icon = ItemIcon(item), count = have, need = need, item = item, uses = { L[spell.label] } }
                 seen[item] = entry
                 out[#out + 1] = entry
             end
@@ -397,7 +402,7 @@ local function ScanBuffs()
             if not present then
                 result[#result + 1] = {
                     icon = SpellIcon(knownID) or "Interface\\Icons\\INV_Misc_QuestionMark",
-                    title = group.label,
+                    title = L[group.label],
                     lines = { { L["Fehlt gerade."], C.warn } },
                 }
             end
@@ -431,7 +436,7 @@ local function OnIconEnter(self)
         local c = line[2] or C.text
         GameTooltip:AddLine(line[1], c[1], c[2], c[3], true)
     end
-    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
+    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], C.faint[1], C.faint[2], C.faint[3])
     GameTooltip:Show()
 end
 
@@ -470,14 +475,17 @@ local function CreateIcon(i)
     return b
 end
 
-local SAMPLE = {
-    { icon = "Interface\\Icons\\INV_Misc_Candle_01", count = 3, title = L["Beispiel: Heilige Kerze"],
-      lines = { { L["Noch 3, Warnschwelle 10"], C.text }, { L["Für: Gebet der Seelenstärke"], C.dim } } },
-    { icon = AMMO_ICON, count = 120, title = L["Beispiel: Munition"], lines = { { L["Noch 120 Schuss, Warnschwelle 200"], C.text } } },
-    { icon = FOOD_ICON, count = 4, title = L["Beispiel: Essen"], lines = { { L["Noch 4, Warnschwelle 10"], C.text } } },
-    { icon = DRINK_ICON, count = 0, title = L["Beispiel: Wasser"], lines = { { L["Noch 0, Warnschwelle 10"], C.warn } } },
-    { icon = "Interface\\Icons\\Spell_Holy_InnerFire", title = L["Beispiel: Inneres Feuer"], lines = { { L["Fehlt gerade."], C.warn } } },
-}
+-- Beispielinhalt; wird beim Anzeigen gebaut, damit die gewählte Sprache gilt
+local function SampleEntries()
+    return {
+        { icon = "Interface\\Icons\\INV_Misc_Candle_01", count = 3, title = L["Beispiel: Heilige Kerze"],
+          lines = { { L["Noch 3, Warnschwelle 10"], C.text }, { L["Für: Gebet der Seelenstärke"], C.dim } } },
+        { icon = AMMO_ICON, count = 120, title = L["Beispiel: Munition"], lines = { { L["Noch 120 Schuss, Warnschwelle 200"], C.text } } },
+        { icon = FOOD_ICON, count = 4, title = L["Beispiel: Essen"], lines = { { L["Noch 4, Warnschwelle 10"], C.text } } },
+        { icon = DRINK_ICON, count = 0, title = L["Beispiel: Wasser"], lines = { { L["Noch 0, Warnschwelle 10"], C.warn } } },
+        { icon = "Interface\\Icons\\Spell_Holy_InnerFire", title = L["Beispiel: Inneres Feuer"], lines = { { L["Fehlt gerade."], C.warn } } },
+    }
+end
 
 local function Collect()
     local out = {}
@@ -493,15 +501,15 @@ local function SetGlow(b, on)
     if ns.Glow then pcall(ns.Glow, b, on and true or false) end
 end
 
+-- Der laufende Rand gehört fest zur Vorrats-Erinnerung (Show läuft nur, wenn sie an ist)
 local function Show(entries)
-    local glow = ns.db and ns.db.supGlow
     for i, e in ipairs(entries) do
         local b = icons[i] or CreateIcon(i)
         b.entry = e
         b.tex:SetTexture(e.icon)
         b.count:SetText(e.count and tostring(e.count) or "")
         b:Show()
-        SetGlow(b, glow)
+        SetGlow(b, true)
     end
     for i = #entries + 1, #icons do
         icons[i].entry = nil
@@ -518,11 +526,12 @@ end
 
 local function Update()
     if not ns.db or not ns.db.supplies then
+        for _, b in ipairs(icons) do SetGlow(b, false) end
         holder:Hide()
         return
     end
     if ns.IsConfigOpen() then
-        Show(SAMPLE)
+        Show(SampleEntries())
         return
     end
     Show(Collect())
@@ -600,7 +609,7 @@ local function IsOn() return ns.db and ns.db.supplies end
 ns.AddOption(1, SECTION, {
     key = "supplies",
     label = L["Vorrats-Erinnerung"],
-    tooltip = L["Eine kleine Symbolreihe zeigt, was dir fehlt oder knapp wird: Reagenzien für deine Zauber, Munition, Essen und Wasser, fehlende eigene Buffs. Ist alles da, bleibt sie unsichtbar.\n\nDer Tooltip jedes Symbols sagt, was fehlt und wie viel noch da ist. Mit Shift + linker Maustaste verschiebst du die Reihe."],
+    tooltip = L["Eine kleine Symbolreihe zeigt, was dir fehlt oder knapp wird: Reagenzien für deine Zauber, Munition, Essen und Wasser, fehlende eigene Buffs. Ist alles da, bleibt sie unsichtbar. Gelbe Striche laufen um die Symbole, damit fehlende Sachen sofort auffallen.\n\nDer Tooltip jedes Symbols sagt, was fehlt und wie viel noch da ist. Mit Shift + linker Maustaste verschiebst du die Reihe."],
     set = function(value)
         ns.db.supplies = value
         Refresh()
@@ -647,13 +656,4 @@ ns.AddOption(1, SECTION, {
     min = 1, max = 40, step = 1,
     isEnabled = IsOn,
     set = function(value) ns.db.supThreshold = value; Request() end,
-})
-
-ns.AddOption(1, SECTION, {
-    key = "supGlow",
-    label = L["Laufender Rand"],
-    tooltip = L["Gelbe Striche laufen im Kreis um die Symbole der Vorrats-Erinnerung, damit dir fehlende Sachen sofort auffallen."],
-    keywords = { "rand", "leuchten", "glow", "pixel glow", "border", "highlight", "animation", "supplies" },
-    isEnabled = IsOn,
-    set = function(value) ns.db.supGlow = value; Request() end,
 })

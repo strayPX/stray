@@ -63,18 +63,27 @@ local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
 local GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down"
 local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
 
-local C = {
-    bg       = { 0.051, 0.067, 0.090, 0.75 }, -- wie die Kacheln der Gruppenrahmen
-    barBg    = { 0.110, 0.122, 0.149, 0.8 },  -- wie der Lebensbalken-Hintergrund
-    border   = { 0.169, 0.290, 0.451, 1 },
-    accent   = { 0.353, 0.659, 1.000, 1 },
-    text     = { 0.890, 0.914, 0.953, 1 },
-    textDim  = { 0.435, 0.525, 0.651, 1 },
-    textSide = { 0.682, 0.733, 0.816, 1 },
-    menuBg   = { 0.067, 0.102, 0.157, 0.97 },
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz mit gleichen Werten, falls die Tabelle fehlt)
+local COLORS = ns.Colors or {
+    bg = { 0.078, 0.078, 0.098, 0.96 }, card = { 0.094, 0.094, 0.118, 1 }, hover = { 0.122, 0.122, 0.153, 1 },
+    line = { 0.149, 0.149, 0.184, 1 }, accent = { 0.545, 0.486, 0.965, 1 }, accentText = { 0.702, 0.659, 0.980, 1 },
+    text = { 0.902, 0.902, 0.925, 1 }, textDim = { 0.545, 0.545, 0.600, 1 }, textFaint = { 0.369, 0.369, 0.420, 1 },
 }
 
-local MODE_LABEL = { damage = L["Schaden"], healing = L["Heilung"] }
+local C = {
+    bg         = { COLORS.bg[1], COLORS.bg[2], COLORS.bg[3], 0.85 }, -- etwas durchsichtig, liegt im Kampf über der Welt
+    barBg      = COLORS.hover,
+    border     = COLORS.line,
+    accent     = COLORS.accent,
+    accentText = COLORS.accentText,
+    text       = COLORS.text,
+    textDim    = COLORS.textDim,
+    textSide   = COLORS.textDim,
+    menuBg     = COLORS.card,
+}
+
+-- Deutsche Schlüssel, übersetzt wird beim Anzeigen
+local MODE_LABEL = { damage = "Schaden", healing = "Heilung" }
 
 ---------------------------------------------------------------------------
 -- Kleine Bausteine
@@ -114,19 +123,21 @@ local function ShadowText(parent, size, c)
     return fs
 end
 
--- Kompakter Buchstaben-Knopf für den Umschalter S | H; aktiv = Akzentblau
+-- Kompakter Buchstaben-Knopf für den Umschalter S | H; aktiv = Akzent-Lila.
+-- letter ist der deutsche Schlüssel, übersetzt wird beim Anzeigen (SetActive)
 local function LetterButton(parent, letter)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(14, 16)
-    b.text = Text(b, 12, C.textSide, FONT)
+    b.text = Text(b, 12, C.textSide, FONT_BODY)
     b.text:SetPoint("CENTER", b, "CENTER", 0, 0)
     b.text:SetJustifyH("CENTER")
-    b.text:SetText(letter)
+    b.text:SetText(L[letter])
     local hover = b:CreateTexture(nil, "HIGHLIGHT")
     hover:SetAllPoints()
-    hover:SetColorTexture(1, 1, 1, 0.08)
+    hover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
     function b:SetActive(on)
-        local c = on and C.accent or C.textSide
+        local c = on and C.accentText or C.textSide
+        self.text:SetText(L[letter])
         self.text:SetTextColor(c[1], c[2], c[3], 1)
     end
     return b
@@ -430,7 +441,7 @@ end
 
 local function ModeTooltip(owner, label)
     GameTooltip:SetOwner(owner, "ANCHOR_TOP")
-    GameTooltip:SetText(label, 1, 1, 1)
+    GameTooltip:SetText(L[label], C.text[1], C.text[2], C.text[3]) -- label = deutscher Schlüssel
     GameTooltip:Show()
 end
 
@@ -468,6 +479,12 @@ local function CreateMeter(cfg)
     mainBg:SetAllPoints()
     mainBg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4])
     Border(main, C.border)
+    -- 2-px-lila Kante oben (wie die Bedrohungsliste)
+    local topEdge = main:CreateTexture(nil, "ARTWORK")
+    topEdge:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
+    topEdge:SetPoint("TOPLEFT", main, "TOPLEFT", 0, 0)
+    topEdge:SetPoint("TOPRIGHT", main, "TOPRIGHT", 0, 0)
+    topEdge:SetHeight(2)
 
     -- 1-px-Linie unter der Kopfzeile
     local headerLine = main:CreateTexture(nil, "BORDER")
@@ -547,20 +564,21 @@ local function CreateMeter(cfg)
 
     local function MainTooltip(owner)
         GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
-        GameTooltip:SetText(L[cfg.label], 1, 1, 1)
-        GameTooltip:AddLine(L["Klick auf den Titel: Gesamt, aktueller Kampf oder ein einzelner Kampf."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
-        GameTooltip:AddLine(L["Werte: gesamt (pro Sekunde). Die Daten kommen aus dem eingebauten Schadensmesser des Spiels."], 0.7, 0.7, 0.7, true)
-        GameTooltip:AddLine(L["S || H oben rechts: Schaden oder Heilung."], 0.7, 0.7, 0.7, true)
-        GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
+        local a, t, d = C.accentText, C.text, C.textDim
+        GameTooltip:SetText(L[cfg.label], a[1], a[2], a[3])
+        GameTooltip:AddLine(L["Klick auf den Titel: Gesamt, aktueller Kampf oder ein einzelner Kampf."], t[1], t[2], t[3], true)
+        GameTooltip:AddLine(L["Werte: gesamt (pro Sekunde). Die Daten kommen aus dem eingebauten Schadensmesser des Spiels."], d[1], d[2], d[3], true)
+        GameTooltip:AddLine(L["S || H oben rechts: Schaden oder Heilung."], d[1], d[2], d[3], true)
+        GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], d[1], d[2], d[3])
         if cfg.dockable then
-            GameTooltip:AddLine(L["An die Ober- oder Unterkante des ersten DMG-Meters ziehen: andocken. Wegziehen löst es wieder."], 0.5, 0.5, 0.5, true)
+            GameTooltip:AddLine(L["An die Ober- oder Unterkante des ersten DMG-Meters ziehen: andocken. Wegziehen löst es wieder."], d[1], d[2], d[3], true)
             if win.Docked() then
-                GameTooltip:AddLine(L["Angedockt: Ziehgriff ändert nur die Höhe"], 0.5, 0.5, 0.5)
+                GameTooltip:AddLine(L["Angedockt: Ziehgriff ändert nur die Höhe"], d[1], d[2], d[3])
             else
-                GameTooltip:AddLine(L["Unten rechts ziehen: Größe ändern"], 0.5, 0.5, 0.5)
+                GameTooltip:AddLine(L["Unten rechts ziehen: Größe ändern"], d[1], d[2], d[3])
             end
         else
-            GameTooltip:AddLine(L["Unten rechts ziehen: Größe ändern"], 0.5, 0.5, 0.5)
+            GameTooltip:AddLine(L["Unten rechts ziehen: Größe ändern"], d[1], d[2], d[3])
         end
         GameTooltip:Show()
     end
@@ -586,14 +604,14 @@ local function CreateMeter(cfg)
     end
     local resetHover = resetButton:CreateTexture(nil, "HIGHLIGHT")
     resetHover:SetAllPoints()
-    resetHover:SetColorTexture(1, 1, 1, 0.12)
+    resetHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
 
-    local healingButton = LetterButton(main, L["H"])
+    local healingButton = LetterButton(main, "H")
     healingButton:SetPoint("RIGHT", resetButton, "LEFT", -6, 0)
     local modeSeparator = Text(main, 11, C.textDim, FONT)
     modeSeparator:SetPoint("RIGHT", healingButton, "LEFT", 0, 0)
     modeSeparator:SetText("||") -- „||“ = ein sichtbarer Strich (| ist WoWs Steuerzeichen)
-    local damageButton = LetterButton(main, L["S"])
+    local damageButton = LetterButton(main, "S")
     damageButton:SetPoint("RIGHT", modeSeparator, "LEFT", 0, 0)
     ForwardDrag(damageButton)
     ForwardDrag(healingButton)
@@ -611,11 +629,12 @@ local function CreateMeter(cfg)
     titleButton:SetHeight(HEADER_H - 4)
     local titleHover = titleButton:CreateTexture(nil, "HIGHLIGHT")
     titleHover:SetAllPoints()
-    titleHover:SetColorTexture(1, 1, 1, 0.06)
-    local title = Text(titleButton, 12, C.text, FONT)
+    titleHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 0.6)
+    local title = Text(titleButton, 12, C.accentText, FONT_BODY)
+    title:SetShadowOffset(1, -1)
     title:SetPoint("LEFT", titleButton, "LEFT", 3, 0)
     title:SetPoint("RIGHT", titleButton, "RIGHT", -12, 0)
-    local titleArrow = Text(titleButton, 10, C.accent)
+    local titleArrow = Text(titleButton, 10, C.textDim)
     titleArrow:SetPoint("RIGHT", titleButton, "RIGHT", -2, 0)
     titleArrow:SetText("v")
     ForwardDrag(titleButton)
@@ -645,7 +664,7 @@ local function CreateMeter(cfg)
         bar.bg:SetAllPoints()
         bar.bg:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], C.barBg[4])
 
-        -- Eigene Zeile: 2 px blauer Strich am linken Rand
+        -- Eigene Zeile: 2 px lila Strich am linken Rand
         bar.mark = bar:CreateTexture(nil, "OVERLAY")
         bar.mark:SetPoint("TOPLEFT")
         bar.mark:SetPoint("BOTTOMLEFT")
@@ -767,7 +786,7 @@ local function CreateMeter(cfg)
         self:SetAlpha(1)
         if sizing then return end
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(win.Docked() and L["Ziehen: Höhe ändern"] or L["Ziehen: Größe ändern"], 1, 1, 1)
+        GameTooltip:SetText(win.Docked() and L["Ziehen: Höhe ändern"] or L["Ziehen: Größe ändern"], C.text[1], C.text[2], C.text[3])
         GameTooltip:Show()
     end)
     grip:SetScript("OnLeave", function(self)
@@ -805,7 +824,7 @@ local function CreateMeter(cfg)
         b:SetPoint("TOPRIGHT", menu, "TOPRIGHT", -4, -4 - (i - 1) * MENU_ITEM_H)
         local hover = b:CreateTexture(nil, "HIGHLIGHT")
         hover:SetAllPoints()
-        hover:SetColorTexture(1, 1, 1, 0.08)
+        hover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
         b.text = Text(b, 11, C.text)
         b.text:SetPoint("LEFT", b, "LEFT", 6, 0)
         b.text:SetPoint("RIGHT", b, "RIGHT", -6, 0)
@@ -841,7 +860,7 @@ local function CreateMeter(cfg)
             if not item.view then
                 c = C.textDim
             elseif item.view == win.view then
-                c = C.accent
+                c = C.accentText
             end
             b.text:SetTextColor(c[1], c[2], c[3], 1)
             b:Show()
@@ -872,8 +891,8 @@ local function CreateMeter(cfg)
     end)
     resetButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(L["Zurücksetzen"], 1, 1, 1)
-        GameTooltip:AddLine(L["Löscht alle Kämpfe in beiden DMG-Meter-Fenstern – auch in Blizzards eigenem Schadensmesser. Geht nur außerhalb des Kampfes."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+        GameTooltip:SetText(L["Zurücksetzen"], C.accentText[1], C.accentText[2], C.accentText[3])
+        GameTooltip:AddLine(L["Löscht alle Kämpfe in beiden DMG-Meter-Fenstern – auch in Blizzards eigenem Schadensmesser. Geht nur außerhalb des Kampfes."], C.text[1], C.text[2], C.text[3], true)
         GameTooltip:Show()
     end)
     resetButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -914,7 +933,7 @@ local function CreateMeter(cfg)
     end
 
     local function UpdateHeader(mode, demo)
-        local text = MODE_LABEL[mode] .. " – " .. ViewLabel()
+        local text = L[MODE_LABEL[mode] or "Schaden"] .. " – " .. ViewLabel()
         if demo then text = text .. " · " .. L["Beispiel"] end
         title:SetText(text)
         damageButton:SetActive(mode == "damage")
@@ -1169,9 +1188,11 @@ local function DoReset(auto)
     return true
 end
 
+local RESET_TEXT = "Alle Kämpfe im DMG-Meter zurücksetzen?\n\nDas betrifft auch Blizzards eigenen Schadensmesser."
+
 if StaticPopupDialogs then
     StaticPopupDialogs["STRAY_DAMAGEMETER_RESET"] = {
-        text = L["Alle Kämpfe im DMG-Meter zurücksetzen?\n\nDas betrifft auch Blizzards eigenen Schadensmesser."],
+        text = L[RESET_TEXT],
         button1 = YES or L["Ja"],
         button2 = NO or L["Nein"],
         OnAccept = function() DoReset(false) end,
@@ -1183,7 +1204,12 @@ if StaticPopupDialogs then
 end
 
 OpenResetPopup = function()
-    if StaticPopup_Show and StaticPopupDialogs and StaticPopupDialogs["STRAY_DAMAGEMETER_RESET"] then
+    local dialog = StaticPopupDialogs and StaticPopupDialogs["STRAY_DAMAGEMETER_RESET"]
+    if StaticPopup_Show and dialog then
+        -- Text beim Anzeigen übersetzen (eigene Tabelle, gewählte Sprache)
+        dialog.text = L[RESET_TEXT]
+        if not YES then dialog.button1 = L["Ja"] end
+        if not NO then dialog.button2 = L["Nein"] end
         StaticPopup_Show("STRAY_DAMAGEMETER_RESET")
     else
         DoReset(false)
@@ -1330,7 +1356,7 @@ end
 ns.AddOption(2, "DMG-Meter", {
     key = "dmShow",
     label = L["DMG-Meter anzeigen"],
-    tooltip = L["Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (so hell wie die Gruppenrahmen), dein eigener Balken hat links einen blauen Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit S || H zwischen Schaden und Heilung um; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben."],
+    tooltip = L["Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (so hell wie die Gruppenrahmen), dein eigener Balken hat links einen lila Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit S || H zwischen Schaden und Heilung um; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("dmShow"),

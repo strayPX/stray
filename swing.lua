@@ -38,14 +38,21 @@ local ROW_GAP = 3
 local FONT = "Fonts\\ARIALN.TTF"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz mit gleichen Werten, falls die Tabelle fehlt)
+local COLORS = ns.Colors or {
+    bg = { 0.078, 0.078, 0.098, 0.96 }, card = { 0.094, 0.094, 0.118, 1 }, hover = { 0.122, 0.122, 0.153, 1 },
+    line = { 0.149, 0.149, 0.184, 1 }, accent = { 0.545, 0.486, 0.965, 1 }, accentText = { 0.702, 0.659, 0.980, 1 },
+    text = { 0.902, 0.902, 0.925, 1 }, textDim = { 0.545, 0.545, 0.600, 1 }, textFaint = { 0.369, 0.369, 0.420, 1 },
+}
+
 local C = {
-    bg      = { 0.05, 0.067, 0.09, 0.95 },
-    border  = { 0.169, 0.290, 0.451, 1 },
-    fill    = { 0.353, 0.659, 1.0, 1 },
-    fillOH  = { 0.255, 0.510, 0.820, 1 },
-    fillR   = { 0.420, 0.780, 0.450, 1 },
-    range   = { 0.85, 0.15, 0.15, 1 },
-    text    = { 0.89, 0.914, 0.953, 1 },
+    bg      = COLORS.bg,
+    border  = COLORS.line,
+    fill    = COLORS.accent,                 -- Haupthand: stray-Lila
+    fillOH  = { 0.400, 0.357, 0.725, 1 },    -- Nebenhand: dunkleres Lila
+    fillR   = { 0.420, 0.780, 0.450, 1 },    -- Fernkampf: Grün (Funktionsfarbe)
+    range   = { 0.85, 0.15, 0.15, 1 },       -- außer Reichweite: Rot (Funktionsfarbe)
+    text    = COLORS.text,
     textOut = { 1, 0.35, 0.35, 1 },
 }
 
@@ -93,13 +100,13 @@ local function Edge(parent, p1, p2, horizontal)
     if horizontal then t:SetHeight(1) else t:SetWidth(1) end
 end
 
--- Reihenfolge von oben nach unten
+-- Reihenfolge von oben nach unten; tag = deutscher Schlüssel, übersetzt wird beim Anzeigen
 local ROW_DEFS = {}
 if HAS_API then
     ROW_DEFS = {
-        { type = SWING.MainHand, tag = L["Haupthand"], fill = C.fill },
-        { type = SWING.OffHand, tag = L["Nebenhand"], fill = C.fillOH },
-        { type = SWING.Ranged, tag = L["Fernkampf"], fill = C.fillR },
+        { type = SWING.MainHand, tag = "Haupthand", fill = C.fill },
+        { type = SWING.OffHand, tag = "Nebenhand", fill = C.fillOH },
+        { type = SWING.Ranged, tag = "Fernkampf", fill = C.fillR },
     }
 end
 
@@ -136,7 +143,7 @@ local function NewRow(def)
     row.tag:SetPoint("LEFT", row, "LEFT", 4, 0)
     row.tag:SetJustifyH("LEFT")
     row.tag:SetWordWrap(false)
-    row.tag:SetText(def.tag)
+    row.tag:SetText(L[def.tag])
     row.time = textFrame:CreateFontString(nil, "OVERLAY")
     row.time:SetFont(FONT, 10, "OUTLINE")
     row.time:SetPoint("RIGHT", row, "RIGHT", -4, 0)
@@ -165,6 +172,7 @@ local function ApplyLook(row)
     row.bar:SetStatusBarColor(fill[1], fill[2], fill[3], fill[4])
     row.bar:SetAlpha(row.outOfRange and 0.55 or 1)
     local t = row.outOfRange and C.textOut or C.text
+    row.tag:SetText(L[row.def.tag])
     row.tag:SetTextColor(t[1], t[2], t[3], 1)
     row.time:SetTextColor(t[1], t[2], t[3], 1)
 end

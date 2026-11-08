@@ -14,10 +14,11 @@ ns.defaults.dangerLevels = 3
 local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
 local REPEAT_DELAY = 10 -- Sekunden bis zum nächsten Hinweis für denselben Namen
 
+-- Deutsche Sprachschlüssel, übersetzt erst beim Anzeigen (gewählte Sprache)
 local CLASS_LABELS = {
-    elite = L["Elite"],
-    rareelite = L["Seltene Elite"],
-    worldboss = L["Weltboss"],
+    elite = "Elite",
+    rareelite = "Seltene Elite",
+    worldboss = "Weltboss",
 }
 
 local pool = {}    -- freie Symbole
@@ -49,14 +50,14 @@ notice.anim:SetScript("OnFinished", function() notice:Hide() end)
 ns.MakeMovable(notice, "dangerwarn", { "TOP", "TOP", 0, -115 })
 notice:EnableMouse(false) -- fängt sonst Mausklicks in der Spielwelt ab
 
-local SAMPLE = L["Gefährlich: Murloc-Orakel (Elite, Stufe 32)"]
+local SAMPLE = "Gefährlich: Murloc-Orakel (Elite, Stufe 32)" -- Sprachschlüssel
 local sampleShown = false
 
 local function ShowSample(on)
     if on and ns.db and ns.db.dangerWarn then
         sampleShown = true
         notice.anim:Stop()
-        notice.text:SetText(SAMPLE)
+        notice.text:SetText(L[SAMPLE])
         notice:SetAlpha(1)
         notice:Show()
         -- Bei offenem stray-Fenster mit Shift + Ziehen verschiebbar
@@ -162,7 +163,7 @@ local function Assess(unit)
     if Public(UnitIsDead(unit), "boolean") == true then return nil end
 
     local classification = Public(UnitClassification(unit), "string")
-    local classLabel = classification and CLASS_LABELS[classification]
+    local classLabel = classification and CLASS_LABELS[classification] and L[CLASS_LABELS[classification]]
     local level = Public(UnitLevel(unit), "number")
     local myLevel = Public(UnitLevel("player"), "number")
     local margin = tonumber(ns.db.dangerLevels) or 3

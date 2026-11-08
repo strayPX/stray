@@ -23,6 +23,8 @@ local Public = ns.Public
 ns.defaults.partyPets = false
 ns.defaults.partyPetWidth = 70
 ns.defaults.partyPetHeight = 22
+-- Andockstelle des Begleiters am Rahmen des Besitzers (Nachtrag 0.22.0); LEFT = bisheriges Verhalten
+ns.defaults.partyPetAnchor = "LEFT"
 
 local POWER_H = 4
 local MAX_TILES = 5
@@ -37,6 +39,23 @@ local FALLBACK_DEBUFF_COLORS = {
     Poison  = { r = 0.00, g = 0.60, b = 0.00 },
 }
 local NEUTRAL_BORDER = { 0.9, 0.9, 0.9 }
+
+-- Gemeinsame stray-Farben (ns.Colors aus stray.lua); Rückfall, falls die Tabelle fehlt
+local COLOR_FALLBACK = {
+    bg = { 0.078, 0.078, 0.098, 0.96 },
+    card = { 0.094, 0.094, 0.118, 1 },
+    hover = { 0.122, 0.122, 0.153, 1 },
+    line = { 0.149, 0.149, 0.184, 1 },
+    accent = { 0.545, 0.486, 0.965, 1 },
+    accentText = { 0.702, 0.659, 0.980, 1 },
+    text = { 0.902, 0.902, 0.925, 1 },
+    textDim = { 0.545, 0.545, 0.600, 1 },
+}
+local function Color(name)
+    local c = type(ns.Colors) == "table" and ns.Colors[name]
+    if type(c) == "table" and type(c[1]) == "number" then return c end
+    return COLOR_FALLBACK[name] or COLOR_FALLBACK.text
+end
 
 local function Dims()
     local db = ns.db or ns.defaults
@@ -53,7 +72,7 @@ local function Enabled()
     return ns.db and ns.db.partyFrames and true or false
 end
 
--- Begleiter: Größe des kleinen Fensters links neben dem Besitzer
+-- Begleiter: Größe des kleinen Fensters neben dem Besitzer
 local PET_GAP = 4
 local function PetDims()
     local db = ns.db or ns.defaults
@@ -62,6 +81,37 @@ local function PetDims()
     w = math.max(40, math.min(160, math.floor(w + 0.5)))
     h = math.max(14, math.min(60, math.floor(h + 0.5)))
     return w, h
+end
+
+-- Andockstellen am Rahmen des Besitzers (Reihenfolge = Auswahl in den Optionen)
+local PET_ANCHORS = { "LEFT_TOP", "LEFT", "LEFT_BOTTOM", "RIGHT_TOP", "RIGHT", "RIGHT_BOTTOM", "TOP", "BOTTOM" }
+local PET_ANCHOR_LABELS = { "Links oben", "Links mittig", "Links unten", "Rechts oben", "Rechts mittig", "Rechts unten", "Oben", "Unten" }
+local PET_ANCHOR_VALID = {}
+for _, a in ipairs(PET_ANCHORS) do PET_ANCHOR_VALID[a] = true end
+
+local function PetAnchor()
+    local v = ns.db and ns.db.partyPetAnchor
+    if type(v) == "string" and PET_ANCHOR_VALID[v] then return v end
+    return "LEFT"
+end
+
+-- Obere linke Ecke des Begleiters relativ zur oberen linken Ecke des Besitzers (y nach oben positiv)
+local function PetRect(where, w, h, pw, ph)
+    local x, y
+    if where == "TOP" or where == "BOTTOM" then
+        x = math.floor((w - pw) / 2 + 0.5)
+        y = (where == "TOP") and (PET_GAP + ph) or -(h + PET_GAP)
+        return x, y
+    end
+    if where:sub(1, 4) == "LEFT" then x = -PET_GAP - pw else x = w + PET_GAP end
+    if where:find("_TOP", 1, true) then
+        y = 0
+    elseif where:find("_BOTTOM", 1, true) then
+        y = -(h - ph)
+    else
+        y = -math.floor((h - ph) / 2 + 0.5)
+    end
+    return x, y
 end
 
 local function PetsWanted()
@@ -293,9 +343,10 @@ local function BuildTile(parent)
 
     local t = { art = art }
 
+    local bg, card = Color("bg"), Color("card")
     t.bg = art:CreateTexture(nil, "BACKGROUND")
     t.bg:SetAllPoints()
-    t.bg:SetColorTexture(0.051, 0.067, 0.090, 0.75)
+    t.bg:SetColorTexture(bg[1], bg[2], bg[3], 0.8)
 
     t.power = CreateFrame("StatusBar", nil, art)
     t.power:SetPoint("BOTTOMLEFT", art, "BOTTOMLEFT", 1, 1)
@@ -306,7 +357,7 @@ local function BuildTile(parent)
     t.power:SetValue(1)
     local powerBg = t.power:CreateTexture(nil, "BACKGROUND")
     powerBg:SetAllPoints()
-    powerBg:SetColorTexture(0.051, 0.067, 0.090, 1)
+    powerBg:SetColorTexture(bg[1], bg[2], bg[3], 1)
 
     t.health = CreateFrame("StatusBar", nil, art)
     t.health:SetPoint("TOPLEFT", art, "TOPLEFT", 1, -1)
@@ -316,7 +367,7 @@ local function BuildTile(parent)
     t.health:SetValue(1)
     local healthBg = t.health:CreateTexture(nil, "BACKGROUND")
     healthBg:SetAllPoints()
-    healthBg:SetColorTexture(0.110, 0.122, 0.149, 0.8)
+    healthBg:SetColorTexture(card[1], card[2], card[3], 0.85)
 
     -- Heilvorhersage und Schild: Balken in einem Clip-Bereich genau über dem Lebensbalken
     local clip = CreateFrame("Frame", nil, art)
@@ -363,7 +414,7 @@ local function BuildTile(parent)
     t.pct = top:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     t.pct:SetPoint("TOPRIGHT", top, "TOPRIGHT", -4, -4)
     t.pct:SetJustifyH("RIGHT")
-    t.pct:SetTextColor(0.85, 0.85, 0.85)
+    t.pct:SetTextColor(Color("text")[1], Color("text")[2], Color("text")[3])
     t.pct:SetShadowOffset(1, -1)
 
     t.status = top:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -401,8 +452,10 @@ local function BuildTile(parent)
     t.iconOrder = { t.shieldIcon, t.soulIcon } -- von rechts nach links
 
     t.dispel = MakeBorder(top, 2, 0, "OVERLAY", 6)
+    -- Auswahl (aktuelles Ziel) im stray-Lila
     t.target = MakeBorder(top, 1, 1, "OVERLAY", 7)
-    t.target:SetColor(1, 1, 1, 0.9)
+    local accent = Color("accent")
+    t.target:SetColor(accent[1], accent[2], accent[3], 1)
     return t
 end
 
@@ -780,9 +833,10 @@ local function BuildPetTile(parent)
 
     local t = { art = art }
 
+    local bg, card = Color("bg"), Color("card")
     t.bg = art:CreateTexture(nil, "BACKGROUND")
     t.bg:SetAllPoints()
-    t.bg:SetColorTexture(0.051, 0.067, 0.090, 0.75)
+    t.bg:SetColorTexture(bg[1], bg[2], bg[3], 0.8)
 
     t.health = CreateFrame("StatusBar", nil, art)
     t.health:SetPoint("TOPLEFT", art, "TOPLEFT", 1, -1)
@@ -792,7 +846,7 @@ local function BuildPetTile(parent)
     t.health:SetValue(1)
     local healthBg = t.health:CreateTexture(nil, "BACKGROUND")
     healthBg:SetAllPoints()
-    healthBg:SetColorTexture(0.110, 0.122, 0.149, 0.8)
+    healthBg:SetColorTexture(card[1], card[2], card[3], 0.85)
 
     local top = CreateFrame("Frame", nil, art)
     top:SetAllPoints(art)
@@ -802,7 +856,7 @@ local function BuildPetTile(parent)
     t.pct = top:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     t.pct:SetPoint("RIGHT", top, "RIGHT", -3, 0)
     t.pct:SetJustifyH("RIGHT")
-    t.pct:SetTextColor(0.85, 0.85, 0.85)
+    t.pct:SetTextColor(Color("text")[1], Color("text")[2], Color("text")[3])
     t.pct:SetShadowOffset(1, -1)
 
     t.status = top:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -820,7 +874,8 @@ local function BuildPetTile(parent)
     t.name:SetShadowOffset(1, -1)
 
     t.target = MakeBorder(top, 1, 1, "OVERLAY", 7)
-    t.target:SetColor(1, 1, 1, 0.9)
+    local accent = Color("accent")
+    t.target:SetColor(accent[1], accent[2], accent[3], 1)
     return t
 end
 
@@ -998,12 +1053,13 @@ local function PetCondition(unit)
     return "[group:raid] hide; [nogroup] hide; [@" .. unit .. ",exists] show; hide"
 end
 
--- Ecke oben rechts des Begleiters relativ zur oberen linken Ecke des Ankers, Platz 1–5
+-- Obere linke Ecke des Begleiters relativ zur oberen linken Ecke des Ankers, Platz 1–5,
+-- je nach gewählter Andockstelle (partyPetAnchor) am Rahmen des Besitzers
 local function PetOffset(slot)
-    local _, h, sp = Dims()
-    local _, ph = PetDims()
-    local y = -(slot - 1) * (h + sp) - math.floor((h - ph) / 2 + 0.5)
-    return -PET_GAP, y
+    local w, h, sp = Dims()
+    local pw, ph = PetDims()
+    local x, y = PetRect(PetAnchor(), w, h, pw, ph)
+    return x, -(slot - 1) * (h + sp) + y
 end
 
 local function EnsurePetButtons()
@@ -1012,6 +1068,8 @@ local function EnsurePetButtons()
     for slot, unit in ipairs(PET_UNITS) do
         local ok, b = pcall(CreateFrame, "Button", "strayPartyPet" .. slot, anchor, "SecureUnitButtonTemplate")
         if not ok or not b then return #petButtons > 0 end
+        -- Über den Gruppenkacheln (bei „oben“/„unten“ liegt der Begleiter auf der Nachbarkachel)
+        b:SetFrameLevel(anchor:GetFrameLevel() + 20)
         b:SetAttribute("unit", unit)
         b:SetAttribute("type1", "target")
         b:SetAttribute("type2", "togglemenu")
@@ -1038,7 +1096,7 @@ local function LayoutPetButtons()
         b:SetSize(pw, ph)
         b:ClearAllPoints()
         local x, y = PetOffset(slot)
-        b:SetPoint("TOPRIGHT", anchor, "TOPLEFT", x, y)
+        b:SetPoint("TOPLEFT", anchor, "TOPLEFT", x, y)
     end
 end
 
@@ -1068,28 +1126,32 @@ end
 
 local SAMPLES = {
     -- Du selbst (Name, Klasse und Ressource des eingeloggten Charakters): Schild größer als das fehlende Leben → Überschild-Strich
-    { isPlayer = true, name = L["Du"], class = "PRIEST", hp = 0.92, power = "MANA", mp = 0.7, absorb = 0.15 },
+    -- Feste Texte (Du, Tot, Wolf) stehen deutsch hier und werden erst beim Zeichnen übersetzt
+    { isPlayer = true, name = "Du", translate = true, class = "PRIEST", hp = 0.92, power = "MANA", mp = 0.7, absorb = 0.15 },
     -- Kael: laufende Heilung +30 % (eigene 20 % hell, fremde 10 % dunkler)
     { name = "Kael", class = "MAGE", hp = 0.64, power = "MANA", mp = 0.45, dispel = "Poison", icon = "Interface\\Icons\\Ability_Creature_Poison_03", healOwn = 0.2, healOther = 0.1 },
     { name = "Mira", class = "DRUID", hp = 1.0, power = "MANA", mp = 0.9, faded = true },
-    { name = "Brom", class = "WARRIOR", hp = 0, power = "RAGE", mp = 0, status = L["Tot"] },
+    { name = "Brom", class = "WARRIOR", hp = 0, power = "RAGE", mp = 0, status = "Tot" },
     -- Sera (Jägerin): Schild (gestreift) mit Schild-Symbol und „Geschwächte Seele“ (noch 9 von 15 s),
-    -- dazu ihr Begleiter links daneben (nur mit „Begleiter anzeigen“)
+    -- dazu ihr Begleiter an der gewählten Andockstelle (nur mit „Begleiter anzeigen“)
     { name = "Sera", class = "HUNTER", hp = 0.38, power = "MANA", mp = 0.8, target = true, absorb = 0.25, soulLeft = 9, soulDuration = 15,
-      pet = { name = L["Wolf"], hp = 0.55 } },
+      pet = { name = "Wolf", translate = true, hp = 0.55 } },
 }
 
 local samples = {}
 
 local function SamplePetEnter(self)
+    if self.docking then return end
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(L["Begleiter – Beispiel"], 1, 1, 1)
-    GameTooltip:AddLine(L["So erscheint das Tier oder der Dämon eines Gruppenmitglieds links neben seinem Rahmen. Breite und Höhe stellst du im stray-Fenster ein."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:AddLine(L["So erscheint das Tier oder der Dämon eines Gruppenmitglieds am Rahmen seines Besitzers. Breite und Höhe stellst du im stray-Fenster ein."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:AddLine(L["Ziehen: an eine andere Seite des Besitzers andocken (lila Punkte zeigen die Andockstellen)."], 1, 1, 1, true)
+    GameTooltip:AddLine(L["Shift + ziehen: ganze Gruppe verschieben."], 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
 end
 
 local function PaintSamplePet(t, p)
-    t.name:SetText(p.name)
+    t.name:SetText(p.translate and L[p.name] or p.name)
     t.health:SetMinMaxValues(0, 1)
     t.health:SetValue(p.hp)
     t.health:SetStatusBarColor(ClassColor(nil))
@@ -1138,7 +1200,7 @@ end
 -- Erster Beispielplatz: eigener Charakter statt eines festen Namens
 local function PlayerSample(s)
     if not s.isPlayer then return s.name, s.class, s.power end
-    local name, class, power = s.name, s.class, s.power
+    local name, class, power = s.translate and L[s.name] or s.name, s.class, s.power
     local n = ns.Public(UnitName("player"))
     if type(n) == "string" and n ~= "" then name = n end
     local _, c = UnitClass("player")
@@ -1159,7 +1221,7 @@ local function PaintSample(t, s)
     t.power:SetValue(s.mp)
     t.power:SetStatusBarColor(PowerColor(nil, power))
     if s.status then
-        t.status:SetText(s.status)
+        t.status:SetText(L[s.status])
         t.status:Show()
         t.pct:Hide()
         t.health:SetStatusBarColor(0.35, 0.35, 0.35)
@@ -1196,9 +1258,141 @@ local function LayoutSamples()
             local x, y = PetOffset(i)
             f.petFrame:SetSize(pw, ph)
             f.petFrame:ClearAllPoints()
-            f.petFrame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", x, y)
+            f.petFrame:SetPoint("TOPLEFT", anchor, "TOPLEFT", x, y)
         end
     end
+end
+
+---------------------------------------------------------------------------
+-- Begleiter andocken: Beispiel-Begleiter ziehen (stray-Fenster offen oder Bearbeitungsmodus).
+-- Beim Ziehen zeigen lila Punkte die Andockstellen am Besitzer, ein Umriss die nächste Stelle;
+-- beim Loslassen rastet er dort ein. Gespeichert wird nur die Seite (partyPetAnchor).
+---------------------------------------------------------------------------
+
+local dock -- Hinweis-Rahmen über der Besitzer-Kachel
+
+-- Mittelpunkt des Andockpunkts am Besitzer, relativ zu dessen oberer linker Ecke
+local function DockPoint(where, w, h, ph)
+    local half = math.min(ph, h) / 2
+    if where == "TOP" then return w / 2, 0 end
+    if where == "BOTTOM" then return w / 2, -h end
+    local x = (where:sub(1, 4) == "LEFT") and 0 or w
+    if where:find("_TOP", 1, true) then return x, -half end
+    if where:find("_BOTTOM", 1, true) then return x, -h + half end
+    return x, -h / 2
+end
+
+-- Hinweis-Rahmen hängt an der Besitzer-Kachel (gleiche Skalierung wie der Begleiter)
+local function EnsureDock(owner)
+    if dock then return dock end
+    dock = CreateFrame("Frame", nil, owner)
+    dock:SetAllPoints(owner)
+    dock:SetFrameStrata("HIGH")
+    dock:SetFrameLevel(90)
+    dock:Hide()
+    dock.marks = {}
+    for _, where in ipairs(PET_ANCHORS) do
+        local m = dock:CreateTexture(nil, "OVERLAY")
+        m:SetColorTexture(1, 1, 1, 1)
+        dock.marks[where] = m
+    end
+    local ghost = CreateFrame("Frame", nil, dock)
+    ghost.fill = ghost:CreateTexture(nil, "BACKGROUND")
+    ghost.fill:SetAllPoints()
+    ghost.fill:SetColorTexture(1, 1, 1, 1)
+    ghost.border = MakeBorder(ghost, 1, 0, "OVERLAY", 7)
+    ghost.border:SetShown(true)
+    dock.ghost = ghost
+    return dock
+end
+
+-- Nächste Andockstelle zum aktuellen Mittelpunkt des gezogenen Begleiters
+local function NearestDock(owner, pet)
+    local ol, ot = owner:GetLeft(), owner:GetTop()
+    local cx, cy = pet:GetCenter()
+    if not (ol and ot and cx and cy) then return PetAnchor() end
+    local w, h, pw, ph = owner:GetWidth(), owner:GetHeight(), pet:GetWidth(), pet:GetHeight()
+    local best, bestD
+    for _, where in ipairs(PET_ANCHORS) do
+        local x, y = PetRect(where, w, h, pw, ph)
+        local dx = (ol + x + pw / 2) - cx
+        local dy = (ot + y - ph / 2) - cy
+        local d = dx * dx + dy * dy
+        if not bestD or d < bestD then best, bestD = where, d end
+    end
+    return best
+end
+
+local function PaintDock(owner, pet, nearest)
+    local d = EnsureDock(owner)
+    local w, h, pw, ph = owner:GetWidth(), owner:GetHeight(), pet:GetWidth(), pet:GetHeight()
+    local accent = Color("accent")
+    for where, m in pairs(d.marks) do
+        local x, y = DockPoint(where, w, h, ph)
+        local hit = (where == nearest)
+        local size = hit and 9 or 6
+        m:SetSize(size, size)
+        m:ClearAllPoints()
+        m:SetPoint("CENTER", owner, "TOPLEFT", x, y)
+        m:SetVertexColor(accent[1], accent[2], accent[3], hit and 1 or 0.55)
+    end
+    local x, y = PetRect(nearest, w, h, pw, ph)
+    d.ghost:SetSize(pw, ph)
+    d.ghost:ClearAllPoints()
+    d.ghost:SetPoint("TOPLEFT", owner, "TOPLEFT", x, y)
+    d.ghost.fill:SetVertexColor(accent[1], accent[2], accent[3], 0.15)
+    d.ghost.border:SetColor(accent[1], accent[2], accent[3], 1)
+    d:Show()
+end
+
+-- Andockstelle übernehmen: Beispiel sofort, echte sichere Knöpfe nur außerhalb des Kampfes
+-- (im Kampf merkt ns.PartyApplyLayout die Änderung vor; Refresh holt sie danach nach)
+local function ApplyPetAnchor()
+    LayoutSamples()
+    if InCombatLockdown() then
+        ns.PartyApplyLayout()
+        return
+    end
+    LayoutPetButtons()
+end
+
+local function SetPetAnchor(where)
+    if not ns.db or not PET_ANCHOR_VALID[where] then return end
+    ns.db.partyPetAnchor = where
+    ApplyPetAnchor()
+end
+
+local function PetDragUpdate(self)
+    if not self.docking or not self.owner then return end
+    PaintDock(self.owner, self, NearestDock(self.owner, self))
+end
+
+local function PetDragStart(self)
+    -- Shift + ziehen verschiebt wie bisher die ganze Gruppe
+    if IsShiftKeyDown() then
+        StartDrag()
+        return
+    end
+    if self.docking or not self.owner or not ns.IsConfigOpen() then return end
+    if not pcall(self.StartMoving, self) then return end
+    self.docking = true
+    GameTooltip:Hide()
+    self:SetScript("OnUpdate", PetDragUpdate)
+    PetDragUpdate(self)
+end
+
+local function PetDragStop(self)
+    if not self.docking then
+        StopDrag()
+        return
+    end
+    self.docking = false
+    self:SetScript("OnUpdate", nil)
+    local where = self.owner and NearestDock(self.owner, self) or PetAnchor()
+    pcall(self.StopMovingOrSizing, self)
+    pcall(self.SetUserPlaced, self, false)
+    if dock then dock:Hide() end
+    SetPetAnchor(where)
 end
 
 local function EnsureSamples()
@@ -1219,10 +1413,16 @@ local function EnsureSamples()
         if s.pet then
             local p = CreateFrame("Frame", nil, anchor)
             p:SetFrameStrata(anchor:GetFrameStrata())
+            p:SetFrameLevel(anchor:GetFrameLevel() + 20)
             p:EnableMouse(true)
+            p:SetMovable(true)
+            p:SetClampedToScreen(true)
             p:RegisterForDrag("LeftButton")
-            p:SetScript("OnDragStart", StartDrag)
-            p:SetScript("OnDragStop", StopDrag)
+            p.owner = f
+            p:SetScript("OnDragStart", PetDragStart)
+            p:SetScript("OnDragStop", PetDragStop)
+            -- Verschwindet die Testgruppe mitten im Ziehen: Ziehen sauber beenden
+            p:SetScript("OnHide", function(self) if self.docking then PetDragStop(self) end end)
             p:SetScript("OnEnter", SamplePetEnter)
             p:SetScript("OnLeave", function() GameTooltip:Hide() end)
             p.stray = BuildPetTile(p)
@@ -1244,7 +1444,18 @@ local function UpdatePreview()
         -- Beim Einblenden neu zeichnen: startet die Abklinganzeige der Testgruppe neu
         if show and not f:IsShown() and f.sample then PaintSample(f.stray, f.sample) end
         f:SetShown(show)
-        if f.petFrame then f.petFrame:SetShown(show and PetsWanted()) end
+        local p = f.petFrame
+        if p then
+            -- Im Bearbeitungsmodus über dem Rahmen-Overlay (HIGH), damit sich der Begleiter ziehen lässt
+            if ns.editMode then
+                p:SetFrameStrata("HIGH")
+                p:SetFrameLevel(60)
+            else
+                p:SetFrameStrata(anchor:GetFrameStrata())
+                p:SetFrameLevel(anchor:GetFrameLevel() + 20)
+            end
+            p:SetShown(show and PetsWanted())
+        end
     end
     -- Der Anker hält den sicheren Header: nur außerhalb des Kampfes ein-/ausblenden
     if not InCombatLockdown() then
@@ -1570,7 +1781,7 @@ end
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyPets",
     label = L["Begleiter anzeigen"],
-    tooltip = L["Zeigt das Tier oder den Dämon eines Gruppenmitglieds (Jäger, Hexenmeister …) als kleines Fenster links neben seinem Rahmen: Name, Lebensbalken und Leben in Prozent. Auch dein eigener Begleiter erscheint neben deinem Rahmen.\n\nLinksklick wählt den Begleiter als Ziel, Rechtsklick öffnet sein Menü; mit „Mouseover-Zauber“ (Kampf → Zaubern) heilst du ihn direkt unter der Maus. Die Testgruppe zeigt einen Begleiter bei der Jägerin. Ein- und Ausschalten wirkt nur außerhalb des Kampfes."],
+    tooltip = L["Zeigt das Tier oder den Dämon eines Gruppenmitglieds (Jäger, Hexenmeister …) als kleines Fenster an seinem Rahmen (Seite unter „Begleiter-Position“, Standard links mittig): Name, Lebensbalken und Leben in Prozent. Auch dein eigener Begleiter erscheint an deinem Rahmen.\n\nLinksklick wählt den Begleiter als Ziel, Rechtsklick öffnet sein Menü; mit „Mouseover-Zauber“ (Kampf → Zaubern) heilst du ihn direkt unter der Maus. Die Testgruppe zeigt einen Begleiter bei der Jägerin. Ein- und Ausschalten wirkt nur außerhalb des Kampfes."],
     keywords = PET_KEYWORDS,
     isEnabled = function() return ns.db and ns.db.partyFrames and true or false end,
     disabledHint = L["Erst „Gruppenrahmen anzeigen“ einschalten (oben auf dieser Seite)."],
@@ -1578,6 +1789,26 @@ ns.AddOption(3, "Gruppenrahmen", {
         ns.db.partyPets = value
         CombatNote()
         Refresh()
+    end,
+})
+
+local PET_ANCHOR_LABELS_L = {}
+for i, text in ipairs(PET_ANCHOR_LABELS) do PET_ANCHOR_LABELS_L[i] = L[text] end
+
+ns.AddOption(3, "Gruppenrahmen", {
+    key = "partyPetAnchor",
+    type = "choice",
+    label = L["Begleiter-Position"],
+    values = PET_ANCHORS,
+    labels = PET_ANCHOR_LABELS_L,
+    tooltip = L["Wo der Begleiter am Rahmen seines Besitzers andockt: links, rechts (jeweils oben, mittig oder unten), oben oder unten. Gespeichert wird nur die Seite – so sitzt jedes Tier immer an seinem Besitzer, egal an welcher Stelle der Gruppe er steht.\n\nBei offenem stray-Fenster oder im Bearbeitungsmodus kannst du auch den Beispiel-Begleiter (Wolf bei Sera) ziehen: Lila Punkte zeigen die Andockstellen, beim Loslassen rastet er an der nächsten ein. Im Kampf wird die Änderung erst danach übernommen."],
+    keywords = { "pet", "begleiter", "position", "anchor", "andocken", "dock", "seite", "side", "links", "rechts", "left", "right" },
+    isEnabled = PetsOptionOn,
+    disabledHint = L["Erst „Begleiter anzeigen“ einschalten."],
+    set = function(v)
+        if not PET_ANCHOR_VALID[v] then return end
+        CombatNote()
+        SetPetAnchor(v)
     end,
 })
 
@@ -1598,7 +1829,7 @@ ns.AddOption(3, "Gruppenrahmen", {
     type = "slider",
     label = L["Begleiter: Höhe"],
     min = 14, max = 60, step = 1,
-    tooltip = L["Höhe des Begleiter-Fensters in Pixeln; es sitzt mittig neben dem Rahmen des Besitzers. Im Kampf wird die Änderung erst danach übernommen."],
+    tooltip = L["Höhe des Begleiter-Fensters in Pixeln; es sitzt an der gewählten Stelle am Rahmen des Besitzers („Begleiter-Position“). Im Kampf wird die Änderung erst danach übernommen."],
     keywords = PET_KEYWORDS,
     isEnabled = PetsOptionOn,
     disabledHint = L["Erst „Begleiter anzeigen“ einschalten."],

@@ -16,16 +16,33 @@ local FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local FONT_BODY = "Fonts\\ARIALN.TTF"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
 
+-- Farben aus der gemeinsamen Tabelle ns.Colors (stray.lua, lila Look); Ersatzwerte, falls sie fehlt
+local function Col(key, fallback)
+    local c = type(ns.Colors) == "table" and ns.Colors[key]
+    if type(c) == "table" and c[1] then return c end
+    return fallback
+end
+
+local ACCENT_TEXT = Col("accentText", { 0.702, 0.659, 0.980, 1 })
+
 local C = {
-    bg      = { 0.051, 0.067, 0.090, 0.92 },
-    border  = { 0.169, 0.290, 0.451, 1 },
-    accent  = { 0.353, 0.659, 1.000, 1 },
-    text    = { 0.890, 0.914, 0.953, 1 },
-    textDim = { 0.435, 0.525, 0.651, 1 },
-    xp      = { 0.557, 0.369, 0.929, 1 },   -- Lila
-    rested  = { 0.353, 0.659, 1.000, 0.45 }, -- Blau, heller Bereich dahinter
+    bg      = Col("bg", { 0.078, 0.078, 0.098, 0.96 }),
+    border  = Col("line", { 0.149, 0.149, 0.184, 1 }),
+    accent  = Col("accent", { 0.545, 0.486, 0.965, 1 }),
+    hover   = Col("hover", { 0.122, 0.122, 0.153, 1 }),
+    text    = Col("text", { 0.902, 0.902, 0.925, 1 }),
+    textDim = Col("textDim", { 0.545, 0.545, 0.600, 1 }),
+    xp      = Col("accent", { 0.545, 0.486, 0.965, 1 }),                       -- Lila
+    rested  = { ACCENT_TEXT[1], ACCENT_TEXT[2], ACCENT_TEXT[3], 0.40 },        -- helles Lila dahinter
     questxp = { 1.000, 0.820, 0.000, 0.40 }, -- Gold, EP abgabebereiter Quests
 }
+
+-- Farbe als Hex für |c-Codes ("ffrrggbb")
+local function Hex(c)
+    return string.format("ff%02x%02x%02x", math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5))
+end
+local HEX_ACCENT = Hex(ACCENT_TEXT)
+local HEX_DIM = Hex(C.textDim)
 
 ns.defaults.questXPBar = false
 ns.defaults.minimapMiddleMenu = false
@@ -257,7 +274,8 @@ end
 friendsCell.count = Text(friendsCell, 10, FONT_BODY, "OUTLINE")
 friendsCell.count:SetPoint("BOTTOMRIGHT", friendsCell, "BOTTOMRIGHT", -1, 1)
 
-local BNET_CLIENT_NAMES = { App = "Battle.net", BSAp = L["Battle.net (Handy)"], WoW = "WoW" }
+-- Deutsche Schlüssel; übersetzt erst beim Anzeigen (Sprachumschaltung)
+local BNET_CLIENT_NAMES = { App = "Battle.net", BSAp = "Battle.net (Handy)", WoW = "WoW" }
 
 local function WowFriends()
     local list = {}
@@ -309,7 +327,7 @@ local function BNetFriends()
                 entry.level = Number(game.characterLevel)
                 entry.area = String(game.areaName) or String(game.richPresence)
             else
-                entry.area = (client and BNET_CLIENT_NAMES[client]) or client or ""
+                entry.area = (client and BNET_CLIENT_NAMES[client] and L[BNET_CLIENT_NAMES[client]]) or client or ""
             end
             table.insert(list, entry)
         end
@@ -335,7 +353,7 @@ local function FriendLine(entry)
     else
         left = "|c" .. hex .. entry.name .. "|r"
     end
-    if entry.level then left = left .. "  |cff8899aa" .. entry.level .. "|r" end
+    if entry.level then left = left .. "  |c" .. HEX_DIM .. entry.level .. "|r" end
     GameTooltip:AddDoubleLine(left, entry.area or "", 1, 1, 1, C.textDim[1], C.textDim[2], C.textDim[3])
 end
 
@@ -538,9 +556,9 @@ function LayoutBag()
     if not addonBag.empty then
         addonBag.empty = Text(addonBag, 11)
         addonBag.empty:SetPoint("CENTER")
-        addonBag.empty:SetText(L["leer"])
         addonBag.empty:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
     end
+    addonBag.empty:SetText(L["leer"])
     addonBag.empty:SetShown(#shown == 0)
     if #shown == 0 then addonBag:SetSize(BAG_SLOT * 2 + 2 * BAG_PAD, BAG_SLOT + 2 * BAG_PAD) end
 end
@@ -714,41 +732,57 @@ end
 -- has: gibt es einen normalen Eintrag in diesem Client? frame: im Kampf nur, wenn der Rahmen
 -- schon geladen und nicht geschützt ist (nur für normale Knöpfe der unteren Leiste).
 -- micro: erscheint auch als Knopf in der Taschen- und Menüleiste.
+-- rule: Spielregel (Enum.GameRule), mit der Blizzard den Knopf auf Forever abschaltet; ruleFn: eigene
+-- Prüfung (Abenteuerführer). Liste wie Blizzard_MicroMenu/Camelot/MicroMenuContainerOverrides.lua.
+-- label ist der deutsche Schlüssel: übersetzt wird erst beim Anzeigen (Sprachumschaltung).
 local MENU_ENTRIES = {
-    { key = "char", label = L["Charakter"], micro = true, secure = { "CharacterMicroButton" },
-        icons = { "Interface\\Icons\\INV_Chest_Cloth_17" } },
-    { key = "spell", label = L["Zauberbuch"], micro = true, secure = { "SpellbookMicroButton", "PlayerSpellsMicroButton" },
+    { key = "char", label = "Charakter", micro = true, secure = { "CharacterMicroButton" },
+        rule = "CharacterPanelDisabled", icons = { "Interface\\Icons\\INV_Chest_Cloth_17" } },
+    { key = "spell", label = "Zauberbuch", micro = true, secure = { "SpellbookMicroButton", "PlayerSpellsMicroButton" },
         icons = { "Interface\\Icons\\INV_Misc_Book_09" } },
-    { key = "talent", label = L["Talente"], micro = true, secure = { "TalentMicroButton" },
+    { key = "talent", label = "Talente", micro = true, secure = { "TalentMicroButton" },
         icons = { "Interface\\Icons\\Ability_Marksmanship" } },
-    { key = "prof", label = L["Berufe"], micro = true, secure = { "ProfessionMicroButton" },
-        icons = { "Interface\\Icons\\INV_Pick_02", "Interface\\Icons\\Trade_Engineering" } },
-    { key = "quest", label = L["Questlog"], micro = true, secure = { "QuestLogMicroButton" },
-        icons = { "Interface\\Icons\\INV_Misc_Book_08" } },
-    { key = "friends", label = L["Freunde"], micro = true, icons = { "Interface\\Icons\\INV_Misc_GroupNeedMore" },
+    { key = "prof", label = "Berufe", micro = true, secure = { "ProfessionMicroButton" },
+        rule = "ProfessionsPanelDisabled", icons = { "Interface\\Icons\\INV_Pick_02", "Interface\\Icons\\Trade_Engineering" } },
+    { key = "legacy", label = "Vermächtnis", secure = { "LegacyMicroButton" } },
+    { key = "quest", label = "Questlog", micro = true, secure = { "QuestLogMicroButton" },
+        rule = "QuestLogMicrobuttonDisabled", icons = { "Interface\\Icons\\INV_Misc_Book_08" } },
+    { key = "housing", label = "Wohnen", secure = { "HousingMicroButton" }, rule = "HousingDashboardDisabled" },
+    { key = "friends", label = "Freunde", icons = { "Interface\\Icons\\INV_Misc_GroupNeedMore" },
         has = function() return ToggleFriendsFrame ~= nil end,
         frame = function() return _G.FriendsFrame end,
         run = function() ToggleFriendsFrame(FRIEND_TAB_FRIENDS or 1) end },
-    { key = "guild", label = L["Gilde"], micro = true, secure = { "GuildMicroButton" },
-        icons = { "Interface\\Icons\\INV_Shirt_GuildTabard_01" } },
-    { key = "lfg", label = L["Gruppensuche"], micro = true, secure = { "LFDMicroButton", "LFGMicroButton" },
-        icons = { "Interface\\Icons\\INV_Misc_GroupLooking" } },
+    { key = "guild", label = "Gilde", micro = true, secure = { "GuildMicroButton" },
+        rule = "CommunitiesPanelDisabled", icons = { "Interface\\Icons\\INV_Shirt_GuildTabard_01" } },
+    { key = "lfg", label = "Gruppensuche", micro = true, secure = { "LFDMicroButton", "LFGMicroButton" },
+        rule = "FinderPanelDisabled", icons = { "Interface\\Icons\\INV_Misc_GroupLooking" } },
+    { key = "collections", label = "Sammlung", micro = true, secure = { "CollectionsMicroButton" },
+        rule = "CollectionsPanelDisabled", icons = { "Interface\\Icons\\Ability_Mount_RidingHorse" } },
+    { key = "journal", label = "Abenteuerführer", micro = true, secure = { "EJMicroButton" },
+        ruleFn = function()
+            if GameRulesUtil and type(GameRulesUtil.EJIsDisabled) == "function" then
+                local ok, off = pcall(GameRulesUtil.EJIsDisabled)
+                return ok and off and true or false
+            end
+            return false
+        end,
+        icons = { "Interface\\Icons\\INV_Misc_Book_17" } },
     { divider = true },
-    { key = "calendar", label = L["Kalender"],
+    { key = "calendar", label = "Kalender",
         has = function() return ToggleCalendar ~= nil or GameTimeFrame ~= nil end,
         frame = function() return _G.CalendarFrame end,
         run = OpenCalendar },
-    { key = "tracking", label = L["Verfolgung"],
+    { key = "tracking", label = "Verfolgung",
         has = function()
             return (C_Minimap and C_Minimap.GetNumTrackingTypes) ~= nil
                 or TrackingButton() ~= nil or _G.MiniMapTrackingDropDown ~= nil
         end,
         run = OpenTrackingMenu },
-    { key = "worldmap", label = L["Weltkarte"],
+    { key = "worldmap", label = "Weltkarte",
         has = function() return ToggleWorldMap ~= nil or WorldMapFrame ~= nil end,
         frame = function() return _G.WorldMapFrame end,
         run = OpenWorldMap },
-    { key = "alts", label = L["Twinks"],
+    { key = "alts", label = "Twinks",
         has = function() return ns.ToggleAlts ~= nil and ns.db and ns.db.alts and true or false end,
         run = function() ns.ToggleAlts() end },
 }
@@ -775,11 +809,37 @@ local function MicroUsable(entry)
     return ns.Public(enabled) and true or false
 end
 
+-- Von Blizzard per Spielregel gesperrt? (Blizzard nimmt den Knopf dann gar nicht in die Menüleiste)
+local function RuleOff(entry)
+    if entry.ruleFn then
+        local ok, off = pcall(entry.ruleFn)
+        if ok and off then return true end
+    end
+    if entry.rule and C_GameRules and C_GameRules.IsGameRuleActive and type(Enum) == "table"
+        and type(Enum.GameRule) == "table" then
+        local rule = Enum.GameRule[entry.rule]
+        if rule ~= nil then
+            local ok, active = pcall(C_GameRules.IsGameRuleActive, rule)
+            if ok and ns.Public(active) == true then return true end
+        end
+    end
+    return false
+end
+
 local function Has(entry)
     if entry.divider then return false end
-    if entry.secure then return MicroFor(entry) ~= nil end
+    if entry.secure then return MicroFor(entry) ~= nil and not RuleOff(entry) end
     local ok, has = pcall(entry.has)
     return ok and has and true or false
+end
+
+-- Namen aller gerade verfügbaren Einträge, z. B. für Tooltips
+local function AvailableLabels()
+    local names = {}
+    for _, entry in ipairs(MENU_ENTRIES) do
+        if not entry.divider and Has(entry) then table.insert(names, L[entry.label]) end
+    end
+    return table.concat(names, ", ")
 end
 
 -- Normaler Eintrag im Kampf gesperrt? (geschützte oder noch nicht geladene Fenster)
@@ -867,7 +927,7 @@ local function RowText(row)
     row.text:SetJustifyH("LEFT")
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
-    hl:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.18)
+    hl:SetColorTexture(C.hover[1], C.hover[2], C.hover[3], 1)
 end
 
 local function BuildMenu()
@@ -903,7 +963,6 @@ local function BuildMenu()
                 row.entry = entry
                 row:SetSize(MENU_W - 2, ROW_H)
                 RowText(row)
-                row.text:SetText(entry.label)
                 row:Hide()
                 table.insert(menuItems, { entry = entry, row = row })
             end
@@ -937,6 +996,7 @@ local function LayoutMenu()
             local row = item.row
             local usable = not item.entry.secure or MicroUsable(item.entry)
             local c = usable and C.text or C.textDim
+            row.text:SetText(L[item.entry.label])
             row.text:SetTextColor(c[1], c[2], c[3])
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", menu, "TOPLEFT", 1, y)
@@ -1004,7 +1064,7 @@ mapButton:SetScript("OnEnter", function(self)
     SetBorder(self, C.accent)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
     GameTooltip:AddLine(L["Kartenmenü"])
-    GoldLine(L["Linksklick: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte"])
+    GoldLine(L("Linksklick: %s", AvailableLabels()))
     GameTooltip:AddLine(L["Geht nur außerhalb des Kampfes."], C.textDim[1], C.textDim[2], C.textDim[3], true)
     GameTooltip:Show()
 end)
@@ -1223,7 +1283,7 @@ end
 local function UpdateClock()
     local fps = GetFramerate and Number(GetFramerate())
     local fpsText = fps and tostring(math.floor(fps + 0.5)) or "?"
-    clock.text:SetText(string.format("|cff5aa8ff%s|r FPS   %s", fpsText, date("%H:%M")))
+    clock.text:SetText(string.format("|c%s%s|r FPS   %s", HEX_ACCENT, fpsText, date("%H:%M")))
     LayoutClock(false)
 end
 
@@ -1969,7 +2029,7 @@ local function BuildMicroButtons()
                 end
                 b:HookScript("OnEnter", function(self)
                     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                    GameTooltip:AddLine(self.entry.label)
+                    GameTooltip:AddLine(L[self.entry.label])
                     if self.entry.secure then
                         if not MicroUsable(self.entry) then
                             GameTooltip:AddLine(L["Gerade nicht verfügbar"], C.textDim[1], C.textDim[2], C.textDim[3])
@@ -2323,8 +2383,9 @@ local function BottomOptionOn() return BottomActive() end
 ns.AddOption(3, SECTION, {
     key = "bottomMicroButtons",
     label = L["Menüknöpfe unten"],
-    keywords = { "menü", "menu", "micro", "mikromenü", "charakter", "zauberbuch", "talente" },
-    tooltip = L["Setzt links neben den Taschenknopf Blizzards Menüsymbole ohne Rahmen: Charakter (rundes Bild deines Charakters), Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde und Gruppensuche.\n\n"
+    keywords = { "menü", "menu", "micro", "mikromenü", "charakter", "zauberbuch", "talente", "sammlung", "collections",
+        "abenteuerführer", "adventure guide", "reittiere", "mounts", "haustiere", "pets" },
+    tooltip = L["Setzt links neben den Taschenknopf Blizzards Menüsymbole ohne Rahmen: Charakter (rundes Bild deines Charakters), Zauberbuch, Talente, Berufe, Questlog, Gilde, Gruppensuche, Sammlung (Reittiere und Haustiere) und Abenteuerführer – jeweils nur, wenn es das Fenster auf Forever gibt. Freunde findest du an der Minimap-Knopfspalte und im Minimap-Menü.\n\n"
         .. "Sie klicken Blizzards eigene Menüknöpfe an und gehen deshalb auch im Kampf. Grau heißt: Blizzard hat den Knopf gerade abgeschaltet (z. B. Talente unter Stufe 10). "
         .. "Das Spielmenü öffnest du wie gewohnt mit Esc. Ein- und Umbau im Kampf geschieht erst danach."],
     isEnabled = BottomOptionOn,
@@ -2380,7 +2441,7 @@ ns.AddOption(3, SECTION, {
     key = "minimapMiddleMenu",
     label = L["Menü per Mittelklick auf die Minimap"],
     keywords = { "minimap", "menü", "menu", "mittelklick", "middle click", "maustaste" },
-    tooltip = L["Mittlere Maustaste auf der Minimap öffnet an der Maus ein kleines stray-Menü: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche sowie Kalender, Verfolgung, Weltkarte und, falls eingeschaltet, Twinks. "
+    tooltip = L["Mittlere Maustaste auf der Minimap öffnet an der Maus ein kleines stray-Menü mit allen Blizzard-Fenstern, die es auf Forever gibt: Charakter, Zauberbuch, Talente, Berufe, Vermächtnis, Questlog, Wohnen, Freunde, Gilde, Gruppensuche, Sammlung und Abenteuerführer sowie Kalender, Verfolgung, Weltkarte und, falls eingeschaltet, Twinks. Was Blizzard gerade sperrt, fehlt; grau heißt: im Moment abgeschaltet. "
         .. "Dasselbe Menü öffnet der Kartenmenü-Knopf oben links in der Karte.\n\n"
         .. "Der Mittelklick pingt nicht: stray fängt nur die mittlere Taste ab, Links- und Rechtsklick sowie Mausrad gehen wie gewohnt an die Karte. "
         .. "Im Kampf geht das Menü nicht auf, dann kommt ein Hinweis im Chat. Schließen per Klick daneben, zweitem Mittelklick oder Esc."],
@@ -2397,7 +2458,7 @@ ns.AddOption(3, SECTION, {
         .. "Freunde: Zahl der Freunde online, Liste im Tooltip, Linksklick öffnet die Freundesliste.\n"
         .. "Addon-Tasche: sammelt die Minimap-Knöpfe anderer Addons und klappt sie per Klick auf "
         .. "(verträgt sich nicht mit Leatrix „Hide addon buttons“).\n"
-        .. "Oben links in der Minimap sitzt ein kleines Kartenmenü (Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte). Bei der eckigen Minimap ist es immer da, auch ohne diese Spalte.\n\n"
+        .. "Oben links in der Minimap sitzt ein kleines Kartenmenü (dasselbe Menü wie per Mittelklick: alle Blizzard-Fenster, Kalender, Verfolgung, Weltkarte). Bei der eckigen Minimap ist es immer da, auch ohne diese Spalte.\n\n"
         .. "Die Spalte steht rechts neben der Minimap, am rechten Bildschirmrand links davon. "
         .. "Bei der eckigen Minimap sitzt sie links bündig daran."],
     isEnabled = MainOn,

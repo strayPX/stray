@@ -133,19 +133,20 @@ end
 -- Tastenkürzel kurz schreiben
 ---------------------------------------------------------------------------
 
+-- Dritter Eintrag true: Kürzel ist ein deutscher Sprachschlüssel, wird beim Anzeigen übersetzt
 local KEY_SHORT = {
     { "ALT%-", "A" }, { "CTRL%-", "C" }, { "SHIFT%-", "S" }, { "META%-", "M" },
     { "MOUSEWHEELUP", "WU" }, { "MOUSEWHEELDOWN", "WD" }, { "MIDDLEBUTTON", "M3" }, { "BUTTON", "M" },
     { "NUMPADPLUS", "N+" }, { "NUMPADMINUS", "N-" }, { "NUMPADMULTIPLY", "N*" },
     { "NUMPADDIVIDE", "N/" }, { "NUMPADDECIMAL", "N," }, { "NUMPAD", "N" },
     { "PAGEUP", "PU" }, { "PAGEDOWN", "PD" }, { "BACKSPACE", "Bks" }, { "SPACE", "Spc" },
-    { "INSERT", "Ins" }, { "DELETE", "Del" }, { "HOME", L["Pos1"] }, { "CAPSLOCK", "Caps" },
+    { "INSERT", "Ins" }, { "DELETE", "Del" }, { "HOME", "Pos1", true }, { "CAPSLOCK", "Caps" },
 }
 
 local function ShortKey(key)
     if type(key) ~= "string" or key == "" then return "" end
     local s = key:upper()
-    for _, pair in ipairs(KEY_SHORT) do s = s:gsub(pair[1], pair[2]) end
+    for _, pair in ipairs(KEY_SHORT) do s = s:gsub(pair[1], pair[3] and L[pair[2]] or pair[2]) end
     return s
 end
 
@@ -639,7 +640,7 @@ local function CreateButton(bar, l, i)
     b.empty = b:CreateTexture(nil, "BACKGROUND", nil, 1)
     b.empty:SetPoint("TOPLEFT", 1, -1)
     b.empty:SetPoint("BOTTOMRIGHT", -1, 1)
-    b.empty:SetColorTexture(0.08, 0.09, 0.11, 0.6)
+    b.empty:SetColorTexture(0.094, 0.094, 0.118, 0.6) -- ns.Colors.card
 
     -- Dünner Rand für dauerhaft gezeigte leere Plätze („Leere Plätze immer zeigen“)
     b.emptyEdge = MakeEdges(b, "BACKGROUND", 2)
@@ -1246,6 +1247,13 @@ function ns.ActionBarsToggled()
     end
     if blizzardHidden then
         ns.Print(L["Blizzards Aktionsleisten kommen nach /reload zurück."])
+        -- Texte beim Anzeigen holen, damit sie der gewählten Sprache folgen
+        local dialog = StaticPopupDialogs["STRAY_AB_RELOAD"]
+        if dialog then
+            dialog.text = L["stray: Blizzards Aktionsleisten kommen erst nach dem Neuladen zurück.\nJetzt neu laden?"]
+            dialog.button1 = L["Neu laden"]
+            dialog.button2 = L["Später"]
+        end
         StaticPopup_Show("STRAY_AB_RELOAD")
     end
 end

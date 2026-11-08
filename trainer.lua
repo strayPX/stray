@@ -17,12 +17,21 @@ local L = ns.L
 ns.defaults.trainerLearnAll = false
 
 local FONT = "Fonts\\ARIALN.TTF"
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz gleicher Werte, falls die Tabelle fehlt)
+local PALETTE = type(ns.Colors) == "table" and ns.Colors or {}
+local function Col(key, fallback)
+    local c = PALETTE[key]
+    if type(c) == "table" and type(c[1]) == "number" then return c end
+    return fallback
+end
+
 local C = {
-    bg     = { 0.051, 0.067, 0.090, 0.95 },
-    border = { 0.169, 0.290, 0.451, 1 },
-    accent = { 0.353, 0.659, 1.000, 1 },
-    text   = { 0.890, 0.914, 0.953, 1 },
-    dim    = { 0.435, 0.525, 0.651, 1 },
+    bg     = Col("bg", { 0.078, 0.078, 0.098, 0.96 }),
+    border = Col("line", { 0.149, 0.149, 0.184, 1 }),
+    accent = Col("accent", { 0.545, 0.486, 0.965, 1 }),
+    accentText = Col("accentText", { 0.702, 0.659, 0.980, 1 }),
+    text   = Col("text", { 0.902, 0.902, 0.925, 1 }),
+    dim    = Col("textDim", { 0.545, 0.545, 0.600, 1 }),
 }
 
 local button
@@ -183,7 +192,7 @@ local function CreateButton()
         if #plan == 0 then
             GameTooltip:AddLine(L["Gerade gibt es nichts zu lernen."], C.dim[1], C.dim[2], C.dim[3])
         else
-            GameTooltip:AddDoubleLine(L["Summe"], ShortMoney(total), C.accent[1], C.accent[2], C.accent[3], 1, 0.82, 0)
+            GameTooltip:AddDoubleLine(L["Summe"], ShortMoney(total), C.accentText[1], C.accentText[2], C.accentText[3], 1, 0.82, 0)
         end
         if tooExpensive > 0 then
             GameTooltip:AddLine(L("%d weitere: zu wenig Gold", tooExpensive), 1, 0.3, 0.3)

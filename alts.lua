@@ -13,13 +13,22 @@ local FONT_BODY = "Fonts\\ARIALN.TTF"
 local ROW_H = 18
 local MAX_ROWS = 30
 
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz gleicher Werte, falls die Tabelle fehlt)
+local PALETTE = type(ns.Colors) == "table" and ns.Colors or {}
+local function Col(key, fallback)
+    local c = PALETTE[key]
+    if type(c) == "table" and type(c[1]) == "number" then return c end
+    return fallback
+end
+
 local C = {
-    bg      = { 0.05, 0.067, 0.09, 0.95 },
-    head    = { 0.08, 0.105, 0.14, 1 },
-    border  = { 0.169, 0.290, 0.451, 1 },
-    accent  = { 0.353, 0.659, 1.0, 1 },
-    text    = { 0.89, 0.914, 0.953, 1 },
-    textDim = { 0.435, 0.525, 0.651, 1 },
+    bg      = Col("bg", { 0.078, 0.078, 0.098, 0.96 }),
+    head    = Col("card", { 0.094, 0.094, 0.118, 1 }),
+    border  = Col("line", { 0.149, 0.149, 0.184, 1 }),
+    accent  = Col("accent", { 0.545, 0.486, 0.965, 1 }),
+    accentText = Col("accentText", { 0.702, 0.659, 0.980, 1 }),
+    text    = Col("text", { 0.902, 0.902, 0.925, 1 }),
+    textDim = Col("textDim", { 0.545, 0.545, 0.600, 1 }),
 }
 
 -- Spalten: Schlüssel, Überschrift, Breite, Ausrichtung
@@ -339,13 +348,11 @@ do
     Border(frame, C.border)
 end
 
-local title = Text(frame, 14, C.accent)
+local title = Text(frame, 14, C.accentText)
 title:SetPoint("TOPLEFT", PAD, -9)
-title:SetText(L["Twink-Übersicht"])
 
 local subtitle = Text(frame, 11, C.textDim)
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
-subtitle:SetText(L["Rechtsklick auf eine Zeile entfernt den Eintrag. Ziehen verschiebt das Fenster."])
 
 local close = CreateFrame("Button", nil, frame)
 close:SetSize(20, 20)
@@ -383,13 +390,11 @@ local function MakeCells(parent, size, color)
     return cells
 end
 
-local headerCells = MakeCells(header, 12, C.accent)
-for _, col in ipairs(COLUMNS) do headerCells[col.key]:SetText(L[col.label]) end
+local headerCells = MakeCells(header, 12, C.accentText)
 
 local rows = {}
 local emptyText = Text(frame, 12, C.textDim)
 emptyText:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 4, -8)
-emptyText:SetText(L["Noch keine Twinks erfasst. Schalte „Twinks erfassen“ ein und logge deine Charaktere einmal ein."])
 emptyText:SetWidth(tableWidth - 8)
 emptyText:SetWordWrap(true)
 emptyText:SetJustifyH("LEFT")
@@ -407,7 +412,21 @@ do
 end
 local footerCells = MakeCells(footer, 12, C.text)
 
+-- Feste Texte erst beim Anzeigen setzen, damit sie der gewählten Sprache folgen
+local function ApplyTexts()
+    title:SetText(L["Twink-Übersicht"])
+    subtitle:SetText(L["Rechtsklick auf eine Zeile entfernt den Eintrag. Ziehen verschiebt das Fenster."])
+    for _, col in ipairs(COLUMNS) do headerCells[col.key]:SetText(L[col.label]) end
+    emptyText:SetText(L["Noch keine Twinks erfasst. Schalte „Twinks erfassen“ ein und logge deine Charaktere einmal ein."])
+end
+
 local function AskRemove(key)
+    local dialog = StaticPopupDialogs["STRAY_ALT_REMOVE"]
+    if dialog then
+        dialog.text = L["Twink „%s“ aus der Übersicht entfernen?"]
+        dialog.button1 = L["Entfernen"]
+        dialog.button2 = L["Abbrechen"]
+    end
     StaticPopup_Show("STRAY_ALT_REMOVE", key, nil, key)
 end
 
@@ -543,6 +562,7 @@ end
 
 frame:SetScript("OnShow", function(self)
     ns.RestorePosition(self)
+    pcall(ApplyTexts)
     local ok, err = pcall(Refresh)
     if not ok then geterrorhandler()(err) end
 end)
@@ -553,9 +573,10 @@ function ns.ToggleAlts()
 end
 
 StaticPopupDialogs["STRAY_ALT_REMOVE"] = {
+    -- Texte setzt AskRemove beim Anzeigen erneut (gewählte Sprache)
     text = L["Twink „%s“ aus der Übersicht entfernen?"],
     button1 = L["Entfernen"],
-    button2 = CANCEL or L["Abbrechen"],
+    button2 = L["Abbrechen"],
     OnAccept = function(self, data)
         local key = data or self.data
         local altData = Data()

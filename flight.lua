@@ -22,12 +22,19 @@ ns.defaults.flightRouteTimes = {} -- ["Start → Ziel"] = Sekunden
 
 local FONT = "Fonts\\ARIALN.TTF"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz mit gleichen Werten, falls die Tabelle fehlt)
+local COLORS = ns.Colors or {
+    bg = { 0.078, 0.078, 0.098, 0.96 }, card = { 0.094, 0.094, 0.118, 1 }, hover = { 0.122, 0.122, 0.153, 1 },
+    line = { 0.149, 0.149, 0.184, 1 }, accent = { 0.545, 0.486, 0.965, 1 }, accentText = { 0.702, 0.659, 0.980, 1 },
+    text = { 0.902, 0.902, 0.925, 1 }, textDim = { 0.545, 0.545, 0.600, 1 }, textFaint = { 0.369, 0.369, 0.420, 1 },
+}
 local C = {
-    bg     = { 0.051, 0.067, 0.090, 0.95 },
-    border = { 0.169, 0.290, 0.451, 1 },
-    accent = { 0.353, 0.659, 1.000, 1 },
-    text   = { 0.890, 0.914, 0.953, 1 },
-    dim    = { 0.435, 0.525, 0.651, 1 },
+    bg         = COLORS.bg,
+    border     = COLORS.line,
+    accent     = COLORS.accent,
+    accentText = COLORS.accentText,
+    text       = COLORS.text,
+    dim        = COLORS.textDim,
 }
 
 local WIDTH, HEIGHT = 260, 20
@@ -128,18 +135,18 @@ dest:SetPoint("RIGHT", timeText, "LEFT", -6, 0)
 
 bar:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:SetText(L["Flugzeit"], 1, 1, 1)
+    GameTooltip:SetText(L["Flugzeit"], C.accentText[1], C.accentText[2], C.accentText[3])
     if flight then
         GameTooltip:AddLine(flight.from .. ARROW .. flight.to, C.text[1], C.text[2], C.text[3], true)
         if flight.known then
-            GameTooltip:AddLine(L("Gemessene Dauer: %s", FormatTime(flight.known)), C.accent[1], C.accent[2], C.accent[3])
+            GameTooltip:AddLine(L("Gemessene Dauer: %s", FormatTime(flight.known)), C.accentText[1], C.accentText[2], C.accentText[3])
         else
             GameTooltip:AddLine(L["Diese Strecke wird gerade zum ersten Mal gemessen."], C.dim[1], C.dim[2], C.dim[3], true)
         end
     else
         GameTooltip:AddLine(L["Zeigt Ziel und Restzeit, solange du fliegst. Unbekannte Strecken misst stray beim ersten Flug."], C.text[1], C.text[2], C.text[3], true)
     end
-    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
+    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], C.dim[1], C.dim[2], C.dim[3])
     GameTooltip:Show()
 end)
 bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -288,7 +295,7 @@ local function AddTimeLine(slot)
     local times = Times()
     local seconds = times and tonumber(times[from .. ARROW .. to])
     if seconds then
-        GameTooltip:AddLine(L("Flugzeit: %s", FormatTime(seconds)), C.accent[1], C.accent[2], C.accent[3])
+        GameTooltip:AddLine(L("Flugzeit: %s", FormatTime(seconds)), C.accentText[1], C.accentText[2], C.accentText[3])
     else
         GameTooltip:AddLine(L["Flugzeit: noch nicht gemessen"], C.dim[1], C.dim[2], C.dim[3])
     end

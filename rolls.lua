@@ -16,12 +16,21 @@ local L = ns.L
 ns.defaults.rollsMove = false
 
 local FONT = "Fonts\\ARIALN.TTF"
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz gleicher Werte, falls die Tabelle fehlt)
+local PALETTE = type(ns.Colors) == "table" and ns.Colors or {}
+local function Col(key, fallback)
+    local c = PALETTE[key]
+    if type(c) == "table" and type(c[1]) == "number" then return c end
+    return fallback
+end
+
 local C = {
-    bg     = { 0.051, 0.067, 0.090, 0.95 },
-    border = { 0.169, 0.290, 0.451, 1 },
-    accent = { 0.353, 0.659, 1.000, 1 },
-    text   = { 0.890, 0.914, 0.953, 1 },
-    dim    = { 0.435, 0.525, 0.651, 1 },
+    bg     = Col("bg", { 0.078, 0.078, 0.098, 0.96 }),
+    border = Col("line", { 0.149, 0.149, 0.184, 1 }),
+    accent = Col("accent", { 0.545, 0.486, 0.965, 1 }),
+    accentText = Col("accentText", { 0.702, 0.659, 0.980, 1 }),
+    text   = Col("text", { 0.902, 0.902, 0.925, 1 }),
+    dim    = Col("textDim", { 0.545, 0.545, 0.600, 1 }),
 }
 
 local holder = CreateFrame("Frame", "strayRolls", UIParent)
@@ -47,14 +56,17 @@ do
     end
     local title = sample:CreateFontString(nil, "OVERLAY")
     title:SetFont(FONT, 13, "")
-    title:SetTextColor(C.accent[1], C.accent[2], C.accent[3])
+    title:SetTextColor(C.accentText[1], C.accentText[2], C.accentText[3])
     title:SetPoint("TOP", 0, -14)
-    title:SetText(L["Würfelfenster"])
     local hint = sample:CreateFontString(nil, "OVERLAY")
     hint:SetFont(FONT, 11, "")
     hint:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     hint:SetPoint("TOP", title, "BOTTOM", 0, -6)
-    hint:SetText(L["Bedarf / Gier erscheint hier, weitere darüber"])
+    -- Texte beim Anzeigen setzen, damit sie der gewählten Sprache folgen
+    sample:SetScript("OnShow", function()
+        title:SetText(L["Würfelfenster"])
+        hint:SetText(L["Bedarf / Gier erscheint hier, weitere darüber"])
+    end)
 end
 sample:Hide()
 holder:SetScript("OnEnter", function(self)

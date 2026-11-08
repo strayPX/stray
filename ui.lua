@@ -1,30 +1,40 @@
 -- stray – Einstellungsfenster „Zentrale“
 -- Flaches, dunkles Fenster mit ruhigem Lila: links Logo, Suche und Seiten in Gruppen (mit eigenen
--- Symbolen und Zähler an/gesamt), rechts Kopf mit Hauptschalter, Bereiche als Karten in zwei Spalten
--- und eine Fußzeile mit ungespeicherten Änderungen, Verwerfen, Bearbeitungsmodus und Neu laden.
+-- Symbolen und Zähler an/gesamt), rechts Kopf mit Hauptschalter und Knopf „Bearbeitungsmodus“,
+-- Bereiche als Karten (zwei Spalten, schmal eine) und eine Fußzeile mit ungespeicherten Änderungen,
+-- Verwerfen und Neu laden. Das Fenster lässt sich unten rechts in der Größe ziehen.
 -- Die Optionen kommen aus dem Register in stray.lua (ns.AddOption); die Spaltennummer dort stammt
--- aus dem alten Fenster und wird hier nicht gebraucht.
+-- aus dem alten Fenster und wird hier nicht gebraucht. Optionszeilen zeigen nur den Namen, die
+-- Beschreibung steht im Tooltip. Optionstexte werden beim Laden in der Client-Sprache aufgelöst und
+-- hier über ns.T in die gewählte Sprache gebracht.
 -- Beim Öffnen merkt sich das Fenster eine Kopie der Einstellungen. Beim Schließen mit Änderungen
 -- fragt ein Dialog: Neu laden (behalten) oder Verwerfen (Stand beim Öffnen wiederherstellen).
--- Symbole in media/icons: Tabler Icons (MIT-Lizenz, tabler.io).
+-- Symbole in media/icons: Tabler Icons (MIT-Lizenz, tabler.io); „meditation“ ist eigenes stray-Symbol
+-- im gleichen Stil. media/logo: stray-Siegel.
 
 local _, ns = ...
 local L = ns.L
+local T = ns.T or function(text) return text end
 
 ---------------------------------------------------------------------------
 -- Maße und Farben
 ---------------------------------------------------------------------------
 
-local WIDTH, HEIGHT = 900, 570
+local WIDTH, HEIGHT = 900, 570  -- Standardgröße (Doppelklick auf den Griff)
+local MIN_W, MIN_H = 760, 480   -- kleinste Größe (Höhe mindestens so, dass die Navigation passt)
 local SIDE_W = 210
 local HEAD_H = 96          -- Kopfbereich rechts
 local FOOT_H = 60          -- Fußzeile rechts
-local SCROLL_W = 644       -- Breite des Inhalts (zwei Spalten)
+local SCROLL_L, SCROLL_R = 18, 26 -- Abstand des Inhalts links/rechts im Inhaltsbereich
+local SCROLL_W = 644       -- Breite des Inhalts; folgt der Fenstergröße (UpdateMetrics)
 local COL_GAP = 12
+local TWO_COLS_MIN = 600   -- ab dieser Inhaltsbreite zwei Spalten, darunter eine
+local COLS = 2
 local COL_W = (SCROLL_W - COL_GAP) / 2
-local CARD_HEAD = 36       -- Kartenkopf
-local CARD_PAD = 6         -- Luft unter der letzten Zeile
+local CARD_HEAD = 34       -- Kartenkopf
+local CARD_PAD = 4         -- Luft unter der letzten Zeile
 local PAD = 12             -- Innenabstand in Karten
+local ROW_H = 30           -- Optionszeile (nur Name + Bedienelement)
 local WHEEL_STEP = 40
 
 local MEDIA = "Interface\\AddOns\\stray\\media\\"
@@ -32,16 +42,18 @@ local ICONS = MEDIA .. "icons\\"
 local ROUND = MEDIA .. "round"
 local FONT = "Fonts\\ARIALN.TTF"
 
+-- Grundfarben aus ns.Colors (stray.lua), dazu ein paar nur hier gebrauchte
+local NC = ns.Colors or {}
 local C = {
-    window   = { 0.078, 0.078, 0.098, 0.98 },  -- #141419
-    card     = { 0.094, 0.094, 0.118, 1 },     -- #18181e
-    hover    = { 0.122, 0.122, 0.153, 1 },     -- #1f1f27
-    line     = { 0.149, 0.149, 0.184, 1 },     -- #26262f
-    accent   = { 0.545, 0.486, 0.965, 1 },     -- #8b7cf6
+    window   = NC.bg or { 0.078, 0.078, 0.098, 0.96 },     -- #141419
+    card     = NC.card or { 0.094, 0.094, 0.118, 1 },      -- #18181e
+    hover    = NC.hover or { 0.122, 0.122, 0.153, 1 },     -- #1f1f27
+    line     = NC.line or { 0.149, 0.149, 0.184, 1 },      -- #26262f
+    accent   = NC.accent or { 0.545, 0.486, 0.965, 1 },    -- #8b7cf6
     accentHi = { 0.612, 0.557, 0.976, 1 },
-    text     = { 0.902, 0.902, 0.925, 1 },     -- #e6e6ec
-    grey     = { 0.545, 0.545, 0.600, 1 },     -- #8b8b99
-    faint    = { 0.369, 0.369, 0.420, 1 },     -- #5e5e6b
+    text     = NC.text or { 0.902, 0.902, 0.925, 1 },      -- #e6e6ec
+    grey     = NC.textDim or { 0.545, 0.545, 0.600, 1 },   -- #8b8b99
+    faint    = NC.textFaint or { 0.369, 0.369, 0.420, 1 }, -- #5e5e6b
     off      = { 0.169, 0.169, 0.208, 1 },     -- Schalter aus
     red      = { 0.878, 0.478, 0.478, 1 },
     amber    = { 0.961, 0.682, 0.290, 1 },
@@ -51,7 +63,7 @@ local C = {
 -- Seiten in Gruppen; die Bereiche der Module (ns.AddOption) werden auf einer Seite zu Karten
 local GROUPS = {
     { label = "ALLTAG", pages = {
-        { name = "Komfort", icon = "coins", sections = { "Beute", "Händler", "NPCs", "Filmsequenzen", "Chat" } },
+        { name = "Komfort", icon = "meditation", sections = { "Beute", "Händler", "NPCs", "Filmsequenzen", "Chat" } },
         { name = "Taschen", icon = "backpack", sections = { "Taschen", "Vorrat" } },
         { name = "Quests", icon = "exclamation-circle", sections = { "Quests" } },
     } },
@@ -120,7 +132,6 @@ local KEYWORDS = {
     bagTriage = { "bags", "voll", "full", "inventar", "inventory", "aufräumen" },
     bagWindow = { "bags", "bag", "inventar", "inventory", "rucksack", "sortieren", "sort" },
     bagColumns = { "bags", "spalten", "columns", "inventar", "breite" },
-    bagHeightReset = { "bags", "höhe", "height", "inventar" },
     supplies = { "supplies", "vorrat", "erinnerung", "reminder", "reagenzien" },
     supReagents = { "reagenzien", "reagents", "vorrat" },
     supAmmo = { "ammo", "munition", "pfeile", "arrows", "kugeln", "bullets", "jäger", "hunter" },
@@ -326,14 +337,16 @@ local function MakeButton(parent, label, style, height)
     return b
 end
 
--- Tooltip an einem Knopf zusätzlich zur Hover-Farbe
+-- Tooltip an einem Knopf zusätzlich zur Hover-Farbe. title/body: deutscher Schlüssel (wird erst beim
+-- Anzeigen übersetzt) oder Funktion, die den fertigen Text liefert
 local function ButtonTooltip(b, title, body)
     local onEnter = b:GetScript("OnEnter")
     b:SetScript("OnEnter", function(self)
         onEnter(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(type(title) == "function" and title() or title, 1, 1, 1)
-        local text = type(body) == "function" and body() or body
+        GameTooltip:SetText(type(title) == "function" and title() or L[title], 1, 1, 1)
+        local text
+        if type(body) == "function" then text = body() elseif body then text = L[body] end
         if text then GameTooltip:AddLine(text, ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true) end
         GameTooltip:Show()
     end)
@@ -365,21 +378,6 @@ local function MakeSwitch(parent)
     return s
 end
 
--- Kurzbeschreibung: erster Satz des Tooltips (Abkürzungen wie „z. B.“ überspringen)
-local function ShortDesc(option)
-    if option.desc then return option.desc end
-    local text = (option.tooltip or ""):match("^[^\n]*") or ""
-    local start = 1
-    while true do
-        local pos = text:find("[%.!%?] ", start)
-        if not pos then return text end
-        local before = text:sub(math.max(1, pos - 2), pos - 1)
-        local abbreviation = before:match("^[%s%.]%a$") or before:match("^%a$")
-        if pos > 25 and not abbreviation then return text:sub(1, pos) end
-        start = pos + 1
-    end
-end
-
 -- Kleinbuchstaben inklusive Umlaute (string.lower kennt nur ASCII)
 local function Lower(s)
     s = tostring(s or ""):lower()
@@ -409,17 +407,22 @@ frame:SetFrameStrata("DIALOG")
 frame:SetToplevel(true)
 frame:SetClampedToScreen(true)
 frame:SetMovable(true)
+frame:SetResizable(true)
 frame:EnableMouse(true)
 frame:RegisterForDrag("LeftButton")
 frame:Hide()
 
 Panel(frame, 12, C.window, C.line, "BACKGROUND")
 
+local function SavePoint(self)
+    local point, _, relPoint, x, y = self:GetPoint()
+    if point and ns.db then ns.db.point = { point, relPoint, x, y } end
+end
+
 frame:SetScript("OnDragStart", frame.StartMoving)
 frame:SetScript("OnDragStop", function(self)
     self:StopMovingOrSizing()
-    local point, _, relPoint, x, y = self:GetPoint()
-    ns.db.point = { point, relPoint, x, y }
+    SavePoint(self)
 end)
 
 -- Trennlinie zwischen Navigation und Inhalt
@@ -437,16 +440,14 @@ side:SetPoint("TOPLEFT", 0, 0)
 side:SetPoint("BOTTOMLEFT", 0, 0)
 side:SetWidth(SIDE_W)
 
-local logoTile = CreateFrame("Frame", nil, side)
-logoTile:SetSize(30, 30)
-logoTile:SetPoint("TOPLEFT", 16, -18)
-RoundRect(logoTile, 8, C.accent, "BACKGROUND")
-local logoS = Text(logoTile, 19, C.white)
-logoS:SetPoint("CENTER", 0, 1)
-logoS:SetText("s")
+-- Logo: stray-Siegel (Sechseck mit lila s)
+local logo = side:CreateTexture(nil, "ARTWORK")
+logo:SetSize(34, 34)
+logo:SetPoint("TOPLEFT", 14, -16)
+logo:SetTexture(MEDIA .. "logo")
 
 local logoName = Text(side, 17, C.white)
-logoName:SetPoint("TOPLEFT", logoTile, "TOPRIGHT", 10, 1)
+logoName:SetPoint("TOPLEFT", logo, "TOPRIGHT", 9, -2)
 logoName:SetText("stray")
 
 local versionText = Text(side, 10, C.faint)
@@ -485,6 +486,8 @@ groupLine:SetPoint("TOPLEFT", 22, -22)
 
 local title = Text(content, 24, C.white)
 title:SetPoint("TOPLEFT", groupLine, "BOTTOMLEFT", 0, -6)
+title:SetPoint("RIGHT", content, "RIGHT", -190, 0)
+title:SetWordWrap(false)
 
 local subtitle = Text(content, 12, C.grey)
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -6)
@@ -516,6 +519,12 @@ close:SetScript("OnLeave", function()
     closeIcon:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1)
 end)
 
+-- Knopf „Bearbeitungsmodus“ oben rechts neben dem Schließen
+local editButton = MakeButton(content, L["Bearbeitungsmodus"], "dark", 24)
+editButton.text:SetFont(FONT, 12, "")
+editButton:SetLabel(L["Bearbeitungsmodus"])
+editButton:SetPoint("TOPRIGHT", -40, -9)
+
 -- Hauptschalter „Modul aktiv“
 local master = CreateFrame("Frame", nil, content)
 master:SetSize(130, 22)
@@ -532,8 +541,8 @@ master:Hide()
 ---------------------------------------------------------------------------
 
 local scroll = CreateFrame("ScrollFrame", nil, content)
-scroll:SetPoint("TOPLEFT", 18, -(HEAD_H + 14))
-scroll:SetPoint("BOTTOMRIGHT", -26, FOOT_H + 10)
+scroll:SetPoint("TOPLEFT", SCROLL_L, -(HEAD_H + 14))
+scroll:SetPoint("BOTTOMRIGHT", -SCROLL_R, FOOT_H + 10)
 scroll:EnableMouseWheel(true)
 
 local scrollChild = CreateFrame("Frame", nil, scroll)
@@ -673,13 +682,98 @@ local footText = Text(content, 13, C.grey)
 footText:SetPoint("LEFT", footDot, "RIGHT", 8, 0)
 
 local applyButton = MakeButton(content, L["Übernehmen & neu laden"], "primary")
-applyButton:SetPoint("BOTTOMRIGHT", -18, (FOOT_H - 30) / 2)
-
-local editButton = MakeButton(content, L["Bearbeitungsmodus"], "dark")
-editButton:SetPoint("RIGHT", applyButton, "LEFT", -8, 0)
+applyButton:SetPoint("BOTTOMRIGHT", -22, (FOOT_H - 30) / 2)
 
 local discardButton = MakeButton(content, L["Verwerfen"], "dark")
-discardButton:SetPoint("RIGHT", editButton, "LEFT", -8, 0)
+discardButton:SetPoint("RIGHT", applyButton, "LEFT", -8, 0)
+
+footText:SetPoint("RIGHT", discardButton, "LEFT", -12, 0)
+footText:SetWordWrap(false)
+
+---------------------------------------------------------------------------
+-- Größe ziehen: Griff unten rechts
+---------------------------------------------------------------------------
+
+local navBottom = 0 -- unterste Kante der Navigation (nach BuildNav), bestimmt die Mindesthöhe
+
+local function ScreenSize()
+    local w = UIParent and UIParent:GetWidth() or 0
+    local h = UIParent and UIParent:GetHeight() or 0
+    if w < MIN_W then w = 4000 end
+    if h < MIN_H then h = 4000 end
+    return w, h
+end
+
+local function MinHeight()
+    return math.max(MIN_H, math.ceil(navBottom + 12))
+end
+
+local function UpdateResizeBounds()
+    local maxW, maxH = ScreenSize()
+    local minH = math.min(MinHeight(), maxH)
+    if frame.SetResizeBounds then
+        frame:SetResizeBounds(MIN_W, minH, maxW, maxH)
+    else
+        if frame.SetMinResize then frame:SetMinResize(MIN_W, minH) end
+        if frame.SetMaxResize then frame:SetMaxResize(maxW, maxH) end
+    end
+end
+
+-- Größe in die Grenzen bringen und setzen
+local function ApplySize(w, h)
+    local maxW, maxH = ScreenSize()
+    w = math.max(MIN_W, math.min(maxW, tonumber(w) or WIDTH))
+    h = math.max(math.min(MinHeight(), maxH), math.min(maxH, tonumber(h) or HEIGHT))
+    frame:SetSize(math.floor(w + 0.5), math.floor(h + 0.5))
+end
+
+local grip = CreateFrame("Button", nil, frame)
+grip:SetSize(16, 16)
+grip:SetPoint("BOTTOMRIGHT", -3, 3)
+grip:SetFrameLevel(frame:GetFrameLevel() + 20)
+grip:RegisterForClicks("LeftButtonUp")
+local gripTex = grip:CreateTexture(nil, "OVERLAY")
+gripTex:SetAllPoints()
+gripTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+gripTex:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1)
+grip:SetScript("OnEnter", function(self)
+    gripTex:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText(L["Größe ändern"], 1, 1, 1)
+    GameTooltip:AddLine(L["Ziehen: Fenster größer oder kleiner.\nDoppelklick: Standardgröße."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:Show()
+end)
+grip:SetScript("OnLeave", function(self)
+    if not self.sizing then gripTex:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1) end
+    GameTooltip:Hide()
+end)
+grip:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" then return end
+    UpdateResizeBounds()
+    self.sizing = true
+    GameTooltip:Hide()
+    frame:StartSizing("BOTTOMRIGHT")
+end)
+local function StopSizing(self)
+    if not self.sizing then return end
+    self.sizing = false
+    frame:StopMovingOrSizing()
+    if not self:IsMouseOver() then gripTex:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1) end
+    if ns.db then
+        ns.db.uiSize = { math.floor(frame:GetWidth() + 0.5), math.floor(frame:GetHeight() + 0.5) }
+    end
+    SavePoint(frame)
+end
+grip:SetScript("OnMouseUp", StopSizing)
+grip:SetScript("OnHide", StopSizing)
+grip:SetScript("OnDoubleClick", function()
+    -- nach dem Loslassen auf Standardgröße (StopMovingOrSizing des zweiten Klicks ist dann durch)
+    C_Timer.After(0, function()
+        ApplySize(WIDTH, HEIGHT)
+        if ns.db then ns.db.uiSize = nil end
+        SavePoint(frame)
+    end)
+end)
 
 ---------------------------------------------------------------------------
 -- Bereiche aus dem Register sammeln
@@ -788,7 +882,7 @@ end
 
 -- Laufende Daten (keine Einstellungen): zählen nicht als Änderung und werden nie zurückgesetzt
 local DATA_KEYS = {
-    point = true, altData = true, accountCVarData = true, flightRouteTimes = true,
+    point = true, uiSize = true, altData = true, accountCVarData = true, flightRouteTimes = true,
     mailAltList = true, playerNoteData = true, xpHistory = true,
 }
 local function IsDataKey(key)
@@ -1015,9 +1109,12 @@ local function ShowTooltip(row)
     local option = row.option
     if not option then return end
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-    GameTooltip:SetText(option.label, 1, 1, 1)
+    GameTooltip:SetText(T(option.label), 1, 1, 1)
+    -- Die Beschreibung steht nur hier (die Zeile zeigt nur den Namen)
     if option.tooltip then
-        GameTooltip:AddLine(option.tooltip, ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+        GameTooltip:AddLine(T(option.tooltip), ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    elseif option.desc then
+        GameTooltip:AddLine(T(option.desc), ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
     end
     if option.type == "slider" then
         GameTooltip:AddLine(L["Mausrad mit gedrückter Umschalttaste verstellt den Regler."], C.grey[1], C.grey[2], C.grey[3], true)
@@ -1025,7 +1122,10 @@ local function ShowTooltip(row)
         GameTooltip:AddLine(L["Linksklick: weiter, Rechtsklick: zurück."], C.grey[1], C.grey[2], C.grey[3], true)
     end
     if not OptionEnabled(option) and option.disabledHint then
-        GameTooltip:AddLine(option.disabledHint, 1, 0.3, 0.3, true)
+        GameTooltip:AddLine(T(option.disabledHint), 1, 0.3, 0.3, true)
+    end
+    if option.key == "language" then
+        GameTooltip:AddLine(L["Umschalten zählt als Änderung: „Übernehmen & neu laden“ setzt die Sprache um."], C.grey[1], C.grey[2], C.grey[3], true)
     end
     GameTooltip:Show()
 end
@@ -1048,7 +1148,7 @@ local function ShowPreview(option, row)
         preview:SetPoint("CENTER", scroll, "CENTER")
     end
     previewImage:SetTexture(MEDIA .. option.preview)
-    previewCaption:SetText(L("Beispielbild: %s", option.label or ""))
+    previewCaption:SetText(L("Beispielbild: %s", T(option.label) or ""))
     preview:Show()
 end
 
@@ -1070,8 +1170,6 @@ local function CreateRow()
 
     row.label = Text(row, 13, C.text)
     row.label:SetWordWrap(false)
-    row.desc = Text(row, 11, C.grey)
-    row.desc:SetWordWrap(false)
 
     -- Schalter
     local switch = MakeSwitch(row)
@@ -1210,7 +1308,7 @@ local function GetRow(i)
 end
 
 local function ChoiceLabel(option, i)
-    return option.labels and option.labels[i] or tostring(option.values[i])
+    return option.labels and T(option.labels[i]) or tostring(option.values[i])
 end
 
 -- Segmentknöpfe füllen; gibt die Gesamtbreite zurück
@@ -1255,25 +1353,17 @@ local function FillSegments(row, option, enabled)
     return x
 end
 
--- Zeile füllen und anordnen; gibt die Zeilenhöhe zurück
+-- Zeile füllen und anordnen; gibt die Zeilenhöhe zurück.
+-- Die Zeile zeigt nur den Namen und das Bedienelement; die Beschreibung (und ein Hinweis, warum eine
+-- Option ausgegraut ist) steht im Tooltip.
 local function FillRow(row, option, width, isFirst)
     local enabled = OptionEnabled(option)
     local inner = width - 2 * PAD
     row.option = option
     row.line:SetShown(not isFirst)
 
-    row.label:SetText(option.label)
+    row.label:SetText(T(option.label))
     SetTextColor(row.label, enabled and C.text or C.grey)
-    local desc
-    if not enabled and option.disabledHint then
-        desc = option.disabledHint
-        SetTextColor(row.desc, C.red)
-    else
-        desc = ShortDesc(option)
-        SetTextColor(row.desc, C.grey)
-    end
-    row.desc:SetText(desc or "")
-    local hasDesc = desc ~= nil and desc ~= ""
 
     local kind = option.type
     local values = option.values or {}
@@ -1287,26 +1377,15 @@ local function FillRow(row, option, width, isFirst)
     row.cycle:SetShown(false)
 
     row.label:ClearAllPoints()
-    row.desc:ClearAllPoints()
     row.slider:ClearAllPoints()
     row.slider.value:ClearAllPoints()
     row.choice:ClearAllPoints()
-    row.desc:Show()
 
-    -- Platz rechts für das Bedienelement
-    local function TextLeft(controlWidth, twoLines)
-        local right = -(PAD + controlWidth + 12)
-        if twoLines then
-            row.label:SetPoint("TOPLEFT", PAD, -9)
-            row.label:SetPoint("RIGHT", row, "RIGHT", right, 0)
-            row.desc:SetPoint("TOPLEFT", row.label, "BOTTOMLEFT", 0, -4)
-            row.desc:SetPoint("RIGHT", row, "RIGHT", right, 0)
-            return 48
-        end
+    -- Name links, Platz rechts für das Bedienelement
+    local function TextLeft(controlWidth)
         row.label:SetPoint("LEFT", PAD, 0)
-        row.label:SetPoint("RIGHT", row, "RIGHT", right, 0)
-        row.desc:Hide()
-        return 36
+        row.label:SetPoint("RIGHT", row, "RIGHT", -(PAD + controlWidth + 12), 0)
+        return ROW_H
     end
 
     if kind == "slider" then
@@ -1322,44 +1401,44 @@ local function FillRow(row, option, width, isFirst)
         slider:EnableMouse(enabled)
         slider:SetAlpha(enabled and 1 or 0.4)
         slider.value:SetAlpha(enabled and 1 or 0.4)
-        row.desc:Hide()
         local labelW = row.label:GetStringWidth() or 0
-        if labelW <= 118 and inner >= 250 then
+        -- breite Karten (eine Spalte) geben dem Namen mehr Platz
+        local nameW = inner >= 420 and 180 or 120
+        if labelW <= nameW - 2 and inner >= 250 then
             -- eine Zeile: Name · Regler · Wert
             row.label:SetPoint("LEFT", PAD, 0)
-            row.label:SetWidth(120)
-            slider:SetPoint("LEFT", row, "LEFT", PAD + 128, 0)
+            row.label:SetWidth(nameW)
+            slider:SetPoint("LEFT", row, "LEFT", PAD + nameW + 8, 0)
             slider:SetPoint("RIGHT", row, "RIGHT", -(PAD + 46), 0)
             slider.value:SetPoint("RIGHT", -PAD, 0)
-            return 36
+            return ROW_H
         end
         -- zwei Zeilen: Name und Wert oben, Regler darunter
-        row.label:SetPoint("TOPLEFT", PAD, -9)
+        row.label:SetPoint("TOPLEFT", PAD, -7)
         row.label:SetPoint("RIGHT", row, "RIGHT", -(PAD + 50), 0)
-        slider.value:SetPoint("TOPRIGHT", -PAD, -9)
-        slider:SetPoint("TOPLEFT", row, "TOPLEFT", PAD, -28)
+        slider.value:SetPoint("TOPRIGHT", -PAD, -7)
+        slider:SetPoint("TOPLEFT", row, "TOPLEFT", PAD, -24)
         slider:SetPoint("RIGHT", row, "RIGHT", -PAD, 0)
-        return 52
+        return 44
     elseif kind == "button" then
-        row.action:SetLabel(option.buttonText or option.label, 70)
+        row.action:SetLabel(T(option.buttonText or option.label), 70)
         row.action:SetActive(enabled)
-        return TextLeft(row.action:GetWidth(), hasDesc)
+        return TextLeft(row.action:GetWidth())
     elseif kind == "choice" then
         if #values > 0 and #values <= 6 then
             row.choice:Show()
             local w = FillSegments(row, option, enabled)
             local labelW = row.label:GetStringWidth() or 0
-            row.desc:Hide()
             if labelW + w + 16 <= inner then
                 row.choice:SetPoint("RIGHT", -PAD, 0)
                 row.label:SetPoint("LEFT", PAD, 0)
                 row.label:SetPoint("RIGHT", row, "RIGHT", -(PAD + w + 12), 0)
-                return 38
+                return ROW_H
             end
-            row.label:SetPoint("TOPLEFT", PAD, -9)
+            row.label:SetPoint("TOPLEFT", PAD, -7)
             row.label:SetPoint("RIGHT", row, "RIGHT", -PAD, 0)
-            row.choice:SetPoint("TOPLEFT", row, "TOPLEFT", PAD, -28)
-            return 60
+            row.choice:SetPoint("TOPLEFT", row, "TOPLEFT", PAD, -24)
+            return 52
         end
         -- viele Werte: Knopf mit dem aktuellen Wert
         row.cycle:Show()
@@ -1369,13 +1448,13 @@ local function FillRow(row, option, width, isFirst)
         end
         row.cycle:SetLabel(label ~= "" and label or tostring(current or "–"), 70)
         row.cycle:SetActive(enabled)
-        return TextLeft(row.cycle:GetWidth(), hasDesc)
+        return TextLeft(row.cycle:GetWidth())
     end
 
     -- Schalter
     row.switch:SetState(SafeGet(option) and true or false, enabled)
     local controlW = 32 + (option.preview and (row.previewButton:GetWidth() + 10) or 0)
-    return TextLeft(controlW, hasDesc)
+    return TextLeft(controlW)
 end
 
 ---------------------------------------------------------------------------
@@ -1390,13 +1469,15 @@ local function GetCard(i)
         card = CreateFrame("Frame", nil, scrollChild)
         card:SetFrameLevel(scrollChild:GetFrameLevel() + 1)
         Panel(card, 10, C.card, C.line, "BACKGROUND")
+        -- Überschrift mittig (bei der Suche mit Seitenname in grau), Zähler rechts
         card.name = Text(card, 14, C.white)
-        card.name:SetPoint("TOPLEFT", PAD, -12)
-        card.page = Text(card, 11, C.faint)
-        card.page:SetPoint("LEFT", card.name, "RIGHT", 8, 0)
+        card.name:SetPoint("TOPLEFT", PAD + 34, -11)
+        card.name:SetPoint("TOPRIGHT", -(PAD + 34), -11)
+        card.name:SetJustifyH("CENTER")
+        card.name:SetWordWrap(false)
         card.badge = CreateFrame("Frame", nil, card)
         card.badge:SetSize(20, 18)
-        card.badge:SetPoint("TOPRIGHT", -10, -10)
+        card.badge:SetPoint("TOPRIGHT", -8, -8)
         RoundRect(card.badge, 5, C.hover, "BACKGROUND")
         card.count = Text(card.badge, 11, C.accent)
         card.count:SetPoint("CENTER")
@@ -1417,9 +1498,22 @@ local function ClampScroll()
 end
 
 -- blocks: Liste von { name =, page = (nur bei der Suche), options = {…} }
+-- Inhaltsbreite und Spaltenzahl aus der Fenstergröße
+local function UpdateMetrics()
+    local w = (frame:GetWidth() or WIDTH) - SIDE_W - 1 - SCROLL_L - SCROLL_R
+    SCROLL_W = math.max(200, math.floor(w))
+    COLS = SCROLL_W >= TWO_COLS_MIN and 2 or 1
+    COL_W = COLS == 2 and math.floor((SCROLL_W - COL_GAP) / 2) or SCROLL_W
+    scrollChild:SetWidth(SCROLL_W)
+end
+
+local FAINT_HEX = string.format("%02x%02x%02x", math.floor(C.faint[1] * 255 + 0.5),
+    math.floor(C.faint[2] * 255 + 0.5), math.floor(C.faint[3] * 255 + 0.5))
+
 local function Layout(blocks)
+    UpdateMetrics()
     local colY = { 0, 0 }
-    local full = #blocks == 1
+    local full = #blocks == 1 or COLS == 1
     local r = 0
     for ci, block in ipairs(blocks) do
         local card = GetCard(ci)
@@ -1431,8 +1525,11 @@ local function Layout(blocks)
         card:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, -top)
         card:SetWidth(width)
         -- Bereichs- und Seitennamen bleiben deutsche Schlüssel, übersetzt wird erst hier
-        card.name:SetText(L[block.name])
-        card.page:SetText(block.page and ("· " .. L[block.page]) or "")
+        if block.page then
+            card.name:SetText(L[block.name] .. "  |cff" .. FAINT_HEX .. "· " .. L[block.page] .. "|r")
+        else
+            card.name:SetText(L[block.name])
+        end
         card.count:SetText(#block.options)
         card.badge:SetWidth(math.max(20, math.floor(card.count:GetStringWidth() + 12)))
 
@@ -1485,12 +1582,25 @@ local function SearchData(option)
     Add(option.keywords)
     Add(option.key and KEYWORDS[option.key])
     Add(SECTION_KEYWORDS[section])
+    -- Name, Beschreibung, Bereich und Seite jeweils deutsch und englisch, damit beides gefunden wird
+    local EN = ns.LocaleEN or {}
+    local function Both(text)
+        if type(text) ~= "string" or text == "" then return "" end
+        if ns.TBoth then
+            local de, en = ns.TBoth(text)
+            return de .. " " .. en
+        end
+        return text
+    end
+    local function BothKey(key) -- deutscher Schlüssel (Bereich, Seite)
+        if not key or key == "" then return "" end
+        local en = EN[key]
+        return key .. " " .. (type(en) == "string" and en or "")
+    end
     data = {
         keywords = words,
-        label = Lower(option.label),
-        -- Bereich und Seite deutsch und in der angezeigten Sprache, damit beides gefunden wird
-        rest = Lower((option.tooltip or "") .. " " .. section .. " " .. L[section] .. " "
-            .. (pageOf[section] or "") .. " " .. L[pageOf[section] or ""]),
+        label = Lower(Both(option.label)),
+        rest = Lower(Both(option.tooltip) .. " " .. BothKey(section) .. " " .. BothKey(pageOf[section])),
     }
     searchCache[option] = data
     return data
@@ -1632,6 +1742,7 @@ local function BuildNav()
         table.insert(navButtons, b)
         y = y - NAV_H - 2
     end
+    navBottom = -y
 end
 
 local function EnsureBuilt()
@@ -1640,6 +1751,9 @@ local function EnsureBuilt()
     CollectSections()
     selected = pages[1] and pages[1].name
     BuildNav()
+    -- Mindesthöhe kennt erst jetzt die Navigation: gespeicherte Größe nochmals prüfen
+    UpdateResizeBounds()
+    ApplySize(frame:GetWidth(), frame:GetHeight())
 end
 
 ---------------------------------------------------------------------------
@@ -1658,6 +1772,10 @@ local function UpdateFooter()
         footDot:SetVertexColor(C.faint[1], C.faint[2], C.faint[3], 1)
         SetTextColor(footText, C.grey)
         footText:SetText(L["Keine ungespeicherten Änderungen"])
+    end
+    -- Sprache umgestellt: wirkt erst nach dem Neuladen
+    if snapshot and ns.db and snapshot.db.language ~= ns.db.language then
+        footText:SetText(footText:GetText() .. " · " .. L["Sprache: neu laden nötig"])
     end
     local combat = InCombat()
     discardButton:SetActive(n > 0)
@@ -1756,10 +1874,10 @@ masterSwitch:SetScript("OnEnter", function(self)
     local option = master.option
     if not option then return end
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-    GameTooltip:SetText(option.label, 1, 1, 1)
-    if option.tooltip then GameTooltip:AddLine(option.tooltip, ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true) end
+    GameTooltip:SetText(T(option.label), 1, 1, 1)
+    if option.tooltip then GameTooltip:AddLine(T(option.tooltip), ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true) end
     if not OptionEnabled(option) and option.disabledHint then
-        GameTooltip:AddLine(option.disabledHint, 1, 0.3, 0.3, true)
+        GameTooltip:AddLine(T(option.disabledHint), 1, 0.3, 0.3, true)
     end
     GameTooltip:Show()
 end)
@@ -1877,7 +1995,7 @@ dialogReload:SetScript("OnClick", function(self)
     if self.inactive or InCombat() then return end
     ReloadUI()
 end)
-ButtonTooltip(dialogReload, L["Neu laden"], function()
+ButtonTooltip(dialogReload, "Neu laden", function()
     return InCombat() and L["Im Kampf nicht möglich."] or L["Lädt die Oberfläche neu und übernimmt alle Änderungen."]
 end)
 
@@ -1888,13 +2006,13 @@ discardButton:SetScript("OnClick", function(self)
     Revert()
     Refresh()
 end)
-ButtonTooltip(discardButton, L["Verwerfen"], L["Setzt alle Einstellungen auf den Stand beim Öffnen des Fensters zurück und wendet sie sofort wieder an."])
+ButtonTooltip(discardButton, "Verwerfen", "Setzt alle Einstellungen auf den Stand beim Öffnen des Fensters zurück und wendet sie sofort wieder an.")
 
 applyButton:SetScript("OnClick", function(self)
     if self.inactive or InCombat() then return end
     ReloadUI()
 end)
-ButtonTooltip(applyButton, L["Übernehmen & neu laden"], function()
+ButtonTooltip(applyButton, "Übernehmen & neu laden", function()
     return InCombat() and L["Im Kampf nicht möglich."]
         or L["Lädt die Oberfläche neu, damit alle Änderungen sicher übernommen werden."]
 end)
@@ -1904,7 +2022,7 @@ editButton:SetScript("OnClick", function(self)
     -- Fenster schließt sich für den Bearbeitungsmodus; ungespeicherte Änderungen bleiben gezählt
     if ns.EnterEditMode then ns.EnterEditMode() end
 end)
-ButtonTooltip(editButton, L["Bearbeitungsmodus"], L["Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein. „Fertig“ oder Esc beendet den Modus. Auch per /stray edit."])
+ButtonTooltip(editButton, "Bearbeitungsmodus", "Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein. „Fertig“ oder Esc beendet den Modus. Auch per /stray edit.")
 
 ns.On("PLAYER_REGEN_DISABLED", function() if frame:IsShown() then UpdateFooter() end end)
 ns.On("PLAYER_REGEN_ENABLED", function() if frame:IsShown() then UpdateFooter() end end)
@@ -1924,6 +2042,9 @@ end)
 
 frame:SetScript("OnShow", function()
     EnsureBuilt()
+    -- Bildschirmgröße kann sich geändert haben
+    UpdateResizeBounds()
+    ApplySize(frame:GetWidth(), frame:GetHeight())
     -- Fenster und Bearbeiten-Modus nicht gleichzeitig
     if ns.editMode and ns.ExitEditMode then ns.ExitEditMode() end
     -- Schnappschuss nur, wenn keiner mehr offen ist (z. B. nach dem Bearbeitungsmodus behalten)
@@ -1955,8 +2076,37 @@ ns.On("CVAR_UPDATE", function()
     if frame:IsShown() then Refresh() end
 end)
 
+-- Feste Texte, die beim Laden der Datei gesetzt wurden: nach ns.SetLanguage in der gewählten Sprache
+local function SetStaticTexts()
+    placeholder:SetText(L["Suchen …"])
+    masterLabel:SetText(L["Modul aktiv"])
+    editButton:SetLabel(L["Bearbeitungsmodus"])
+    applyButton:SetLabel(L["Übernehmen & neu laden"])
+    discardButton:SetLabel(L["Verwerfen"])
+    dialogTitle:SetText(L["Ungespeicherte Änderungen"])
+    dialogReload:SetLabel(L["Neu laden"])
+    dialogDiscard:SetLabel(L["Verwerfen"])
+    dialogBack:SetLabel(L["Zurück"])
+end
+
+-- Größe geändert (Ziehen am Griff, Doppelklick, gespeicherte Größe): Inhalt neu anordnen, höchstens
+-- einmal je Bild
+local layoutPending = false
+frame:SetScript("OnSizeChanged", function()
+    if layoutPending then return end
+    layoutPending = true
+    C_Timer.After(0, function()
+        layoutPending = false
+        if frame:IsShown() and Refresh then Refresh() end
+    end)
+end)
+
 function ns.OnLoaded()
+    SetStaticTexts()
     versionText:SetText((ns.GetVersion() or ""):upper())
+    if type(ns.db.uiSize) == "table" then
+        ApplySize(ns.db.uiSize[1], ns.db.uiSize[2])
+    end
     if ns.db.point then
         frame:ClearAllPoints()
         frame:SetPoint(ns.db.point[1], UIParent, ns.db.point[2], ns.db.point[3], ns.db.point[4])

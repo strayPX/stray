@@ -3,8 +3,10 @@
 
 local ADDON_NAME, ns = ...
 ns.name = ADDON_NAME
+local L = ns.L
 
 ns.defaults = {
+    language = "auto", -- Sprache von stray: "auto" (Client), "deDE" oder "enUS"
     fastLoot = false,
     autoSell = false,
     autoRepair = false,
@@ -77,6 +79,20 @@ ns.GOLD = { 1, 0.82, 0 }
 ns.GOLD_DARK = { 0.79, 0.64, 0.29 }
 ns.GREY = { 0.5, 0.5, 0.5 }
 
+-- Gemeinsame Farben im stray-Look (gedämpftes Lila, keine Verläufe). Alle Fenster und Anzeigen nutzen
+-- diese Werte; Funktionsfarben (Klassen, Aggro, Qualität, Leben/Mana) bleiben eigene.
+ns.Colors = {
+    bg         = { 0.078, 0.078, 0.098, 0.96 }, -- #141419 Fenster
+    card       = { 0.094, 0.094, 0.118, 1 },    -- #18181e Karten
+    hover      = { 0.122, 0.122, 0.153, 1 },    -- #1f1f27 gewählt/Hover
+    line       = { 0.149, 0.149, 0.184, 1 },    -- #26262f Linien
+    accent     = { 0.545, 0.486, 0.965, 1 },    -- #8b7cf6 Akzent Lila
+    accentText = { 0.702, 0.659, 0.980, 1 },    -- #b3a8fa Lila für Text (Titel)
+    text       = { 0.902, 0.902, 0.925, 1 },    -- #e6e6ec
+    textDim    = { 0.545, 0.545, 0.600, 1 },    -- #8b8b99
+    textFaint  = { 0.369, 0.369, 0.420, 1 },    -- #5e5e6b
+}
+
 ---------------------------------------------------------------------------
 -- Events
 ---------------------------------------------------------------------------
@@ -112,6 +128,8 @@ ns.On("ADDON_LOADED", function(name)
         strayDB[key] = nil
     end
     ns.db = strayDB
+    -- Sprache zuerst, damit alle folgenden Handler und ns.L die gewählte Sprache sehen
+    if ns.SetLanguage then ns.SetLanguage(strayDB.language) end
     if ns.OnLoaded then ns.OnLoaded() end
 end)
 
@@ -302,3 +320,17 @@ function ns.AddOption(column, sectionName, option)
     end
     table.insert(section.options, option)
 end
+
+---------------------------------------------------------------------------
+-- Sprache (Seite System, Bereich Profile; wirkt nach dem Neuladen)
+---------------------------------------------------------------------------
+
+ns.AddOption(3, "Profile", {
+    key = "language",
+    type = "choice",
+    label = L["Sprache"],
+    values = { "auto", "deDE", "enUS" },
+    labels = { L["Automatisch"], "Deutsch", "English" },
+    tooltip = L["Sprache von stray. „Automatisch“ folgt der Sprache des Spiels.\nWird nach dem Neuladen wirksam."],
+    keywords = { "sprache", "language", "deutsch", "german", "englisch", "english", "übersetzung", "translation" },
+})

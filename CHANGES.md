@@ -3,8 +3,9 @@
 Diese Version enthält auch 0.21.0-alpha und 0.20.0-alpha, die nie einzeln veröffentlicht wurden (siehe unten).
 
 **Neues stray-Fenster**
-- Ganz neu gestaltet: ruhiges Lila, links die Seiten in drei Gruppen (Alltag, Kampf & Gruppe, Oberfläche) mit eigenen Symbolen und einem Zähler, wie viele Optionen an sind.
-- Oben je Seite ein großer Titel und, wo es passt, der Hauptschalter **„Modul aktiv“**. Die Optionen stehen in Karten in zwei Spalten, lange Erklärungen im Tooltip.
+- Ganz neu gestaltet: ruhiges Lila, neues stray-Logo (Siegel), links die Seiten in drei Gruppen (Alltag, Kampf & Gruppe, Oberfläche) mit eigenen Symbolen und einem Zähler, wie viele Optionen an sind.
+- Oben je Seite ein großer Titel, der Knopf **Bearbeitungsmodus** und, wo es passt, der Hauptschalter **„Modul aktiv“**. Die Optionen stehen in Karten (Überschrift mittig) nur mit ihrem Namen – die Erklärung zeigt der Tooltip.
+- **Größe ziehen** unten rechts: Das Fenster passt sich an (schmal = eine Spalte), Doppelklick auf den Griff stellt die Standardgröße her.
 - **Stichwort-Suche:** findet Optionen auch über Begriffe wie „aggro“, „bags“, „xp“ oder „heal“ – deutsch und englisch.
 - **Ungespeicherte Änderungen** werden unten gezählt. Beim Schließen fragt stray: **Neu laden** (übernehmen) oder **Verwerfen** (alles zurück auf den Stand beim Öffnen).
 - Was du einstellst, siehst du direkt im Spiel an den echten Anzeigen.
@@ -17,24 +18,36 @@ Diese Version enthält auch 0.21.0-alpha und 0.20.0-alpha, die nie einzeln verö
 **Taschen- und Menüleiste unten rechts**
 - Neu gestaltet: Blizzards Menüsymbole frei auf einem dunklen Streifen, der Charakter-Knopf zeigt dein **Porträt**.
 - Rucksack und Taschen sind **ein Knopf** mit Füllbalken (grün, gelb, rot) und Tooltip mit allen Taschen. Der Schlüsselbund ist weg.
+- Menüknöpfe: **Sammlung** (Haustiere, Reittiere) und **Abenteuerführer** neu, Freunde ist nur noch an der Minimap.
+- Das **Menü an der Minimap** zeigt alle Fenster, die es auf Forever gibt (gesperrte bleiben weg).
 
 **Erfahrung**
 - **EP-Leiste besser lesbar:** größer, klarere Schrift, links Stufe und Prozent, Mitte Erholt, rechts Quest-EP. Breite, Höhe und Schriftgröße einstellbar.
 - **EP-Tracker:** EP pro Stunde, Zeit bis zum Levelaufstieg, Zeit auf der aktuellen Stufe, Gesamtspielzeit und Verlauf je Stufe – an der EP-Leiste, im Tooltip oder als kleine Tabelle.
 
 **Gruppe**
-- **Begleiter am Gruppenrahmen:** Tiere von Jägern und Dämonen von Hexenmeistern erscheinen links neben ihrem Besitzer, mit Lebensbalken und Mouseover-Heilen. Breite und Höhe einstellbar.
+- **Begleiter am Gruppenrahmen:** Tiere von Jägern und Dämonen von Hexenmeistern erscheinen links neben ihrem Besitzer, mit Lebensbalken und Mouseover-Heilen. Breite und Höhe einstellbar. Die **Position am Besitzer** (links, rechts, oben, unten …) wählst du in den Optionen oder ziehst den Beispiel-Begleiter im Bearbeitungsmodus an die gewünschte Stelle – er bleibt immer an seinem Jäger oder Hexenmeister.
 
 **Bearbeitungsmodus** (früher „Anzeigen verschieben“)
 - Klick auf eine Anzeige öffnet ein kleines Fenster: Position X/Y, **Größe in Prozent**, wo möglich Breite und Höhe, mittig ausrichten, Zurücksetzen.
 - **Pfeiltasten** verschieben die gewählte Anzeige um 1 Pixel, mit Shift um 10.
+- **Shift + Rechtsklick** setzt eine Anzeige ganz auf Standard zurück (beim Taschenfenster: Höhe wieder automatisch).
+- Knopf **Zurück** (und Strg + Z) nimmt Änderungen Schritt für Schritt zurück.
+- Größere Leiste mit Hinweiszeile, damit man alle Kürzel sieht.
 - Esc hebt erst die Auswahl auf, ein zweites Esc beendet den Modus.
 
-**Vorrat**
+**Taschenfenster**
+- **Anheft-Leiste** oben in „Alle“: Gegenstand in einen Platz ziehen, dann bleibt er dort. Der Ruhestein sitzt schon auf Platz 1. Lösen mit Shift + Rechtsklick.
+
+**Vorrat und Bedrohung**
 - **Laufender Rand** um die Symbole der Vorrats-Erinnerung, damit Fehlendes sofort auffällt.
+- **Bedrohungsliste** im stray-Look.
+
+**Neuer Look überall**
+- Alle Anzeigen (DMG-Meter, Gruppenrahmen, Taschen, Minimap, EP-Leiste, Swing-Timer, Twinks, Notizen …) im gleichen ruhigen Lila wie das stray-Fenster.
 
 **Englisch**
-- stray gibt es jetzt auch auf **Englisch**. Auf einem deutschen Client bleibt alles deutsch, auf allen anderen erscheint stray englisch.
+- stray gibt es jetzt auch auf **Englisch**. Standard: deutscher Client deutsch, sonst englisch. Unter System → **Sprache** stellst du es fest auf Deutsch oder English (wirkt nach dem Neuladen).
 
 **Kleinigkeiten**
 - Der Profil-Export nimmt jetzt auch neue Einstellungen mit (zweites DMG-Meter, Taschenfenster, Bearbeitungsmodus, Größen je Anzeige, Minimap, Taschenleiste, Hauptschalter, EP-Leiste).

@@ -97,8 +97,10 @@ end
 -- Verlaufs- und internen Daten. So kommen neue Einstellungen ohne Liste automatisch mit.
 ---------------------------------------------------------------------------
 
--- Nie exportieren: Twinks, Notizen, Post-Twinks, Flugzeiten, Kontodaten, interner Zustand
+-- Nie exportieren: Twinks, Notizen, Post-Twinks, Flugzeiten, Kontodaten, interner Zustand,
+-- Lage und Größe des stray-Fensters (Fenster-/Gerätedaten)
 local NO_EXPORT_DB = {
+    point = true, uiSize = true,
     altData = true, playerNoteData = true, mailAltList = true, flightRouteTimes = true,
     accountCVarData = true, bagPinned = true, cdCVarByStray = true,
     flightTimer = true, flightTimes = true,
@@ -108,7 +110,7 @@ local NO_EXPORT_DB = {
 local HISTORY_PATTERNS = { "Data$", "History", "Hist$", "Log$", "List$", "Times$", "Session", "Played" }
 
 -- Positionen { Punkt, relPunkt, x, y } unter eigenem Schlüssel
-local POSITION_KEYS = { point = true, editBarPoint = true }
+local POSITION_KEYS = { editBarPoint = true }
 
 -- Feste Auswahlwerte; NONE steht für „nicht gesetzt“ (nil)
 local NONE = "none"
@@ -116,7 +118,11 @@ local ENUMS = {
     dmMode = { damage = true, healing = true },
     dm2Mode = { damage = true, healing = true },
     dm2Dock = { top = true, bottom = true, [NONE] = true },
+    language = { auto = true, deDE = true, enUS = true },
 }
+
+-- Auswahlfelder (choice), die trotzdem als einfacher Wert mitgehen
+local ALLOW_CHOICE = { language = true }
 
 local function IsHistoryKey(key)
     for _, pattern in ipairs(HISTORY_PATTERNS) do
@@ -133,7 +139,8 @@ end
 -- Darf dieser ns.db-Schlüssel als einfacher Wert ins Profil?
 local function IsGenericKey(key, byKey, blocked)
     if type(key) ~= "string" or not key:match("^%a[%w_]*$") then return false end
-    if byKey[key] or blocked[key] or SKIP_KEYS[key] or NO_EXPORT_DB[key] then return false end
+    if blocked[key] and not ALLOW_CHOICE[key] then return false end
+    if byKey[key] or SKIP_KEYS[key] or NO_EXPORT_DB[key] then return false end
     if POSITION_KEYS[key] or key == "positions" or key == "scales" or key == "minimapAngle" then return false end
     if ENUMS[key] then return true end
     if IsHistoryKey(key) then return false end
@@ -208,7 +215,7 @@ local function BuildExport()
     if IsFinite(db.minimapAngle) then
         table.insert(parts, "minimapAngle=n:" .. FormatNumber(Round1(db.minimapAngle)))
     end
-    for _, key in ipairs({ "point", "editBarPoint" }) do
+    for _, key in ipairs({ "editBarPoint" }) do
         local pos = EncodePosition(db[key])
         if pos then table.insert(parts, key .. "=s:" .. pos) end
     end
@@ -433,9 +440,18 @@ local function FillExportBox(popup)
     box:SetFocus()
 end
 
+-- Popup-Texte beim Anzeigen holen, damit sie der gewählten Sprache folgen
+local function PopupTexts(name, text, button1, button2)
+    local dialog = StaticPopupDialogs[name]
+    if not dialog then return end
+    if text then dialog.text = L[text] end
+    if button1 then dialog.button1 = L[button1] end
+    if button2 then dialog.button2 = L[button2] end
+end
+
 StaticPopupDialogs["STRAY_PROFILE_EXPORT"] = {
     text = L["stray-Profil – mit Strg+C kopieren:"],
-    button1 = CLOSE or L["Schließen"],
+    button1 = L["Schließen"],
     hasEditBox = true,
     editBoxWidth = 350,
     maxLetters = 0,
@@ -459,7 +475,7 @@ StaticPopupDialogs["STRAY_PROFILE_EXPORT"] = {
 StaticPopupDialogs["STRAY_PROFILE_CONFIRM"] = {
     text = "%s",
     button1 = L["Übernehmen"],
-    button2 = CANCEL or L["Abbrechen"],
+    button2 = L["Abbrechen"],
     OnAccept = function()
         local result = pending
         pending = nil
@@ -498,13 +514,16 @@ local function CheckImport(text)
     local message = (changes == 1) and L("1 Einstellung wird geändert%s. Übernehmen und neu laden?", noteText)
         or L("%d Einstellungen werden geändert%s. Übernehmen und neu laden?", changes, noteText)
     pending = result
-    Later(function() StaticPopup_Show("STRAY_PROFILE_CONFIRM", message) end)
+    Later(function()
+        PopupTexts("STRAY_PROFILE_CONFIRM", nil, "Übernehmen", "Abbrechen")
+        StaticPopup_Show("STRAY_PROFILE_CONFIRM", message)
+    end)
 end
 
 StaticPopupDialogs["STRAY_PROFILE_IMPORT"] = {
     text = L["stray-Profil mit Strg+V einfügen:"],
     button1 = L["Prüfen"],
-    button2 = CANCEL or L["Abbrechen"],
+    button2 = L["Abbrechen"],
     hasEditBox = true,
     editBoxWidth = 350,
     maxLetters = 0,
@@ -540,6 +559,7 @@ local function ShowExport()
         return
     end
     exportText = text
+    PopupTexts("STRAY_PROFILE_EXPORT", "stray-Profil – mit Strg+C kopieren:", "Schließen")
     local popup = StaticPopup_Show("STRAY_PROFILE_EXPORT")
     -- Absicherung, falls der Client das Feld erst nach OnShow fertig einrichtet
     if popup then pcall(FillExportBox, popup) end
@@ -548,6 +568,7 @@ end
 local function ShowImport()
     if not ns.db then return end
     pending = nil
+    PopupTexts("STRAY_PROFILE_IMPORT", "stray-Profil mit Strg+V einfügen:", "Prüfen", "Abbrechen")
     StaticPopup_Show("STRAY_PROFILE_IMPORT")
 end
 

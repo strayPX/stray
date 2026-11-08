@@ -19,7 +19,7 @@ ns.AddOption(1, "Chat", {
     tooltip = L["Koordinaten im Chat wie „45.2, 67.8“ oder „45,2 67,8“ werden zu Links. Ganze Zahlen wie „45 67“ nur mit einem Wort davor, z. B. „bei 45 67“ oder „/way 45 67“.\nEin Klick setzt einen Kartenpin auf deiner aktuellen Karte.\nIn Instanzen ist der Chat versiegelt, dort bleibt alles unverändert."],
 })
 
-local LINK_COLOR = "|cff4fb3ff"
+local LINK_COLOR = "|cffb3a8fa" -- stray-Lila (ns.Colors.accentText), gut lesbar im Chat
 local LINK_PREFIX = "addon:stray:"
 
 -- Eigener Linktyp „addon:“ vorhanden? (Forever: ja, über LinkUtil und EventRegistry)
@@ -302,7 +302,7 @@ end
 local copyURL -- zuletzt angezeigte Adresse (statt eines Feldes auf Blizzards Popup)
 StaticPopupDialogs["STRAY_COPY_URL"] = {
     text = L["Link kopieren mit Strg+C:"],
-    button1 = CLOSE or L["Schließen"],
+    button1 = L["Schließen"],
     hasEditBox = true,
     editBoxWidth = 320,
     OnShow = function(self, data)
@@ -331,6 +331,12 @@ StaticPopupDialogs["STRAY_COPY_URL"] = {
 local function ShowCopy(url)
     copyURL = url
     if ItemRefTooltip then ItemRefTooltip:Hide() end
+    -- Texte beim Anzeigen holen, damit sie der gewählten Sprache folgen
+    local dialog = StaticPopupDialogs["STRAY_COPY_URL"]
+    if dialog then
+        dialog.text = L["Link kopieren mit Strg+C:"]
+        dialog.button1 = L["Schließen"]
+    end
     local popup = StaticPopup_Show("STRAY_COPY_URL", nil, nil, url)
     -- Absicherung, falls der Client „data“ erst nach OnShow setzt (keine Felder auf das Popup schreiben)
     if popup then

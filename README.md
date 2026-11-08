@@ -1,6 +1,6 @@
 # stray
 
-Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Minimap-Knopf öffnet das Einstellungsfenster: links die Seiten in drei Gruppen und eine Stichwort-Suche, rechts die Optionen in Karten. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Beim Schließen übernimmst du Änderungen mit „Neu laden“ oder nimmst sie mit „Verwerfen“ zurück. Auf deutschen Clients ist stray deutsch, sonst englisch. Alle Optionen sind anfangs aus (außer dem Minimap-Knopf).
+Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Minimap-Knopf öffnet das Einstellungsfenster: links die Seiten in drei Gruppen und eine Stichwort-Suche, rechts die Optionen in Karten. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Beim Schließen übernimmst du Änderungen mit „Neu laden“ oder nimmst sie mit „Verwerfen“ zurück. Auf deutschen Clients ist stray deutsch, sonst englisch – umstellbar unter System → Sprache. Alle Optionen sind anfangs aus (außer dem Minimap-Knopf).
 
 ## Optionen
 
@@ -27,7 +27,7 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Min
 - **Hilfe bei vollen Taschen:** markiert den billigsten Gegenstand als Löschkandidaten, Goldmünze an wertvollerer Beute. Gelöscht wird nichts automatisch.
 
 **Vorrat**
-- **Vorrats-Erinnerung:** Symbole nur, wenn Reagenzien, Munition, Essen/Wasser oder eigene Buffs fehlen; Warnschwelle einstellbar; optional mit laufendem Rand um die Symbole.
+- **Vorrats-Erinnerung:** Symbole nur, wenn Reagenzien, Munition, Essen/Wasser oder eigene Buffs fehlen; Warnschwelle einstellbar; die Symbole haben einen laufenden Rand.
 
 **Chat**
 - **Links kopierbar:** Webadressen im Chat werden anklickbar und öffnen ein Feld zum Kopieren.
@@ -75,7 +75,7 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 - **Heilvorhersage, Schilde, „Geschwächte Seele“:** immer Teil der Gruppenrahmen – laufende Heilung hellgrün, Schilde gestreift, Symbol mit Restzeit.
 
 **System**
-- **Bearbeitungsmodus:** alle eingeschalteten Anzeigen auf einmal verschieben (Raster, Einrasten, Rechtsklick setzt zurück) – Knopf unten im stray-Fenster oder `/stray edit`. Klick auf eine Anzeige öffnet ein Fenster für Position, Größe in Prozent und, wo möglich, Breite/Höhe; Pfeiltasten verschieben pixelgenau.
+- **Bearbeitungsmodus:** alle eingeschalteten Anzeigen auf einmal verschieben (Raster, Einrasten, Shift + Rechtsklick setzt zurück, Zurück-Knopf / Strg + Z) – Knopf oben im stray-Fenster oder `/stray edit`. Klick auf eine Anzeige öffnet ein Fenster für Position, Größe in Prozent und, wo möglich, Breite/Höhe; Pfeiltasten verschieben pixelgenau.
 - **Profile:** Einstellungen als Text exportieren und importieren.
 
 **stray-Oberfläche** (ein Hauptschalter, jeder Teil einzeln abschaltbar)
@@ -133,7 +133,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
-- 0.22.0-alpha – Neues stray-Fenster (Zentrale, Stichwort-Suche, Neu laden/Verwerfen), Hauptschalter stray-Oberfläche, Mittelklick ohne Ping, neue Taschenleiste, lesbare EP-Leiste + EP-Tracker, Begleiter am Gruppenrahmen, Bearbeitungsmodus mit Fenster je Anzeige und Pfeiltasten, laufender Rand beim Vorrat, englische Übersetzung
+- 0.22.0-alpha – Neues stray-Fenster (Zentrale, Stichwort-Suche, Neu laden/Verwerfen), Hauptschalter stray-Oberfläche, Mittelklick ohne Ping, neue Taschenleiste, lesbare EP-Leiste + EP-Tracker, Begleiter am Gruppenrahmen, Bearbeitungsmodus mit Fenster je Anzeige und Pfeiltasten, laufender Rand beim Vorrat, englische Übersetzung; Nachtrag: Sprache umschaltbar, Logo Siegel, Fenster in der Größe ziehbar, Sammlung/Abenteuerführer, Begleiter-Position, Anheft-Leiste im Taschenfenster, Rückgängig im Bearbeitungsmodus, lila Look überall
 - 0.21.0-alpha – Taschenfenster (Größe ziehen, blättern, sortieren, Quest-Kategorie), zweites DMG-Meter-Fenster zum Andocken, neue Bearbeiten-Leiste (Einrasten, Esc), leere Aktionsplätze dauerhaft, neue Taschenleiste, eckige Minimap, Menü per mittlerer Maustaste
 - 0.20.0-alpha – Einstellungsfenster mit 9 Seiten statt 22 (Zwischenüberschriften, scrollbar); Testgruppe zeigt den eigenen Charakter
 - 0.19.0-alpha – Händlerpreis, Post-Twinkliste, Lehrer „Alles lernen“, volle Taschen, Vorrat, Quest-Hilfen, Swing-Timer, Gefahrenwarnung, Zauberrang, Einladungen, Notizen, Twink-Übersicht, Flugzeit, Würfelfenster; Manaleiste im Gruppenrahmen repariert

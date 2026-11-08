@@ -21,6 +21,14 @@ local L = ns.L
 local HAS_API = (UnitDetailedThreatSituation and UnitThreatSituation) and true or false
 local NO_API = L["Diese Spielversion liefert keine Bedrohungswerte."]
 
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz, falls die Tabelle fehlt)
+local COLORS = ns.Colors or {
+    bg = { 0.078, 0.078, 0.098, 0.96 }, hover = { 0.122, 0.122, 0.153, 1 }, line = { 0.149, 0.149, 0.184, 1 },
+    accent = { 0.545, 0.486, 0.965, 1 }, accentText = { 0.702, 0.659, 0.980, 1 },
+    text = { 0.902, 0.902, 0.925, 1 }, textDim = { 0.545, 0.545, 0.600, 1 }, textFaint = { 0.369, 0.369, 0.420, 1 },
+}
+local FONT = "Fonts\\ARIALN.TTF"
+
 local function ApiAvailable() return HAS_API end
 
 local IsSecret = ns.IsSecret
@@ -59,14 +67,16 @@ end
 -- Farben: Tabellen für lesbare Werte, Farbkurven für versiegelte
 ---------------------------------------------------------------------------
 
-local GREEN, YELLOW, ORANGE, RED = { 0.25, 0.9, 0.25 }, { 1, 0.85, 0 }, { 1, 0.55, 0.1 }, { 1, 0.15, 0.15 }
+local GREEN, YELLOW, RED = { 0.25, 0.9, 0.25 }, { 1, 0.85, 0 }, { 1, 0.15, 0.15 }
 
 -- Status von UnitThreatSituation: 3 = du hast sicher Aggro, 2 = du hast Aggro, aber jemand
 -- liegt vorn, 1 = du liegst vorn, hast aber noch keine Aggro, 0 = keine Aggro, nil = nicht auf der Liste
 local STATUS_COLORS = { [0] = GREEN, [1] = YELLOW, [2] = YELLOW, [3] = RED }
 local STATUS_POINTS = { { 0, GREEN }, { 1, YELLOW }, { 3, RED } }
--- Prozent bis zur Aggro (Liste und Plaketten-Zahl)
-local PERCENT_POINTS = { { 0, GREEN }, { 70, YELLOW }, { 90, ORANGE }, { 100, RED } }
+-- Prozent bis zur Aggro, gedämpfte Aggro-Farben für die Balken der Liste (stray-Optik)
+local BAR_GREEN, BAR_YELLOW = { 0.24, 0.53, 0.30 }, { 0.64, 0.57, 0.19 }
+local BAR_ORANGE, BAR_RED = { 0.73, 0.47, 0.21 }, { 0.70, 0.27, 0.23 }
+local BAR_POINTS = { { 0, BAR_GREEN }, { 70, BAR_YELLOW }, { 90, BAR_ORANGE }, { 100, BAR_RED } }
 
 -- Lesbarer Status als Zahl, sonst nil (versiegelt, nil oder unerwarteter Typ)
 local function PlainStatus(status)
@@ -99,7 +109,7 @@ local function NewStepCurve(points)
 end
 
 local statusCurve = NewStepCurve(STATUS_POINTS)
-local percentCurve = NewStepCurve(PERCENT_POINTS)
+local barCurve = NewStepCurve(BAR_POINTS)
 
 -- Gibt ok, r, g, b zurück; r, g, b können versiegelt sein und werden nur weitergereicht
 local function CurveColor(curve, value)
@@ -144,56 +154,101 @@ local ROW_H = 16
 local ROW_GAP = 2
 local WIDTH = 210
 
-local list = CreateFrame("Frame", "strayThreat", UIParent, ns.BACKDROP_TEMPLATE)
+local function SetColor(tex, c) tex:SetColorTexture(c[1], c[2], c[3], c[4] or 1) end
+
+-- stray-Optik: dunkle Fläche, 1-px-Linie rundum, 2-px-lila Kante oben, eckig, ohne Logo
+local list = CreateFrame("Frame", "strayThreat", UIParent)
 list:SetSize(WIDTH, 40)
 list:SetFrameStrata("MEDIUM")
-ns.ApplyBackdrop(list)
 ns.MakeMovable(list, "threat", { "RIGHT", "RIGHT", -60, -60 })
 ns.RegisterMovable(list, "Bedrohungsliste")
 list:Hide()
 
-local header = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-header:SetPoint("TOPLEFT", list, "TOPLEFT", 8, -7)
-header:SetPoint("TOPRIGHT", list, "TOPRIGHT", -8, -7)
+do
+    local bg = list:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    SetColor(bg, COLORS.bg)
+    local function Edge(p1, p2, horizontal)
+        local t = list:CreateTexture(nil, "BORDER")
+        SetColor(t, COLORS.line)
+        t:SetPoint(p1, list, p1)
+        t:SetPoint(p2, list, p2)
+        if horizontal then t:SetHeight(1) else t:SetWidth(1) end
+    end
+    Edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
+    Edge("TOPLEFT", "BOTTOMLEFT", false)
+    Edge("TOPRIGHT", "BOTTOMRIGHT", false)
+    local top = list:CreateTexture(nil, "ARTWORK")
+    SetColor(top, COLORS.accent)
+    top:SetPoint("TOPLEFT", list, "TOPLEFT", 0, 0)
+    top:SetPoint("TOPRIGHT", list, "TOPRIGHT", 0, 0)
+    top:SetHeight(2)
+end
+
+-- Kopf: „Bedrohung“ in hellem Lila, daneben grau das Ziel bzw. der Beispiel-Hinweis
+local header = list:CreateFontString(nil, "OVERLAY")
+header:SetFont(FONT, 12, "")
+header:SetShadowOffset(1, -1)
+header:SetPoint("TOPLEFT", list, "TOPLEFT", 7, -6)
 header:SetJustifyH("LEFT")
+header:SetTextColor(COLORS.accentText[1], COLORS.accentText[2], COLORS.accentText[3])
+
+local subtitle = list:CreateFontString(nil, "OVERLAY")
+subtitle:SetFont(FONT, 10, "")
+subtitle:SetPoint("BOTTOMLEFT", header, "BOTTOMRIGHT", 5, 0)
+subtitle:SetJustifyH("LEFT")
+subtitle:SetWordWrap(false)
+subtitle:SetTextColor(COLORS.textDim[1], COLORS.textDim[2], COLORS.textDim[3])
 
 local rows = {}
 for i = 1, MAX_ROWS do
     local bar = CreateFrame("StatusBar", nil, list)
     bar:SetSize(WIDTH - 12, ROW_H)
     bar:SetPoint("TOPLEFT", list, "TOPLEFT", 6, -22 - (i - 1) * (ROW_H + ROW_GAP))
-    bar:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+    -- Flache, eckige Balken ohne Verlauf
+    bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
     bar:SetMinMaxValues(0, 100)
 
     local bg = bar:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
-    bg:SetColorTexture(1, 1, 1, 0.08)
+    SetColor(bg, COLORS.hover)
 
-    bar.name = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.name = bar:CreateFontString(nil, "OVERLAY")
+    bar.name:SetFont(FONT, 11, "")
+    bar.name:SetShadowOffset(1, -1)
     bar.name:SetPoint("LEFT", bar, "LEFT", 4, 0)
-    bar.pct = bar:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    bar.name:SetPoint("RIGHT", bar, "RIGHT", -38, 0)
+    bar.name:SetJustifyH("LEFT")
+    bar.name:SetWordWrap(false)
+    bar.pct = bar:CreateFontString(nil, "OVERLAY")
+    bar.pct:SetFont(FONT, 11, "")
+    bar.pct:SetShadowOffset(1, -1)
     bar.pct:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
+    bar.pct:SetJustifyH("RIGHT")
+    bar.pct:SetTextColor(COLORS.text[1], COLORS.text[2], COLORS.text[3])
     bar:Hide()
     rows[i] = bar
 end
 
 list:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText(L["Bedrohung"], 1, 1, 1)
-    GameTooltip:AddLine(L["Prozent = wie nah jemand daran ist, die Aggro zu ziehen. 100 % = hat die Aggro."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
-    GameTooltip:AddLine(L["Sortiert: wer die Aggro hat zuerst, dann nach Bedrohung. Liefert WoW Forever versiegelte Werte, bleibt die Reihenfolge fest (du zuerst)."], 0.7, 0.7, 0.7, true)
-    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
+    local a, t, d = COLORS.accentText, COLORS.text, COLORS.textDim
+    GameTooltip:SetText(L["Bedrohung"], a[1], a[2], a[3])
+    GameTooltip:AddLine(L["Prozent = wie nah jemand daran ist, die Aggro zu ziehen. 100 % = hat die Aggro."], t[1], t[2], t[3], true)
+    GameTooltip:AddLine(L["Sortiert: wer die Aggro hat zuerst, dann nach Bedrohung. Liefert WoW Forever versiegelte Werte, bleibt die Reihenfolge fest (du zuerst)."], d[1], d[2], d[3], true)
+    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], d[1], d[2], d[3])
     GameTooltip:Show()
 end)
 list:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 local function NameColor(unit)
-    if not unit or not UnitIsPlayer(unit) then return 1, 1, 1 end
+    local t = COLORS.text
+    if not unit or not UnitIsPlayer(unit) then return t[1], t[2], t[3] end
     local _, class = UnitClass(unit)
     class = ns.Public(class)
     local color = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
     if color then return color.r, color.g, color.b end
-    return 1, 1, 1
+    return t[1], t[2], t[3]
 end
 
 local function GroupUnits()
@@ -279,9 +334,10 @@ local function FillRow(bar, entry)
     -- Klappt der Balken nicht, bleibt er leer; die Prozentzahl reicht dann
     if not pcall(bar.SetValue, bar, entry.pct) then bar:SetValue(0) end
     local okText = SetPercentText(bar.pct, entry.pct)
-    local okColor, r, g, b = ColorFor(PERCENT_POINTS, percentCurve, entry.pct)
+    local okColor, r, g, b = ColorFor(BAR_POINTS, barCurve, entry.pct)
     if not (okColor and pcall(bar.SetStatusBarColor, bar, r, g, b)) then
-        bar:SetStatusBarColor(0.5, 0.5, 0.5)
+        local d = COLORS.textFaint
+        bar:SetStatusBarColor(d[1], d[2], d[3])
     end
     return okText
 end
@@ -302,10 +358,13 @@ local function UpdateList()
             list:Hide()
             return
         end
-        entries, title = DemoEntries(), L["Beispiel – Shift + ziehen"]
+        entries, title = DemoEntries(), L["Beispiel · Shift + ziehen"]
     end
 
-    header:SetText(L("Bedrohung · %s", title or "?"))
+    header:SetText(L["Bedrohung"])
+    -- Untertitel endet am rechten Rand (lange Namen werden abgeschnitten)
+    subtitle:SetWidth(math.max(20, WIDTH - 14 - 5 - (header:GetStringWidth() or 0)))
+    subtitle:SetText(title or "")
     local shown = math.min(#entries, MAX_ROWS)
     local allOk = true
     for i = 1, MAX_ROWS do
@@ -338,7 +397,7 @@ local function CreateWarning(y, r, g, b, size)
     f:Hide()
 
     f.text = f:CreateFontString(nil, "OVERLAY")
-    f.text:SetFont(STANDARD_TEXT_FONT, size, "OUTLINE")
+    f.text:SetFont(FONT, size, "OUTLINE")
     f.text:SetTextColor(r, g, b)
     f.text:SetPoint("CENTER")
 
@@ -352,8 +411,9 @@ local function CreateWarning(y, r, g, b, size)
     return f
 end
 
-local tankWarning = CreateWarning(-150, 1, 0.23, 0.23, 24)
-local aggroWarning = CreateWarning(-190, 1, 0.69, 0.13, 19)
+-- Funktionsfarben bleiben: Rot = Aggro verloren, Gelb-Orange = gleich Aggro (ARIALN ist schmaler → etwas größer)
+local tankWarning = CreateWarning(-150, 1, 0.23, 0.23, 26)
+local aggroWarning = CreateWarning(-190, 1, 0.69, 0.13, 21)
 
 -- Warntexte im Bearbeiten-Modus verschiebbar (sonst fangen sie keine Mausklicks ab)
 local function MovableWarning(f, key, y, label, optionKey, sample)
@@ -363,7 +423,7 @@ local function MovableWarning(f, key, y, label, optionKey, sample)
     ns.RegisterMovable(f, label, function(on)
         if on and ns.db and ns.db[optionKey] then
             f.anim:Stop()
-            f.text:SetText(sample)
+            f.text:SetText(L[sample]) -- erst beim Anzeigen übersetzen
             f:SetAlpha(1)
             f:Show()
         elseif not on then
@@ -372,8 +432,9 @@ local function MovableWarning(f, key, y, label, optionKey, sample)
         end
     end)
 end
-MovableWarning(tankWarning, "tankwarn", -150, "Tank-Warnung", "threatTankWarn", L["Aggro verloren: Defias-Späher greift Mira an"])
-MovableWarning(aggroWarning, "aggrowarn", -190, "Aggro-Warnung", "threatAggroWarn", L["Gleich ziehst du Aggro! 92 %"])
+-- Beispieltexte als deutsche Schlüssel, übersetzt wird beim Anzeigen
+MovableWarning(tankWarning, "tankwarn", -150, "Tank-Warnung", "threatTankWarn", "Aggro verloren: Defias-Späher greift Mira an")
+MovableWarning(aggroWarning, "aggrowarn", -190, "Aggro-Warnung", "threatAggroWarn", "Gleich ziehst du Aggro! 92 %")
 
 local function ShowWarning(f, message)
     f.anim:Stop()
@@ -431,7 +492,7 @@ local function GetDecoration(plate)
     local holder = CreateFrame("Frame", nil, health)
     holder:SetAllPoints(health)
     local text = holder:CreateFontString(nil, "OVERLAY")
-    text:SetFont(STANDARD_TEXT_FONT, 10, "OUTLINE")
+    text:SetFont(FONT, 11, "OUTLINE")
     text:SetPoint("LEFT", health, "RIGHT", 5, 0)
     text:Hide()
 
@@ -493,7 +554,8 @@ local function UpdatePlate(plate, unit)
             okColor, r, g, b = ColorFor(STATUS_POINTS, statusCurve, detailStatus)
         end
         if not (okColor and pcall(deco.text.SetTextColor, deco.text, r, g, b)) then
-            deco.text:SetTextColor(1, 1, 1)
+            local t = COLORS.text
+            deco.text:SetTextColor(t[1], t[2], t[3])
         end
         deco.text:Show()
     else

@@ -21,9 +21,15 @@ local IsSecret = ns.IsSecret
 local CVAR = "cooldownViewerEnabled"
 local GAP = 4            -- Abstand zwischen den Reihen (Pixel)
 local DEFAULT_POINT = { "BOTTOM", "BOTTOM", 0, 200 }
-local ACCENT = { 0.353, 0.659, 1 }
-local BG = { 0.051, 0.067, 0.090 }
-local EDGE = { 0.169, 0.290, 0.451 }
+-- stray-Farben (ns.Colors aus stray.lua; Ersatz mit gleichen Werten, falls die Tabelle fehlt)
+local COLORS = ns.Colors or {
+    bg = { 0.078, 0.078, 0.098, 0.96 }, card = { 0.094, 0.094, 0.118, 1 }, hover = { 0.122, 0.122, 0.153, 1 },
+    line = { 0.149, 0.149, 0.184, 1 }, accent = { 0.545, 0.486, 0.965, 1 }, accentText = { 0.702, 0.659, 0.980, 1 },
+    text = { 0.902, 0.902, 0.925, 1 }, textDim = { 0.545, 0.545, 0.600, 1 }, textFaint = { 0.369, 0.369, 0.420, 1 },
+}
+local ACCENT = COLORS.accent
+local BG = COLORS.bg
+local LABEL = COLORS.accentText
 
 -- Symbol-Viewer, die umgestaltet werden (die Balken-Anzeige bleibt, wie sie ist)
 local STYLE_VIEWERS = { "EssentialCooldownViewer", "UtilityCooldownViewer", "BuffIconCooldownViewer" }
@@ -115,7 +121,7 @@ end)
 
 anchor.bg = anchor:CreateTexture(nil, "BACKGROUND")
 anchor.bg:SetAllPoints()
-anchor.bg:SetColorTexture(BG[1], BG[2], BG[3], 0.6)
+anchor.bg:SetColorTexture(BG[1], BG[2], BG[3], 0.7)
 anchor.edges = {}
 for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
     local edge = anchor:CreateTexture(nil, "BORDER")
@@ -128,12 +134,12 @@ for _, side in ipairs({ "TOP", "BOTTOM", "LEFT", "RIGHT" }) do
     table.insert(anchor.edges, edge)
 end
 anchor.label = anchor:CreateFontString(nil, "OVERLAY")
-anchor.label:SetFont(STANDARD_TEXT_FONT, 11, "OUTLINE")
-anchor.label:SetTextColor(EDGE[1] + 0.5, EDGE[2] + 0.5, EDGE[3] + 0.4)
+anchor.label:SetFont("Fonts\\ARIALN.TTF", 12, "OUTLINE")
+anchor.label:SetTextColor(LABEL[1], LABEL[2], LABEL[3])
 anchor.label:SetPoint("BOTTOM", anchor, "TOP", 0, 2)
-anchor.label:SetText(L["Abklingzeiten (Shift + Ziehen)"])
 
 local function SetAnchorVisual(on)
+    if on then anchor.label:SetText(L["Abklingzeiten (Shift + Ziehen)"]) end -- beim Anzeigen übersetzen
     anchor.bg:SetShown(on)
     for _, edge in ipairs(anchor.edges) do edge:SetShown(on) end
     anchor.label:SetShown(on)
