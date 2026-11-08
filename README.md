@@ -126,6 +126,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.20.0-alpha – Einstellungsfenster mit 9 Seiten statt 22 (Zwischenüberschriften, scrollbar); Testgruppe zeigt den eigenen Charakter
 - 0.19.0-alpha – Händlerpreis, Post-Twinkliste, Lehrer „Alles lernen“, volle Taschen, Vorrat, Quest-Hilfen, Swing-Timer, Gefahrenwarnung, Zauberrang, Einladungen, Notizen, Twink-Übersicht, Flugzeit, Würfelfenster; Manaleiste im Gruppenrahmen repariert
 - 0.18.0-alpha – Eigene Aktionsleisten, Abklingzeiten über den Leisten, Minimap-Knopfspalte, Uhr/FPS, EP-Leiste oben, Taschen-/Menüleiste, eigenes Taschenfenster
 - 0.17.0-alpha – DMG-Meter: neues flaches Design, Größe unten rechts ziehbar; Umbenennung Schadensmesser → DMG-Meter

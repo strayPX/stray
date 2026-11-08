@@ -860,8 +860,8 @@ header:Hide()
 ---------------------------------------------------------------------------
 
 local SAMPLES = {
-    -- Leon: Schild größer als das fehlende Leben → Überschild-Strich
-    { name = "Leon", class = "PRIEST", hp = 0.92, power = "MANA", mp = 0.7, absorb = 0.15 },
+    -- Du selbst (Name, Klasse und Ressource des eingeloggten Charakters): Schild größer als das fehlende Leben → Überschild-Strich
+    { isPlayer = true, name = "Du", class = "PRIEST", hp = 0.92, power = "MANA", mp = 0.7, absorb = 0.15 },
     -- Kael: laufende Heilung +30 % (eigene 20 % hell, fremde 10 % dunkler)
     { name = "Kael", class = "MAGE", hp = 0.64, power = "MANA", mp = 0.45, dispel = "Poison", icon = "Interface\\Icons\\Ability_Creature_Poison_03", healOwn = 0.2, healOther = 0.1 },
     { name = "Mira", class = "DRUID", hp = 1.0, power = "MANA", mp = 0.9, faded = true },
@@ -907,13 +907,29 @@ local function PaintSamplePrediction(t, s)
     LayoutIcons(t)
 end
 
+-- Erster Beispielplatz: eigener Charakter statt eines festen Namens
+local function PlayerSample(s)
+    if not s.isPlayer then return s.name, s.class, s.power end
+    local name, class, power = s.name, s.class, s.power
+    local n = ns.Public(UnitName("player"))
+    if type(n) == "string" and n ~= "" then name = n end
+    local _, c = UnitClass("player")
+    c = ns.Public(c)
+    if type(c) == "string" then class = c end
+    local _, token = UnitPowerType("player")
+    token = ns.Public(token)
+    if type(token) == "string" then power = token end
+    return name, class, power
+end
+
 local function PaintSample(t, s)
-    t.name:SetText(s.name)
+    local name, class, power = PlayerSample(s)
+    t.name:SetText(name)
     t.health:SetMinMaxValues(0, 1)
     t.health:SetValue(s.hp)
     t.power:SetMinMaxValues(0, 1)
     t.power:SetValue(s.mp)
-    t.power:SetStatusBarColor(PowerColor(nil, s.power))
+    t.power:SetStatusBarColor(PowerColor(nil, power))
     if s.status then
         t.status:SetText(s.status)
         t.status:Show()
@@ -923,7 +939,7 @@ local function PaintSample(t, s)
         t.status:Hide()
         t.pct:SetText(("%.0f%%"):format(s.hp * 100))
         t.pct:Show()
-        t.health:SetStatusBarColor(ClassColor(s.class))
+        t.health:SetStatusBarColor(ClassColor(class))
     end
     PaintDispel(t, s.dispel ~= nil, s.icon, s.dispel)
     t.target:SetShown(s.target and true or false)

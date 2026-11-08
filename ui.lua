@@ -13,7 +13,6 @@ local _, ns = ...
 local WIDTH, HEIGHT = 760, 720
 local SIDE_W = 190
 local ROW_H = 48
-local MAX_ROWS = 7
 local CONTENT_PAD = 22
 
 local MEDIA = "Interface\\AddOns\\stray\\media\\"
@@ -38,14 +37,34 @@ local C = {
     red       = { 1.000, 0.350, 0.350, 1 },
 }
 
--- Gruppen und Reihenfolge der Bereiche in der Seitenleiste
-local GROUPS = {
-    { name = "Komfort", sections = { "Beute", "Händler", "NPCs", "Taschen", "Vorrat", "Quests", "Filmsequenzen", "Chat" } },
-    { name = "Kampf", sections = { "Bedrohung", "DMG-Meter", "Kampfhilfen", "Zaubern", "Aktionsleisten", "Abklingzeiten" } },
+-- Seiten in der Seitenleiste. Die Bereiche der Module (ns.AddOption) werden auf einer Seite
+-- zu Zwischenüberschriften; der Inhalt scrollt.
+local PAGES = {
+    { name = "Komfort", sections = { "Beute", "Händler", "NPCs", "Filmsequenzen", "Chat" } },
+    { name = "Taschen", sections = { "Taschen", "Vorrat" } },
+    { name = "Quests", sections = { "Quests" } },
+    { name = "Kampf", sections = { "Bedrohung", "DMG-Meter", "Kampfhilfen", "Zaubern" } },
+    { name = "Aktionsleisten", sections = { "Aktionsleisten", "Abklingzeiten" } },
     { name = "Gruppe", sections = { "Gruppenrahmen" } },
-    { name = "Oberfläche", sections = { "Kamera & Karte", "Leisten & Minimap", "Interface", "Sozial", "Charaktere" } },
+    { name = "Oberfläche", sections = { "Kamera & Karte", "Leisten & Minimap", "Interface" } },
+    { name = "Sozial", sections = { "Sozial", "Charaktere" } },
     { name = "System", sections = { "Bearbeiten", "Profile" } },
 }
+
+local PAGE_SUBTITLES = {
+    ["Komfort"] = "Beute, Händler, Post und Lehrer, Filmsequenzen und Chat.",
+    ["Taschen"] = "Taschen, Taschenfenster und Vorrat.",
+    ["Quests"] = "Quests annehmen, abgeben und im Blick behalten.",
+    ["Kampf"] = "Bedrohung, DMG-Meter, Kampfhilfen und Zaubern.",
+    ["Aktionsleisten"] = "Eigene Aktionsleisten und Abklingzeiten.",
+    ["Gruppe"] = "Deine 5er-Gruppe als Heiler-Rahmen.",
+    ["Oberfläche"] = "Kamera, Karte, Minimap, Leisten und Interface.",
+    ["Sozial"] = "Mitspieler, Einladungen und deine Charaktere.",
+    ["System"] = "Anzeigen verschieben und Profile.",
+}
+
+local HEADER_H = 30   -- Zwischenüberschrift auf einer Seite
+local BLOCK_GAP = 12  -- Abstand zwischen zwei Bereichen
 
 local SUBTITLES = {
     ["Beute"] = "Schneller plündern, ohne Klickerei.",
@@ -280,23 +299,69 @@ moveButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 local headLine = Line(content, C.line)
 headLine:SetPoint("TOPLEFT", 0, -56); headLine:SetPoint("TOPRIGHT", 0, -56); headLine:SetHeight(1)
 
--- Karte mit den Optionszeilen
-local card = CreateFrame("Frame", nil, content)
-card:SetPoint("TOPLEFT", 0, -70)
-card:SetPoint("TOPRIGHT", 0, -70)
-card:SetHeight(ROW_H)
-local cardBg = card:CreateTexture(nil, "BACKGROUND")
-cardBg:SetAllPoints()
-Color(cardBg, C.card)
-Border(card, C.line)
+-- Scrollbarer Bereich mit den Optionen (Zwischenüberschrift + Karte je Bereich)
+local SCROLL_W = WIDTH - SIDE_W - 1 - 2 * CONTENT_PAD - 10 -- rechts Platz für den Scrollbalken
 
-local emptyText = Text(content, 12, C.textDim, FONT_BODY)
-emptyText:SetPoint("TOPLEFT", card, "BOTTOMLEFT", 2, -10)
+local scroll = CreateFrame("ScrollFrame", nil, content)
+scroll:SetPoint("TOPLEFT", 0, -66)
+scroll:SetPoint("BOTTOMRIGHT", -10, 44)
+scroll:EnableMouseWheel(true)
 
--- Vorschau-Bereich unter der Karte
-local preview = CreateFrame("Frame", nil, content)
+local scrollChild = CreateFrame("Frame", nil, scroll)
+scrollChild:SetSize(SCROLL_W, 10)
+scroll:SetScrollChild(scrollChild)
+
+-- Schmaler Scrollbalken (nur Anzeige, scrollen per Mausrad)
+local scrollTrack = content:CreateTexture(nil, "ARTWORK")
+scrollTrack:SetPoint("TOPRIGHT", 0, -66)
+scrollTrack:SetPoint("BOTTOMRIGHT", 0, 44)
+scrollTrack:SetWidth(3)
+scrollTrack:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.6)
+local scrollThumb = content:CreateTexture(nil, "OVERLAY")
+scrollThumb:SetWidth(3)
+scrollThumb:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.9)
+
+local function UpdateScrollBar()
+    local view = scroll:GetHeight() or 0
+    local total = scrollChild:GetHeight() or 0
+    if view <= 0 or total <= view + 1 then
+        scrollTrack:Hide()
+        scrollThumb:Hide()
+        return
+    end
+    local thumbH = math.max(24, view * view / total)
+    local maxScroll = total - view
+    local offset = (scroll:GetVerticalScroll() or 0) / maxScroll * (view - thumbH)
+    scrollThumb:ClearAllPoints()
+    scrollThumb:SetPoint("TOPRIGHT", scrollTrack, "TOPRIGHT", 0, -offset)
+    scrollThumb:SetHeight(thumbH)
+    scrollTrack:Show()
+    scrollThumb:Show()
+end
+
+local preview -- weiter unten angelegt
+
+local function SetScroll(value)
+    local maxScroll = math.max(0, (scrollChild:GetHeight() or 0) - (scroll:GetHeight() or 0))
+    scroll:SetVerticalScroll(math.max(0, math.min(maxScroll, value)))
+    if preview then preview:Hide() end
+    UpdateScrollBar()
+end
+
+scroll:SetScript("OnMouseWheel", function(self, delta)
+    SetScroll(self:GetVerticalScroll() - delta * ROW_H)
+end)
+
+local emptyText = Text(scrollChild, 12, C.textDim, FONT_BODY)
+emptyText:SetPoint("TOPLEFT", 2, -4)
+
+-- Vorschau-Bild: schwebt unter der Zeile, deren „Vorschau“ geklickt wurde
+preview = CreateFrame("Frame", nil, content)
 preview:SetSize(272, 150)
-preview:SetPoint("TOPLEFT", card, "BOTTOMLEFT", 0, -12)
+preview:SetFrameLevel(content:GetFrameLevel() + 20)
+-- Klicks nicht an verdeckte Zeilen durchreichen; ein Klick auf das Bild schließt es
+preview:EnableMouse(true)
+preview:SetScript("OnMouseUp", function(self) self:Hide() end)
 local previewBg = preview:CreateTexture(nil, "BACKGROUND")
 previewBg:SetAllPoints()
 Color(previewBg, C.card)
@@ -374,8 +439,8 @@ StaticPopupDialogs["STRAY_RELOAD"] = {
 -- Bereiche aus dem Register sammeln
 ---------------------------------------------------------------------------
 
-local sections = {}      -- Name → Liste der Optionen
-local sectionOrder = {}  -- { group = Name, section = Name } in Anzeige-Reihenfolge
+local sections = {}      -- Bereichsname → Liste der Optionen
+local pages = {}         -- { name = Seite, sections = { Bereichsnamen mit Optionen } } in Anzeige-Reihenfolge
 
 local function CollectSections()
     for _, column in ipairs(ns.columns) do
@@ -387,16 +452,24 @@ local function CollectSections()
         end
     end
     local placed = {}
-    for _, group in ipairs(GROUPS) do
-        for _, name in ipairs(group.sections) do
+    for _, page in ipairs(PAGES) do
+        local list = {}
+        for _, name in ipairs(page.sections) do
             if sections[name] then
-                table.insert(sectionOrder, { group = group.name, section = name })
+                table.insert(list, name)
                 placed[name] = true
             end
         end
+        if #list > 0 then table.insert(pages, { name = page.name, sections = list }) end
     end
+    -- Bereiche, die keiner Seite zugeordnet sind, landen auf „Weitere“
+    local rest = {}
     for name in pairs(sections) do
-        if not placed[name] then table.insert(sectionOrder, { group = "Weitere", section = name }) end
+        if not placed[name] then table.insert(rest, name) end
+    end
+    if #rest > 0 then
+        table.sort(rest)
+        table.insert(pages, { name = "Weitere", sections = rest })
     end
 end
 CollectSections()
@@ -412,15 +485,24 @@ local function SectionActive(name)
     return false
 end
 
+local function PageActive(page)
+    for _, name in ipairs(page.sections) do
+        if SectionActive(name) then return true end
+    end
+    return false
+end
+
 ---------------------------------------------------------------------------
 -- Seitenleisten-Einträge
 ---------------------------------------------------------------------------
 
-local selected = sectionOrder[1] and sectionOrder[1].section
+local NAV_H = 30
+local selected = pages[1] and pages[1].name
 local navButtons = {}
 local Refresh
 
-local function SelectSection(name)
+local function SelectPage(name)
+    if selected ~= name or search:GetText() ~= "" then SetScroll(0) end
     selected = name
     search:SetText("")
     search:ClearFocus()
@@ -430,21 +512,12 @@ local function SelectSection(name)
 end
 
 do
-    local y = -110
-    local lastGroup
-    for _, entry in ipairs(sectionOrder) do
-        if entry.group ~= lastGroup then
-            if lastGroup then y = y - 8 end
-            lastGroup = entry.group
-            local header = Text(side, 11, C.accent, FONT_BODY)
-            header:SetPoint("TOPLEFT", 14, y)
-            header:SetText(entry.group:upper())
-            y = y - 18
-        end
+    local y = -116
+    for _, page in ipairs(pages) do
         local b = CreateFrame("Button", nil, side)
-        b:SetSize(SIDE_W - 1, 21)
+        b:SetSize(SIDE_W - 1, NAV_H)
         b:SetPoint("TOPLEFT", 0, y)
-        b.section = entry.section
+        b.page = page
 
         b.active = b:CreateTexture(nil, "BACKGROUND", nil, 3)
         b.active:SetAllPoints()
@@ -457,18 +530,18 @@ do
         hover:SetAllPoints()
         hover:SetColorTexture(1, 1, 1, 0.04)
 
-        b.text = Text(b, 13, C.textSide, FONT_BODY)
-        b.text:SetPoint("LEFT", 14, 0)
-        b.text:SetText(entry.section)
+        b.text = Text(b, 14, C.textSide, FONT_BODY)
+        b.text:SetPoint("LEFT", 16, 0)
+        b.text:SetText(page.name)
 
         b.dot = b:CreateTexture(nil, "ARTWORK")
         b.dot:SetSize(7, 7)
         b.dot:SetPoint("RIGHT", -14, 0)
         b.dot:SetTexture(MEDIA .. "dot")
 
-        b:SetScript("OnClick", function(self) SelectSection(self.section) end)
+        b:SetScript("OnClick", function(self) SelectPage(self.page.name) end)
         table.insert(navButtons, b)
-        y = y - 21
+        y = y - NAV_H
     end
 end
 
@@ -515,22 +588,31 @@ local function ShowTooltip(row)
     GameTooltip:Show()
 end
 
-local function ShowPreview(option)
+local function ShowPreview(option, row)
     if preview:IsShown() and preview.option == option then
         preview:Hide()
         return
     end
     preview.option = option
+    preview:ClearAllPoints()
+    -- Unter die Zeile; reicht der Platz nicht, darüber
+    local rowBottom = row and row:GetBottom()
+    local scrollBottom = scroll:GetBottom()
+    if row and rowBottom and scrollBottom and rowBottom - 160 < scrollBottom then
+        preview:SetPoint("BOTTOMRIGHT", row, "TOPRIGHT", 0, 4)
+    elseif row then
+        preview:SetPoint("TOPRIGHT", row, "BOTTOMRIGHT", 0, -4)
+    else
+        preview:SetPoint("CENTER", scroll, "CENTER")
+    end
     previewImage:SetTexture("Interface\\AddOns\\stray\\media\\" .. option.preview)
     previewCaption:SetText("Beispielbild: " .. option.label)
     preview:Show()
 end
 
-local function CreateRow(i)
-    local row = CreateFrame("Frame", nil, card)
+local function CreateRow()
+    local row = CreateFrame("Frame", nil, scrollChild)
     row:SetHeight(ROW_H)
-    row:SetPoint("TOPLEFT", 14, -(i - 1) * ROW_H)
-    row:SetPoint("TOPRIGHT", -14, -(i - 1) * ROW_H)
     row:EnableMouse(true)
 
     row.line = Line(row, C.rowLine)
@@ -569,7 +651,7 @@ local function CreateRow(i)
     local previewButton = FlatButton(row, "Vorschau", 70, false)
     previewButton:SetHeight(20)
     previewButton:SetPoint("RIGHT", switch, "LEFT", -12, 0)
-    previewButton:SetScript("OnClick", function() if row.option then ShowPreview(row.option) end end)
+    previewButton:SetScript("OnClick", function() if row.option then ShowPreview(row.option, row) end end)
     row.previewButton = previewButton
 
     -- Schieberegler für Zahlen-Optionen (type = "slider")
@@ -603,9 +685,13 @@ local function CreateRow(i)
             SetDirty(true)
         end
     end)
+    -- Mausrad scrollt die Seite; nur mit gedrückter Umschalttaste verstellt es den Regler
     slider:SetScript("OnMouseWheel", function(self, delta)
         local option = row.option
-        if not option or not OptionEnabled(option) then return end
+        if not IsShiftKeyDown() or not option or not OptionEnabled(option) then
+            SetScroll(scroll:GetVerticalScroll() - delta * ROW_H)
+            return
+        end
         self:SetValue(self:GetValue() + delta * (option.step or 1))
     end)
     slider:SetScript("OnEnter", function() ShowTooltip(row) end)
@@ -684,6 +770,7 @@ local function SetChoice(row, option, enabled)
             if not OptionEnabled(option) then return end
             ns.Sound(SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON)
             option.set(value)
+            SetDirty(true)
             Refresh()
         end)
         b:SetAlpha(enabled and 1 or 0.4)
@@ -693,74 +780,162 @@ local function SetChoice(row, option, enabled)
     choice:SetWidth(math.max(10, x))
 end
 
-for i = 1, MAX_ROWS do rows[i] = CreateRow(i) end
+-- Pools: Zeilen, Karten (Hintergrund je Bereich) und Zwischenüberschriften
+local cards, headers = {}, {}
 
-local function FillRows(options)
-    local shown = math.min(#options, MAX_ROWS)
-    for i = 1, MAX_ROWS do
-        local row, option = rows[i], options[i]
-        if i <= shown then
-            local enabled = OptionEnabled(option)
-            row.option = option
-            row.label:SetText(option.label)
-            row.label:SetTextColor(enabled and C.text[1] or C.textDim[1], enabled and C.text[2] or C.textDim[2], enabled and C.text[3] or C.textDim[3])
-            if not enabled and option.disabledHint then
-                row.desc:SetText(option.disabledHint)
-                row.desc:SetTextColor(C.red[1], C.red[2], C.red[3])
-            else
-                row.desc:SetText(ShortDesc(option))
-                row.desc:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-            end
-            local isSlider = option.type == "slider"
-            local isButton = option.type == "button"
-            local isChoice = option.type == "choice"
-            row.switch:SetShown(not isSlider and not isButton and not isChoice)
-            row.slider:SetShown(isSlider)
-            row.slider.value:SetShown(isSlider)
-            row.action:SetShown(isButton)
-            row.choice:SetShown(isChoice)
-            if isSlider then
-                SetSlider(row, option, enabled)
-            elseif isChoice then
-                SetChoice(row, option, enabled)
-            elseif isButton then
-                row.action.text:SetText(option.buttonText or option.label)
-                row.action:SetAlpha(enabled and 1 or 0.4)
-            else
-                SetSwitch(row.switch, option.get() and true or false, enabled)
-            end
-            -- In der Suche keine Vorschau: dort können mehr Zeilen stehen, als Platz für das Bild bleibt
-            row.previewButton:SetShown(option.preview ~= nil and search:GetText() == "" and not isSlider and not isButton and not isChoice)
-            row.line:SetShown(i < shown)
-            row:Show()
-        else
-            row.option = nil
-            row:Hide()
-        end
+local function GetRow(i)
+    if not rows[i] then
+        rows[i] = CreateRow()
+        rows[i]:SetFrameLevel(scrollChild:GetFrameLevel() + 3)
     end
-    card:SetHeight(math.max(shown, 1) * ROW_H)
-    card:SetShown(shown > 0)
-    return #options - shown
+    return rows[i]
+end
+
+local function GetCard(i)
+    local card = cards[i]
+    if not card then
+        card = CreateFrame("Frame", nil, scrollChild)
+        card:SetFrameLevel(scrollChild:GetFrameLevel() + 1)
+        local bg = card:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        Color(bg, C.card)
+        Border(card, C.line)
+        cards[i] = card
+    end
+    return card
+end
+
+local function GetHeader(i)
+    local h = headers[i]
+    if not h then
+        h = CreateFrame("Frame", nil, scrollChild)
+        h:SetHeight(HEADER_H)
+        h.name = Text(h, 13, C.accent, FONT_BODY)
+        h.name:SetPoint("BOTTOMLEFT", 2, 8)
+        h.desc = Text(h, 11, C.textDim, FONT_BODY)
+        h.desc:SetPoint("LEFT", h.name, "RIGHT", 10, 0)
+        h.desc:SetPoint("RIGHT", h, "RIGHT", 0, 0)
+        h.desc:SetJustifyH("LEFT")
+        h.desc:SetWordWrap(false)
+        headers[i] = h
+    end
+    return h
+end
+
+local function FillRow(row, option, isLast)
+    local enabled = OptionEnabled(option)
+    row.option = option
+    row.label:SetText(option.label)
+    row.label:SetTextColor(enabled and C.text[1] or C.textDim[1], enabled and C.text[2] or C.textDim[2], enabled and C.text[3] or C.textDim[3])
+    if not enabled and option.disabledHint then
+        row.desc:SetText(option.disabledHint)
+        row.desc:SetTextColor(C.red[1], C.red[2], C.red[3])
+    else
+        row.desc:SetText(ShortDesc(option))
+        row.desc:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
+    end
+    local isSlider = option.type == "slider"
+    local isButton = option.type == "button"
+    local isChoice = option.type == "choice"
+    row.switch:SetShown(not isSlider and not isButton and not isChoice)
+    row.slider:SetShown(isSlider)
+    row.slider.value:SetShown(isSlider)
+    row.action:SetShown(isButton)
+    row.choice:SetShown(isChoice)
+    if isSlider then
+        SetSlider(row, option, enabled)
+    elseif isChoice then
+        SetChoice(row, option, enabled)
+    elseif isButton then
+        row.action.text:SetText(option.buttonText or option.label)
+        row.action:SetAlpha(enabled and 1 or 0.4)
+    else
+        SetSwitch(row.switch, option.get() and true or false, enabled)
+    end
+    row.previewButton:SetShown(option.preview ~= nil and not isSlider and not isButton and not isChoice)
+    row.line:SetShown(not isLast)
+    row:Show()
+end
+
+-- Hält die Scrollposition im gültigen Bereich (ohne die Vorschau zu schließen)
+local function ClampScroll()
+    local maxScroll = math.max(0, (scrollChild:GetHeight() or 0) - (scroll:GetHeight() or 0))
+    local current = scroll:GetVerticalScroll() or 0
+    if current > maxScroll then scroll:SetVerticalScroll(maxScroll) end
+    UpdateScrollBar()
+end
+
+-- blocks: Liste von { name =, desc =, header = true/false, options = {…} }
+local function Layout(blocks)
+    local y, r, c, hc = 0, 0, 0, 0
+    for bi, block in ipairs(blocks) do
+        if bi > 1 then y = y + BLOCK_GAP end
+        if block.header then
+            hc = hc + 1
+            local h = GetHeader(hc)
+            h:ClearAllPoints()
+            h:SetPoint("TOPLEFT", 0, -y)
+            h:SetPoint("TOPRIGHT", 0, -y)
+            h.name:SetText(block.name)
+            h.desc:SetText(block.desc or "")
+            h:Show()
+            y = y + HEADER_H
+        end
+        c = c + 1
+        local card = GetCard(c)
+        card:ClearAllPoints()
+        card:SetPoint("TOPLEFT", 0, -y)
+        card:SetPoint("TOPRIGHT", 0, -y)
+        card:SetHeight(#block.options * ROW_H)
+        card:Show()
+        for oi, option in ipairs(block.options) do
+            r = r + 1
+            local row = GetRow(r)
+            local top = y + (oi - 1) * ROW_H
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", 14, -top)
+            row:SetPoint("TOPRIGHT", -14, -top)
+            FillRow(row, option, oi == #block.options)
+        end
+        y = y + #block.options * ROW_H
+    end
+    for i = r + 1, #rows do
+        rows[i].option = nil
+        rows[i]:Hide()
+    end
+    for i = c + 1, #cards do cards[i]:Hide() end
+    for i = hc + 1, #headers do headers[i]:Hide() end
+    scrollChild:SetHeight(math.max(y, 1))
+    ClampScroll()
 end
 
 ---------------------------------------------------------------------------
 -- Suche
 ---------------------------------------------------------------------------
 
+-- Treffer nach Bereichen gruppiert; gibt Blöcke und Anzahl zurück
 local function SearchResults(query)
     query = query:lower()
-    local results = {}
-    for _, entry in ipairs(sectionOrder) do
-        for _, option in ipairs(sections[entry.section]) do
-            local haystack = (option.label .. " " .. (option.tooltip or "") .. " " .. entry.section):lower()
-            if haystack:find(query, 1, true) then table.insert(results, option) end
+    local blocks, count = {}, 0
+    for _, page in ipairs(pages) do
+        for _, name in ipairs(page.sections) do
+            local found = {}
+            for _, option in ipairs(sections[name]) do
+                local haystack = (option.label .. " " .. (option.tooltip or "") .. " " .. name .. " " .. page.name):lower()
+                if haystack:find(query, 1, true) then table.insert(found, option) end
+            end
+            if #found > 0 then
+                count = count + #found
+                table.insert(blocks, { name = name, desc = page.name, header = true, options = found })
+            end
         end
     end
-    return results
+    return blocks, count
 end
 
 search:SetScript("OnTextChanged", function(self)
     placeholder:SetShown(self:GetText() == "")
+    SetScroll(0)
     preview:Hide()
     Refresh()
 end)
@@ -778,36 +953,42 @@ function Refresh()
     if not ns.db then return end
 
     for _, b in ipairs(navButtons) do
-        local isSelected = b.section == selected and search:GetText() == ""
+        local isSelected = b.page.name == selected and search:GetText() == ""
         b.active:SetShown(isSelected)
         b.bar:SetShown(isSelected)
         local c = isSelected and { 1, 1, 1, 1 } or C.textSide
         b.text:SetTextColor(c[1], c[2], c[3])
-        local dot = SectionActive(b.section) and C.green or C.off
+        local dot = PageActive(b.page) and C.green or C.off
         b.dot:SetVertexColor(dot[1], dot[2], dot[3])
     end
 
     local query = search:GetText()
-    local options, rest
+    local blocks = {}
     if query ~= "" then
+        local count
+        blocks, count = SearchResults(query)
         title:SetText("Suche")
-        options = SearchResults(query)
-        subtitle:SetText(#options == 0 and ("Nichts gefunden für „" .. query .. "“.")
-            or (#options == 1 and "1 Option gefunden." or (#options .. " Optionen gefunden.")))
+        subtitle:SetText(count == 0 and ("Nichts gefunden für „" .. query .. "“.")
+            or (count == 1 and "1 Option gefunden." or (count .. " Optionen gefunden.")))
+        emptyText:SetText(count == 0 and "Versuch ein anderes Wort, z. B. „Taschen“ oder „Bedrohung“." or "")
     else
+        local page
+        for _, p in ipairs(pages) do
+            if p.name == selected then page = p break end
+        end
         title:SetText(selected or "")
-        subtitle:SetText(SUBTITLES[selected] or "")
-        options = sections[selected] or {}
+        subtitle:SetText(PAGE_SUBTITLES[selected] or "")
+        if page then
+            -- Seiten mit nur einem Bereich brauchen keine Zwischenüberschrift
+            local withHeader = #page.sections > 1
+            for _, name in ipairs(page.sections) do
+                table.insert(blocks, { name = name, desc = SUBTITLES[name], header = withHeader, options = sections[name] })
+            end
+        end
+        emptyText:SetText("")
     end
-    rest = FillRows(options)
-    if rest > 0 then
-        emptyText:SetText(("… und %d weitere – genauer suchen."):format(rest))
-        emptyText:Show()
-    else
-        emptyText:Hide()
-    end
-    preview:ClearAllPoints()
-    preview:SetPoint("TOPLEFT", card, card:IsShown() and "BOTTOMLEFT" or "TOPLEFT", 0, -12)
+    Layout(blocks)
+    emptyText:SetShown(#blocks == 0)
 end
 
 frame:SetScript("OnShow", function()
