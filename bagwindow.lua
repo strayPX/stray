@@ -18,7 +18,7 @@ local _, ns = ...
 local L = ns.L
 
 ns.defaults.bagHeight = 0 -- 0 = Höhe automatisch nach Inhalt
-ns.defaults.bagSlotsBar = false -- Taschenplätze unten in der Seitenleiste
+ns.defaults.bagSlotsBar = true -- Taschenplätze unten in der Seitenleiste
 
 local IsSecret = ns.IsSecret
 
@@ -2408,6 +2408,11 @@ end
 ---------------------------------------------------------------------------
 
 ns.On("PLAYER_LOGIN", function()
+    -- Taschenplätze sind jetzt standardmäßig an: einmal auch für schon gespeicherte Einstellungen
+    if not ns.db.bagSlotsBarAuto then
+        ns.db.bagSlotsBarAuto = true
+        ns.db.bagSlotsBar = true
+    end
     local h = tonumber(ns.db.bagHeight)
     ns.db.bagHeight = (h and h > 0) and math.max(MinH(), math.min(MAX_H, math.floor(h + 0.5))) or 0
     PinSlots() -- altes Anheft-Format umstellen, Ruhestein auf Platz 1, Plätze 6+ verwerfen
