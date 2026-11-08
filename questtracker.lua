@@ -945,10 +945,14 @@ function U.Layout()
         fs:SetText(L["Keine Quests im Questlog"])
         y = y + 16
     end
+    -- Platz für die Berufsreagenzien-Kopfzeile (und die „weitere Quests“-Zeile) fest reservieren
+    local recipes = data.recipes
+    local hasRecipes = type(recipes) == "table" and #recipes > 0
+    local reserve = hasRecipes and (S.zoneH + 6 + S.moreH + 2) or 0
     local zoneMark, zoneFresh
     for i, e in ipairs(elements) do
         local last = (i == #elements)
-        local limit = maxH - S.bottom - (last and 0 or (S.moreH + 2))
+        local limit = maxH - S.bottom - reserve - (last and 0 or (S.moreH + 2))
         local mark = P.Mark()
         local ny
         if e.kind == "zone" then
@@ -978,40 +982,32 @@ function U.Layout()
         end
         y = ny
     end
-    -- Berufsreagenzien unter den Quests (nur wenn alle Quests Platz hatten)
-    local recipes = data.recipes
-    local recipeRest = 0
-    if not stopped and type(recipes) == "table" and #recipes > 0 then
-        local shut = ns.db.questTrackerRecipesCollapsed and true or false
-        local start = y + 4
-        local mark = P.Mark()
-        local ny = U.DrawRecipesHead(#recipes, shut, start, innerW)
-        if ny > maxH - S.bottom and y > S.header + 8 then
-            P.Rollback(mark)
-            recipeRest = #recipes
-        else
-            y = ny
-            if not shut then
-                for i, r in ipairs(recipes) do
-                    local rmark = P.Mark()
-                    local ry = U.DrawRecipe(r, y, innerW)
-                    local rlimit = maxH - S.bottom - (i == #recipes and 0 or (S.moreH + 2))
-                    if ry > rlimit and i > 1 then
-                        P.Rollback(rmark)
-                        recipeRest = #recipes - i + 1
-                        break
-                    end
-                    y = ry
-                end
-            end
-        end
-    end
+    -- „weitere Quests“ direkt unter den Quests, danach die Berufsreagenzien (Kopfzeile ist reserviert)
     local rest = (data.total or 0) - drawn - hiddenByZone
     if stopped and rest > 0 then
         y = U.DrawMore(y + 2, L("+ %d weitere Quests", rest), true)
-    elseif recipeRest > 0 then
+    end
+    local recipeRest = 0
+    if hasRecipes then
+        local shut = ns.db.questTrackerRecipesCollapsed and true or false
+        y = U.DrawRecipesHead(#recipes, shut, y + 4, innerW)
+        if not shut then
+            for i, r in ipairs(recipes) do
+                local rmark = P.Mark()
+                local ry = U.DrawRecipe(r, y, innerW)
+                local rlimit = maxH - S.bottom - (i == #recipes and 0 or (S.moreH + 2))
+                if ry > rlimit and i > 1 then
+                    P.Rollback(rmark)
+                    recipeRest = #recipes - i + 1
+                    break
+                end
+                y = ry
+            end
+        end
+    end
+    if recipeRest > 0 then
         y = U.DrawMore(y + 2, L("+ %d weitere Rezepte", recipeRest), true)
-    elseif ns.db.questTrackerShowAll and y > normalMax then
+    elseif not (stopped and rest > 0) and ns.db.questTrackerShowAll and y > normalMax then
         y = U.DrawMore(y + 2, L["Weniger anzeigen"], false)
     end
     local h = y + S.bottom
