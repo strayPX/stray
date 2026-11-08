@@ -274,6 +274,9 @@ end
 friendsCell.count = Text(friendsCell, 10, FONT_BODY, "OUTLINE")
 friendsCell.count:SetPoint("BOTTOMRIGHT", friendsCell, "BOTTOMRIGHT", -1, 1)
 
+-- Freundesliste in einem eigenen Block (hält die Zahl der Datei-weiten locals unter Luas Grenze von 200)
+local UpdateFriendCount
+do
 -- Deutsche Schlüssel; übersetzt erst beim Anzeigen (Sprachumschaltung)
 local BNET_CLIENT_NAMES = { App = "Battle.net", BSAp = "Battle.net (Handy)", WoW = "WoW" }
 
@@ -335,7 +338,7 @@ local function BNetFriends()
     return list
 end
 
-local function UpdateFriendCount()
+function UpdateFriendCount()
     local count = #WowFriends()
     if BNGetNumFriends then
         local ok, _, online = pcall(BNGetNumFriends)
@@ -413,6 +416,7 @@ end
 for _, event in ipairs({ "FRIENDLIST_UPDATE", "BN_FRIEND_ACCOUNT_ONLINE", "BN_FRIEND_ACCOUNT_OFFLINE",
     "BN_FRIEND_INFO_CHANGED", "BN_CONNECTED", "BN_DISCONNECTED", "BN_FRIEND_LIST_SIZE_CHANGED" }) do
     SafeOn(event, ScheduleFriends)
+end
 end
 
 -- stray-Knopf -------------------------------------------------------------
@@ -1244,6 +1248,9 @@ clock.text = Text(clock, 12, FONT_BODY, "OUTLINE")
 clock.text:SetPoint("CENTER")
 clock:Hide()
 
+-- (eigener Block: hält die Zahl der Datei-weiten locals unter Luas Grenze von 200)
+local LayoutClock, HideBlizzardClock, ApplyClock
+do
 -- Blizzards Koordinaten (Edit Mode „Spielerkoordinaten“, CVar minimapShowPlayerCoords) stehen
 -- bei der runden Karte 8–18 px unter der Minimap: die Uhr rückt dann darunter.
 local function BlizzardCoordsOn()
@@ -1253,7 +1260,7 @@ end
 
 local clockLayoutKey = nil
 
-local function LayoutClock(force)
+function LayoutClock(force)
     local square = ns.IsSquareMinimap and ns.IsSquareMinimap() or false
     local clockOn = UIOn("hudClock") and true or false
     local coordsOn = (not square) and BlizzardCoordsOn()
@@ -1319,7 +1326,7 @@ end)
 local clockTicker
 local hookedClock = {} -- Blizzard-Uhrknöpfe mit OnShow-Hook (keine Felder auf Blizzard-Frames)
 
-local function HideBlizzardClock()
+function HideBlizzardClock()
     local b = _G.TimeManagerClockButton
     if not b then return end
     pcall(b.Hide, b)
@@ -1331,7 +1338,7 @@ local function HideBlizzardClock()
     end
 end
 
-local function ApplyClock(toggled)
+function ApplyClock(toggled)
     LayoutClock(true)
     if UIOn("hudClock") then
         UpdateClock()
@@ -1345,6 +1352,7 @@ local function ApplyClock(toggled)
         if clockTicker then clockTicker:Cancel() clockTicker = nil end
         if toggled and _G.TimeManagerClockButton then pcall(_G.TimeManagerClockButton.Show, _G.TimeManagerClockButton) end
     end
+end
 end
 
 -- minimap.lua meldet, wenn die Karte eckig/rund wird oder die Größe wechselt
@@ -1392,6 +1400,9 @@ mainBar:SetStatusBarColor(C.xp[1], C.xp[2], C.xp[3], C.xp[4])
 mainBar:SetMinMaxValues(0, 1)
 mainBar:SetValue(0)
 
+-- (eigener Block: hält die Zahl der Datei-weiten locals unter Luas Grenze von 200)
+local LayoutXPBar, SetXPTexts
+do
 -- Drei Texte: links Stufe und Prozent, Mitte Erholt (+ EP-Tracker), rechts Quest-EP.
 -- Schatten statt Kontur, damit die Schrift auf der Leiste ruhig und lesbar bleibt.
 local function XPText(justify)
@@ -1422,7 +1433,7 @@ local function XPHeight() return XPDim("xpBarHeight", 10, 40, 20) end
 local function XPFontSize() return XPDim("xpBarFontSize", 8, 20, 13) end
 
 -- Größe und Schrift auf ganze Pixel
-local function LayoutXPBar()
+function LayoutXPBar()
     xpBar:SetSize(XPWidth(), XPHeight())
     local size = XPFontSize()
     for _, fs in ipairs({ xpLeft, xpMid, xpRight }) do
@@ -1430,10 +1441,11 @@ local function LayoutXPBar()
     end
 end
 
-local function SetXPTexts(left, mid, right)
+function SetXPTexts(left, mid, right)
     xpLeft:SetText(left or "")
     xpMid:SetText(mid or "")
     xpRight:SetText(right or "")
+end
 end
 
 -- Zeile des EP-Trackers (xptracker.lua), falls an und mit Daten
@@ -1868,14 +1880,17 @@ local function UnparkBlizzard()
     if ns.ShowBlizzardBarArt then pcall(ns.ShowBlizzardBarArt) end
 end
 
+local SchedulePark
+do
 local parkScheduled = false
-local function SchedulePark()
+function SchedulePark()
     if parkScheduled or not BottomActive() then return end
     parkScheduled = true
     C_Timer.After(0, function()
         parkScheduled = false
         pcall(ParkBlizzard)
     end)
+end
 end
 
 -- Blizzard setzt die Knöpfe bei Fahrzeug, Haustierkampf oder Edit Mode neu – zurückholen
@@ -2097,7 +2112,18 @@ end
 local bagButton = MakeBarButton(nil, "strayBagButton")
 bagButton.icon:ClearAllPoints()
 bagButton.icon:SetPoint("TOP", bagButton, "TOP", 0, 0)
-SetGlyph(bagButton, nil, { "Interface\\Buttons\\Button-Backpack-Up", "Interface\\Icons\\INV_Misc_Bag_08" })
+-- Eigenes Taschensymbol (media/bag.tga, Variante „WoW × Modern“ mit Rahmen, außen transparent);
+-- Blizzards Rucksack nur als Ersatz, falls die Textur fehlt
+do
+    local BAG_ICON = "Interface\\AddOns\\stray\\media\\bag"
+    if SetFirstTexture(bagButton.icon, { BAG_ICON }) then
+        bagButton.icon:SetTexCoord(0, 1, 0, 1)
+        SetFirstTexture(bagButton.glow, { BAG_ICON })
+        bagButton.glow:SetTexCoord(0, 1, 0, 1)
+    else
+        SetGlyph(bagButton, nil, { "Interface\\Buttons\\Button-Backpack-Up", "Interface\\Icons\\INV_Misc_Bag_08" })
+    end
+end
 
 bagButton.fill = CreateFrame("StatusBar", nil, bagButton)
 bagButton.fill:SetPoint("BOTTOM", bagButton, "BOTTOM", 0, 0)
@@ -2213,14 +2239,17 @@ local function LayoutBottom()
     UpdatePortrait()
 end
 
+local ScheduleBags
+do
 local bagTimer = false
-local function ScheduleBags()
+function ScheduleBags()
     if bagTimer or not BottomActive() then return end
     bagTimer = true
     C_Timer.After(0.2, function()
         bagTimer = false
         pcall(UpdateBags)
     end)
+end
 end
 
 for _, event in ipairs({ "BAG_UPDATE", "BAG_UPDATE_DELAYED", "BAG_CONTAINER_UPDATE", "PLAYER_EQUIPMENT_CHANGED" }) do
@@ -2236,6 +2265,7 @@ if type(UpdateMicroButtons) == "function" then
 end
 
 -- Live-Porträt: bei Ausrüstungs- oder Modellwechsel neu zeichnen (gedrosselt)
+do
 local portraitTimer = false
 local function SchedulePortrait(unit)
     if ns.IsSecret(unit) then return end
@@ -2253,6 +2283,7 @@ for _, event in ipairs({ "UNIT_PORTRAIT_UPDATE", "UNIT_MODEL_CHANGED", "PLAYER_E
         if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PORTRAITS_UPDATED" then unit = nil end
         SchedulePortrait(unit)
     end)
+end
 end
 
 -- Beim Umschalten von „Taschenleiste unten rechts“ bzw. der Hauptoption und nach dem Login

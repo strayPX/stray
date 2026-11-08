@@ -1,6 +1,43 @@
-# stray 0.22.0-alpha
+# stray 0.23.0-alpha
 
-Diese Version enthält auch 0.21.0-alpha und 0.20.0-alpha, die nie einzeln veröffentlicht wurden (siehe unten).
+Diese Version enthält auch 0.22.0-alpha, 0.21.0-alpha und 0.20.0-alpha, die nie einzeln veröffentlicht wurden (siehe unten).
+
+**Neues stray-Fenster**
+- Neu aufgebaut: breites Suchfeld oben, links die Seiten **Zentrale** · Oberfläche (Aktionsleisten, Einheiten, Taschen & Minimap) · Spielhilfen (Kampf & Anzeigen, Komfort) · System (Profile, Sprache & System), unten links die Profil-Auswahl.
+- Jede Seite mit Häkchen **„Aktiv“** und **Reitern**, Inhalt in einer Spalte mit klaren Abschnitten. Regler haben ein **Zahlenfeld** zum Eintippen, Auswahlen sind Klapplisten.
+- **Position X/Y** und „Zentrieren“ direkt auf der Seite. Bei mehreren Leisten bzw. DMG-Meter-Fenstern wählst du oben, welche du einstellst.
+- Unten „n Änderungen“, **Verwerfen** und **Übernehmen** (neu laden nur, wenn nötig).
+- Auf Englisch heißt „Komfort“ jetzt **„Quality of Life“**.
+
+**Bearbeitungsmodus**
+- Schlanke Leiste oben: Zurück, Raster, Einrasten, Alles zurücksetzen, **Tasten belegen**, Fertig.
+- Die gewählte Anzeige bekommt einen lila Rahmen mit Eckgriffen; das stray-Fenster springt danach zur passenden Seite.
+
+**DMG-Meter**
+- **„+“** im Kopf öffnet eine Kopie, die oben andockt – bis zu **5 Fenster**. „×“ schließt ein zusätzliches Fenster.
+- Alle Fenster lassen sich an jedes andere andocken oder frei verschieben. Dein bisheriges zweites Fenster wird zu Fenster 2.
+
+**Questtracker (neu)**
+- Eigene Questliste **rechts am Bildschirmrand**, leicht dunkel hinterlegt, rechtsbündig.
+- Gebiete einzeln einklappbar, Klick auf „Quests“ klappt alles ein, Größe unten links ziehen.
+- Questnamen in **Schwierigkeitsfarbe**, erfüllte Ziele grün mit Haken, „Bereit zur Abgabe“.
+- **Questgegenstände als Knopf** direkt an der Quest – auch im Kampf benutzbar.
+- Blizzards Questverfolgung wird ausgeblendet. Mit **Questie** arbeitet stray zusammen (Hinweis, falls Questies eigene Liste noch an ist).
+
+**Tasten belegen (neu)**
+- Über einen Knopf der stray-Aktionsleisten fahren und eine Taste drücken – auch **Shift/Strg/Alt**-Kombinationen, Maustasten 3–5 und Mausrad.
+- Entf oder Rechtsklick löscht, Speichern für alle Charaktere oder nur diesen, Abbrechen stellt alles wieder her. Start über die Aktionsleisten-Seite, den Bearbeitungsmodus oder `/stray keys`.
+
+**Taschen**
+- **Anheft-Leiste** mit höchstens 5 Plätzen; Angeheftetes steht zusätzlich normal in der Tasche, mehr Abstand dazwischen.
+- **Taschenplätze** im Taschenfenster (Option): Rucksack und Taschen mit freien Plätzen, Hover hebt die Plätze hervor.
+- **Tasche tauschen mit Umpacken:** neue Tasche auf eine alte ziehen – stray räumt die alte aus, setzt die neue ein und legt die alte ab. Reicht der Platz nicht, sagt stray, wie viele Plätze fehlen.
+- Neues **Taschensymbol** in der Taschenleiste unten rechts.
+
+**Warnung bei anderen Addons (neu)**
+- Schaltest du etwas ein, das sich mit einem installierten Addon beißt (z. B. Questie, Leatrix Plus, Bagnon, Details, Bartender, ElvUI), fragt stray vorher nach und sagt, was du dort ausschalten solltest. stray ändert nie Einstellungen anderer Addons.
+
+# Aus 0.22.0-alpha
 
 **Neues stray-Fenster**
 - Ganz neu gestaltet: ruhiges Lila, neues stray-Logo (Siegel), links die Seiten in drei Gruppen (Alltag, Kampf & Gruppe, Oberfläche) mit eigenen Symbolen und einem Zähler, wie viele Optionen an sind.

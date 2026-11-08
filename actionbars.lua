@@ -133,10 +133,12 @@ end
 -- Tastenkürzel kurz schreiben
 ---------------------------------------------------------------------------
 
--- Dritter Eintrag true: Kürzel ist ein deutscher Sprachschlüssel, wird beim Anzeigen übersetzt
+-- Dritter Eintrag true: Kürzel ist ein deutscher Sprachschlüssel, wird beim Anzeigen übersetzt.
+-- Seit 0.23: Modifikatoren mit Bindestrich (S-R, C-1, A-S-2), Maustasten M3–M5, Mausrad MW↑/MW↓.
 local KEY_SHORT = {
-    { "ALT%-", "A" }, { "CTRL%-", "C" }, { "SHIFT%-", "S" }, { "META%-", "M" },
-    { "MOUSEWHEELUP", "WU" }, { "MOUSEWHEELDOWN", "WD" }, { "MIDDLEBUTTON", "M3" }, { "BUTTON", "M" },
+    { "ALT%-", "A-" }, { "CTRL%-", "C-" }, { "SHIFT%-", "S-" }, { "META%-", "Cmd-" },
+    { "MOUSEWHEELUP", "MW↑" }, { "MOUSEWHEELDOWN", "MW↓" },
+    { "MIDDLEBUTTON", "M3" }, { "BUTTON", "M" },
     { "NUMPADPLUS", "N+" }, { "NUMPADMINUS", "N-" }, { "NUMPADMULTIPLY", "N*" },
     { "NUMPADDIVIDE", "N/" }, { "NUMPADDECIMAL", "N," }, { "NUMPAD", "N" },
     { "PAGEUP", "PU" }, { "PAGEDOWN", "PD" }, { "BACKSPACE", "Bks" }, { "SPACE", "Spc" },
@@ -149,16 +151,29 @@ local function ShortKey(key)
     for _, pair in ipairs(KEY_SHORT) do s = s:gsub(pair[1], pair[3] and L[pair[2]] or pair[2]) end
     return s
 end
+ns.ShortKey = ShortKey -- auch für keybinds.lua
 
+-- Alle Tasten eines Befehls (GetBindingKey liefert beliebig viele)
 local function BindingKeys(command)
     if type(GetBindingKey) ~= "function" then return {} end
-    local ok, k1, k2, k3 = pcall(GetBindingKey, command)
-    if not ok then return {} end
+    local res = { pcall(GetBindingKey, command) }
+    if not res[1] then return {} end
     local keys = {}
-    for _, k in ipairs({ k1, k2, k3 }) do
+    for i = 2, #res do
+        local k = res[i]
         if type(k) == "string" and not IsSecret(k) and k ~= "" then table.insert(keys, k) end
     end
     return keys
+end
+
+-- Eigener Befehl eines stray-Knopfs (Tastenbelegung per SetBindingClick, keybinds.lua)
+local function ClickCommand(b)
+    return "CLICK " .. b:GetName() .. ":LeftButton"
+end
+
+-- Läuft gerade die Tastenbelegung per Mouseover (keybinds.lua)?
+local function KeybindMode()
+    return ns.KeybindModeActive and ns.KeybindModeActive() and true or false
 end
 
 ---------------------------------------------------------------------------
@@ -186,8 +201,16 @@ local function SetFont(fs, size)
     end
 end
 
+-- Tastenkürzel in Arial Narrow (hat die Pfeile für MW↑/MW↓, schmal wie Blizzards Kürzel)
+local function SetHotkeyFont(fs, size)
+    local ok, res = pcall(fs.SetFont, fs, "Fonts\\ARIALN.TTF", size, "OUTLINE")
+    if not ok or res == false then SetFont(fs, size) end
+end
+
 local function ApplyFonts(b, size)
-    SetFont(b.hotkey, math.max(8, math.floor(size * 0.28 + 0.5)))
+    SetHotkeyFont(b.hotkey, math.max(9, math.floor(size * 0.30 + 0.5)))
+    -- Lange Kombinationen (A-C-S-MW↑) nicht über den Knopf hinausschreiben
+    pcall(b.hotkey.SetWidth, b.hotkey, math.max(10, size - 4))
     SetFont(b.count, math.max(8, math.floor(size * 0.30 + 0.5)))
     local cd = b.cooldown
     if cd.GetCountdownFontString then
@@ -480,12 +503,20 @@ local function QueueRankScan()
     end)
 end
 
+-- Tasten eines Knopfs: eigene (CLICK-Befehl des Knopfs) und geerbte (Blizzards Leistenbefehl,
+-- per Override auf den Knopf umgeleitet, nur bei angezeigter Leiste)
+local function ButtonKeys(b)
+    local own = BindingKeys(ClickCommand(b))
+    local inherited = BarActive(b.barIndex) and BindingKeys(b.bindingCommand) or {}
+    return own, inherited
+end
+
 local function UpdateHotkey(b)
     local text = ""
-    if ns.db and ns.db.abKeybinds then
-        local keys = BindingKeys(b.bindingCommand)
-        if #keys == 0 then keys = BindingKeys("CLICK " .. b:GetName() .. ":LeftButton") end
-        if keys[1] then text = ShortKey(keys[1]) end
+    if (ns.db and ns.db.abKeybinds) or KeybindMode() then
+        local own, inherited = ButtonKeys(b)
+        local key = own[1] or inherited[1]
+        if key then text = ShortKey(key) end
     end
     b.hotkey:SetText(text)
 end
@@ -505,7 +536,7 @@ end
 -- dann aber ohne Maus (Klicks gehen weiter in die Welt).
 -- Nur Texturen ein-/ausblenden (geht auch im Kampf), der sichere Knopf selbst bleibt sichtbar.
 local function UpdateVisibility(b)
-    local show = b.hasAction or showGrid or ns.IsConfigOpen()
+    local show = b.hasAction or showGrid or ns.IsConfigOpen() or KeybindMode()
     -- Dauerhaft gezeigter leerer Platz (nur Optik, keine Maus)
     local ghost = not show and ShowEmptyOn()
     if ghost then
@@ -1258,10 +1289,60 @@ function ns.ActionBarsToggled()
     end
 end
 
-ns.AddOption(2, "Aktionsleisten", {
+---------------------------------------------------------------------------
+-- Schnittstelle für die Tastenbelegung per Mouseover (keybinds.lua)
+---------------------------------------------------------------------------
+
+-- Eigene Leisten wirksam (Hauptoption + Unterschalter) und gebaut?
+function ns.ActionBarsActive()
+    return Enabled() and built
+end
+
+-- Alle stray-Knöpfe (leer, solange die Leisten nicht gebaut sind)
+function ns.ActionBarButtons()
+    return built and buttons or {}
+end
+
+-- Tasten eines Knopfs: eigene (CLICK-Befehl), geerbte (Blizzards Leistenbefehl), Befehle dazu
+function ns.ActionBarButtonKeys(b)
+    local own, inherited = ButtonKeys(b)
+    return own, inherited, ClickCommand(b), b.bindingCommand
+end
+
+-- Befehl → Leiste, Knopf (CLICK-Befehl eines stray-Knopfs oder Blizzards Leistenbefehl), sonst nil
+function ns.ActionBarCommandSlot(command)
+    if type(command) ~= "string" or IsSecret(command) or command == "" then return nil end
+    local l, i = command:match("^CLICK strayAB(%d)Button(%d+):LeftButton$")
+    if l then return tonumber(l), tonumber(i), "stray" end
+    for bl, info in ipairs(BARS) do
+        local n = command:match("^" .. info.binding .. "(%d+)$")
+        n = tonumber(n)
+        if n and n >= 1 and n <= NUM_BUTTONS then return bl, n, "blizzard" end
+    end
+    return nil
+end
+
+-- Nach einer Änderung der Belegung: Umleitungen und Kürzel sofort neu (nicht auf UPDATE_BINDINGS warten)
+function ns.ActionBarsRefreshBindings()
+    if not built then return end
+    if Enabled() then
+        lastBindings = nil
+        ApplyBindings()
+    end
+    ForEach(UpdateHotkey)
+end
+
+-- Belegungsmodus an/aus: leere Plätze zeigen bzw. wieder ausblenden, Kürzel neu
+function ns.ActionBarsRefreshVisibility()
+    if not built then return end
+    ForEach(UpdateHotkey)
+    ForEach(UpdateVisibility)
+end
+
+ns.AddOption(2, "Tastenbelegung", {
     key = "abKeybinds",
     label = L["Tastenkürzel anzeigen"],
-    tooltip = L["Zeigt die Taste jedes Knopfs klein oben rechts (z. B. „S1“ für Umschalt+1)."],
+    tooltip = L["Zeigt die Taste jedes Knopfs klein oben rechts, in Kurzform: „S-R“ = Umschalt+R, „C-1“ = Strg+1, „A-“ = Alt, „M4“ = Maustaste 4, „MW↑“ = Mausrad hoch."],
     isEnabled = IsOn,
     disabledHint = DISABLED_HINT,
     set = function(value)

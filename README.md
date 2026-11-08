@@ -1,6 +1,6 @@
 # stray
 
-Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Minimap-Knopf öffnet das Einstellungsfenster: links die Seiten in drei Gruppen und eine Stichwort-Suche, rechts die Optionen in Karten. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Beim Schließen übernimmst du Änderungen mit „Neu laden“ oder nimmst sie mit „Verwerfen“ zurück. Auf deutschen Clients ist stray deutsch, sonst englisch – umstellbar unter System → Sprache. Alle Optionen sind anfangs aus (außer dem Minimap-Knopf).
+Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Minimap-Knopf öffnet das Einstellungsfenster: oben die Stichwort-Suche, links die Seiten (Zentrale, Oberfläche, Spielhilfen, System) und die Profil-Auswahl, rechts die Optionen mit Reitern, Zahlenfeldern und Position X/Y. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Beim Schließen übernimmst du Änderungen mit „Neu laden“ oder nimmst sie mit „Verwerfen“ zurück. Auf deutschen Clients ist stray deutsch, sonst englisch – umstellbar unter System → Sprache. Alle Optionen sind anfangs aus (außer dem Minimap-Knopf).
 
 ## Optionen
 
@@ -111,6 +111,15 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 - **Twink-Übersicht:** Stufe, Gold, erholte EP und Spielzeit aller Charaktere – auch per `/stray alts`.
 - **Interface-Einstellungen für alle Charaktere:** übernimmt charakterbezogene Interface-Einstellungen beim Wechsel.
 
+**Questtracker**
+- **Questliste rechts am Rand:** nach Gebiet gruppiert und einklappbar, Schwierigkeitsfarben, Questgegenstände als Knopf, Größe ziehbar; blendet Blizzards Questverfolgung aus. Läuft Questie mit eigener Liste, weist stray darauf hin.
+
+**Tastenbelegung**
+- **Tasten belegen:** über einen Knopf der stray-Leisten fahren und Taste drücken (mit Shift/Strg/Alt, Maustasten, Mausrad) – `/stray keys`.
+
+**Andere Addons**
+- Bevor du etwas einschaltest, das sich mit einem installierten Addon beißt, warnt stray und sagt, was dort auszuschalten ist.
+
 Bei Händler und Quests verhindert gedrückte **Shift**-Taste die Automatik. Anzeigen am Bildschirm verschiebst du mit **Shift + linker Maustaste**.
 
 Hinweis: Hat ein anderes Addon (z. B. Leatrix Plus oder Questie) die gleiche Automatik aktiv, nutze nur eins von beiden.
@@ -133,6 +142,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 0.23.0-alpha – Neues stray-Fenster (Seiten, Reiter, Zahlenfelder, Position), DMG-Meter bis 5 Fenster per „+“, eigener Questtracker mit Questgegenstand-Knöpfen, Tasten belegen per Mouseover, Anheft-Leiste (5 Plätze), Taschenplätze und Tasche tauschen, neues Taschensymbol, Warnung bei Konflikten mit anderen Addons
 - 0.22.0-alpha – Neues stray-Fenster (Zentrale, Stichwort-Suche, Neu laden/Verwerfen), Hauptschalter stray-Oberfläche, Mittelklick ohne Ping, neue Taschenleiste, lesbare EP-Leiste + EP-Tracker, Begleiter am Gruppenrahmen, Bearbeitungsmodus mit Fenster je Anzeige und Pfeiltasten, laufender Rand beim Vorrat, englische Übersetzung; Nachtrag: Sprache umschaltbar, Logo Siegel, Fenster in der Größe ziehbar, Sammlung/Abenteuerführer, Begleiter-Position, Anheft-Leiste im Taschenfenster, Rückgängig im Bearbeitungsmodus, lila Look überall
 - 0.21.0-alpha – Taschenfenster (Größe ziehen, blättern, sortieren, Quest-Kategorie), zweites DMG-Meter-Fenster zum Andocken, neue Bearbeiten-Leiste (Einrasten, Esc), leere Aktionsplätze dauerhaft, neue Taschenleiste, eckige Minimap, Menü per mittlerer Maustaste
 - 0.20.0-alpha – Einstellungsfenster mit 9 Seiten statt 22 (Zwischenüberschriften, scrollbar); Testgruppe zeigt den eigenen Charakter

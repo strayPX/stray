@@ -8,7 +8,7 @@ E["KAMPF & GRUPPE"] = "COMBAT & GROUP"
 E["OBERFLÄCHE"] = "INTERFACE"
 
 -- Seiten (ui.lua)
-E["Komfort"] = "Convenience"
+E["Komfort"] = "Quality of Life"
 E["Taschen"] = "Bags"
 E["Quests"] = "Quests"
 E["Kampf"] = "Combat"

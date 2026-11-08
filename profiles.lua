@@ -116,10 +116,71 @@ local POSITION_KEYS = { editBarPoint = true }
 local NONE = "none"
 local ENUMS = {
     dmMode = { damage = true, healing = true },
-    dm2Mode = { damage = true, healing = true },
-    dm2Dock = { top = true, bottom = true, [NONE] = true },
     language = { auto = true, deDE = true, enUS = true },
 }
+
+-- Altes zweites DMG-Meter-Fenster (bis 0.22.x): aus alten Profilen übernehmen, damagemeter.lua
+-- macht beim Anmelden Fenster 2 daraus
+local LEGACY_DM2 = {
+    dm2Show = "boolean", dm2Width = "number", dm2Height = "number",
+    dm2Mode = { damage = true, healing = true },
+    dm2Dock = { top = true, bottom = true, [NONE] = true },
+}
+
+---------------------------------------------------------------------------
+-- DMG-Meter-Fensterliste (ns.db.dmWindows, seit 0.23.0-alpha) als ein Eintrag „dmw“:
+-- Fenster durch „+“ getrennt, je Fenster „n,modus,seite,ziel“ (leere Felder erlaubt),
+-- z. B. "2,healing,top,1+3,damage,,". Fenster 1 steht nur drin, wenn es angedockt ist.
+---------------------------------------------------------------------------
+
+local DM_MAX = 5
+local DM_MODES = { damage = true, healing = true }
+local DM_SIDES = { top = true, bottom = true }
+
+local function EncodeDMWindows(list)
+    if type(list) ~= "table" then return "" end
+    local parts = {}
+    for n = 1, DM_MAX do
+        local e = list[n]
+        if type(e) == "table" then
+            local mode = (n > 1 and DM_MODES[e.mode]) and e.mode or ""
+            local side, to = "", ""
+            local t = e.dockTo
+            if DM_SIDES[e.dockSide] and type(t) == "number" and t >= 1 and t <= DM_MAX and t == math.floor(t) and t ~= n then
+                side, to = e.dockSide, tostring(t)
+            end
+            if n > 1 or side ~= "" then
+                table.insert(parts, n .. "," .. mode .. "," .. side .. "," .. to)
+            end
+        end
+    end
+    return table.concat(parts, "+")
+end
+
+-- Gibt die Liste zurück oder nil, wenn der Text ungültig ist
+local function DecodeDMWindows(text)
+    local list = {}
+    if type(text) ~= "string" then return nil end
+    if text == "" then return list end
+    for item in text:gmatch("[^+]+") do
+        local n, mode, side, to = item:match("^(%d),(%a*),(%a*),(%d*)$")
+        n, to = tonumber(n), tonumber(to)
+        if not n or n < 1 or n > DM_MAX or list[n] then return nil end
+        local e = {}
+        if n > 1 then
+            if not DM_MODES[mode] then return nil end
+            e.mode = mode
+        elseif mode ~= "" then
+            return nil
+        end
+        if side ~= "" or to then
+            if not DM_SIDES[side] or not to or to < 1 or to > DM_MAX or to == n then return nil end
+            e.dockTo, e.dockSide = to, side
+        end
+        if n > 1 or e.dockTo then list[n] = e end
+    end
+    return list
+end
 
 -- Auswahlfelder (choice), die trotzdem als einfacher Wert mitgehen
 local ALLOW_CHOICE = { language = true }
@@ -220,6 +281,11 @@ local function BuildExport()
         if pos then table.insert(parts, key .. "=s:" .. pos) end
     end
 
+    -- DMG-Meter-Fenster: immer mitgeben (auch leer), damit der Import überzählige Fenster schließt
+    if ns.defaults.dmWindows ~= nil then
+        table.insert(parts, "dmw=s:" .. Escape(EncodeDMWindows(db.dmWindows)))
+    end
+
     -- Größen je Anzeige: scales[Anzeige] = Zahl oder { Feld = Zahl, … }
     if type(db.scales) == "table" then
         local keys = {}
@@ -311,6 +377,29 @@ local function ParseImport(text)
 
             if seen[key] then
                 -- doppelte Einträge: nur den ersten verwenden
+            elseif key == "dmw" and ns.defaults.dmWindows ~= nil then
+                seen[key] = true
+                local list = (t == "s") and DecodeDMWindows(value) or nil
+                if not list then
+                    result.invalid = result.invalid + 1
+                elseif EncodeDMWindows(list) ~= EncodeDMWindows(db.dmWindows) then
+                    table.insert(result.changes, { dmWindows = list })
+                end
+            elseif LEGACY_DM2[key] then
+                seen[key] = true
+                local rule = LEGACY_DM2[key]
+                local ok
+                if type(rule) == "table" then
+                    ok = type(value) == "string" and rule[value] == true
+                else
+                    ok = type(value) == rule
+                end
+                if not ok then
+                    result.invalid = result.invalid + 1
+                else
+                    if value == NONE then value = nil end
+                    table.insert(result.changes, { dbKey = key, value = value })
+                end
             elseif scaleKey then
                 seen[key] = true
                 if type(value) ~= "number" or value <= 0 then
@@ -388,6 +477,8 @@ local function ApplyImport(result)
         if change.option then
             local ok = pcall(change.option.set, change.value)
             if not ok then failed = failed + 1 end
+        elseif change.dmWindows then
+            ns.db.dmWindows = change.dmWindows
         elseif change.dbKey then
             ns.db[change.dbKey] = change.value
         elseif change.scaleKey then

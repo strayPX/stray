@@ -7,12 +7,22 @@
 -- Anzeige-Funktionen (SetText, SetFormattedText, SetValue, SetMinMaxValues, AbbreviateNumbers)
 -- weitergereicht – jeweils in pcall. Klassenname und „bin ich das“ sind nie versiegelt.
 --
--- Es gibt bis zu zwei Fenster mit eigenem Modus, eigener Ansicht, Größe und Position. Beide baut
--- dieselbe Fabrik-Funktion (CreateMeter). Fenster 2 lässt sich an Ober- oder Unterkante von
--- Fenster 1 andocken und läuft dann mit (Position und Breite).
+-- Es gibt bis zu fünf Fenster (seit 0.23.0-alpha) mit eigenem Modus, eigener Ansicht, Größe und
+-- Position. Alle baut dieselbe Fabrik-Funktion (CreateMeter). „+“ im Kopf öffnet eine Kopie (gleiche
+-- Größe, gleicher Modus), die oben an dieses Fenster andockt; „×“ schließt ein zusätzliches Fenster.
+-- Jedes Fenster lässt sich an Ober- oder Unterkante eines anderen andocken; angedockte Ketten laufen
+-- mit (Position und Breite folgen dem untersten nicht angedockten Fenster der Kette, der „Wurzel“).
+--
+-- Speicherung: Fenster 1 nutzt weiter dmMode, dmWidth, dmHeight und positions.damagemeter.
+-- ns.db.dmWindows ist die Liste der Fenster: [n] = { mode =, dockTo =, dockSide = } für n = 2–5
+-- (vorhanden = offen); [1] trägt nur die Andock-Angabe von Fenster 1. Breite/Höhe der Fenster 2–5
+-- liegen in dmWidthN/dmHeightN (der Bearbeitungsmodus braucht einfache Schlüssel), die Position in
+-- positions.damagemeterN. Angedockte Fenster haben keine gespeicherte Position.
+-- Das alte zweite Fenster (dm2Show, dm2Mode, dm2Width, dm2Height, dm2Dock) wird beim Anmelden
+-- Fenster 2.
 --
 -- Aktualisiert wird ereignisbasiert (zusammengefasst) und im Kampf zusätzlich etwa alle 0,5 s –
--- beide Fenster gemeinsam, mit höchstens einer Abfrage je Ansicht und Modus.
+-- alle Fenster gemeinsam, mit höchstens einer Abfrage je Ansicht und Modus.
 -- Die Ereignisse sind nur registriert, solange die passende Option an ist.
 
 local _, ns = ...
@@ -20,12 +30,14 @@ local L = ns.L
 
 local IsSecret = ns.IsSecret
 
--- Zweites Fenster (Fenster 1 nutzt weiter dmMode, dmWidth, dmHeight und positions.damagemeter)
-ns.defaults.dm2Show = false
-ns.defaults.dm2Mode = "healing"
-ns.defaults.dm2Width = 230
-ns.defaults.dm2Height = 190
--- dm2Dock ("top", "bottom" oder nil) hat bewusst keinen Standardwert: nil heißt „nicht angedockt“.
+local MAX_WINDOWS = 5
+
+-- Liste der Fenster (siehe oben); Größen der Fenster 2–5
+ns.defaults.dmWindows = {}
+for n = 2, MAX_WINDOWS do
+    ns.defaults["dmWidth" .. n] = 230
+    ns.defaults["dmHeight" .. n] = 190
+end
 
 local DM = C_DamageMeter
 local SESSION_TYPE = Enum and Enum.DamageMeterSessionType
@@ -447,29 +459,226 @@ end
 
 local MENU_ITEM_H = 18
 
--- Andock-Zustand von Fenster 2: "top", "bottom" oder nil
-local function DockState()
-    local d = ns.db and ns.db.dm2Dock
-    if d == "top" or d == "bottom" then return d end
+---------------------------------------------------------------------------
+-- Fensterliste und Andock-Daten (ns.db.dmWindows, siehe Kopf der Datei)
+---------------------------------------------------------------------------
+
+local windows = {} -- [n] = Fenster (nur gebaute; ein geschlossenes bleibt gebaut, aber versteckt)
+local byFrame = {} -- [Frame] = Fenster
+local OpenResetPopup, ApplyDock, Decide, AddWindow, CloseWindow, PublishInstances -- unten definiert
+
+local function List()
+    local db = ns.db
+    if type(db.dmWindows) ~= "table" then db.dmWindows = {} end
+    return db.dmWindows
+end
+
+-- Ist Fenster n offen? Fenster 1 ist immer da (an/aus über „DMG-Meter anzeigen“).
+local function IsOpen(n)
+    if n == 1 then return true end
+    if not ns.db or type(n) ~= "number" or n < 2 or n > MAX_WINDOWS then return false end
+    return type(List()[n]) == "table"
+end
+
+local function OpenCount()
+    local c = 0
+    for n = 1, MAX_WINDOWS do
+        if IsOpen(n) then c = c + 1 end
+    end
+    return c
+end
+
+-- Andock-Angabe von Fenster n: Ziel-Fenster und Seite ("top" = n sitzt oben auf dem Ziel), sonst nil
+local function GetDock(n)
+    if not ns.db then return nil end
+    local e = List()[n]
+    if type(e) ~= "table" then return nil end
+    local to, side = e.dockTo, e.dockSide
+    if type(to) ~= "number" or to == n or not (side == "top" or side == "bottom") then return nil end
+    return to, side
+end
+
+local function SetDock(n, to, side)
+    local l = List()
+    local e = l[n]
+    if type(e) ~= "table" then
+        if not to or n ~= 1 then return end -- Fenster 2–5 nur, wenn offen
+        e = {}
+        l[n] = e
+    end
+    e.dockTo = to
+    e.dockSide = to and side or nil
+    -- Fenster 1 hat in der Liste nur die Andock-Angabe
+    if n == 1 and not to then l[1] = nil end
+end
+
+local function ModeOf(n)
+    local m
+    if n == 1 then
+        m = ns.db and ns.db.dmMode
+    elseif ns.db then
+        local e = List()[n]
+        m = type(e) == "table" and e.mode or nil
+    end
+    if m == "damage" or m == "healing" then return m end
+    return "damage"
+end
+
+local function SetModeOf(n, mode)
+    if mode ~= "damage" and mode ~= "healing" then return end
+    if n == 1 then
+        ns.db.dmMode = mode
+    elseif IsOpen(n) then
+        List()[n].mode = mode
+    end
+end
+
+-- Welches Fenster hängt an Seite side von t? (ignore: dieses Fenster nicht mitzählen)
+local function Dependent(t, side, ignore)
+    for n = 1, MAX_WINDOWS do
+        if n ~= ignore and IsOpen(n) then
+            local to, s = GetDock(n)
+            if to == t and s == side then return n end
+        end
+    end
     return nil
 end
 
-local windows = {}
-local OpenResetPopup -- unten definiert
+-- Ist Seite side von t frei? Belegt durch ein dort angedocktes Fenster oder durch t selbst
+-- (oben angedockt belegt die eigene Unterkante, unten angedockt die eigene Oberkante).
+local function SideFree(t, side, ignore)
+    if Dependent(t, side, ignore) then return false end
+    local _, s = GetDock(t)
+    return not (s and s ~= side)
+end
+
+-- Hängt x (direkt oder über andere) an n, bewegt sich also mit n mit? (x == n zählt mit)
+local function MovesWith(n, x)
+    local cur, guard = x, 0
+    while cur and guard <= MAX_WINDOWS do
+        if cur == n then return true end
+        cur = GetDock(cur)
+        guard = guard + 1
+    end
+    return false
+end
+
+-- Unterstes nicht angedocktes Fenster der Kette (bestimmt Position und Breite)
+local function RootOf(n)
+    local cur, guard = n, 0
+    while guard < MAX_WINDOWS do
+        local to = GetDock(cur)
+        if not to then break end
+        cur, guard = to, guard + 1
+    end
+    return cur
+end
+
+-- Oberstes Fenster im Stapel über n
+local function TopOf(n)
+    local cur = n
+    for _ = 1, MAX_WINDOWS do
+        local up = Dependent(cur, "top")
+        if up then
+            cur = up
+        else
+            local to, side = GetDock(cur)
+            if to and side == "bottom" then cur = to else break end
+        end
+    end
+    return cur
+end
+
+-- Gespeicherte Liste prüfen: ungültige Einträge, Ringe und doppelt belegte Kanten entfernen
+local function Sanitize()
+    local l = List()
+    for k, e in pairs(l) do
+        if type(k) ~= "number" or k < 1 or k > MAX_WINDOWS or k ~= math.floor(k) or type(e) ~= "table" then
+            l[k] = nil
+        end
+    end
+    for n = 2, MAX_WINDOWS do
+        local e = l[n]
+        if e and e.mode ~= "damage" and e.mode ~= "healing" then e.mode = "damage" end
+    end
+    for n = 1, MAX_WINDOWS do
+        local to = GetDock(n)
+        if IsOpen(n) and to and (not IsOpen(to) or MovesWith(n, to)) then SetDock(n, nil) end
+    end
+    local used = {}
+    for n = 1, MAX_WINDOWS do
+        local to, side = GetDock(n)
+        if to then
+            local mine = n .. (side == "top" and "b" or "t")
+            local theirs = to .. (side == "top" and "t" or "b")
+            if used[mine] or used[theirs] then
+                SetDock(n, nil)
+            else
+                used[mine], used[theirs] = true, true
+            end
+        end
+    end
+    if l[1] and not GetDock(1) then l[1] = nil end
+end
+
+-- Altes zweites Fenster (bis 0.22.x) wird Fenster 2
+local LEGACY_KEYS = { "dm2Show", "dm2Mode", "dm2Width", "dm2Height", "dm2Dock" }
+
+local function Migrate()
+    local db = ns.db
+    local l = List()
+    if db.dm2Show == true then
+        local e = { mode = (db.dm2Mode == "damage") and "damage" or "healing" }
+        if db.dm2Dock == "top" or db.dm2Dock == "bottom" then
+            e.dockTo, e.dockSide = 1, db.dm2Dock
+        elseif type(db.positions) == "table" and db.positions.damagemeter2 == nil then
+            e.dockTo, e.dockSide = 1, "top" -- früherer Standard: oben an Fenster 1
+        end
+        l[2] = e
+        if type(db.dm2Width) == "number" then db.dmWidth2 = db.dm2Width end
+        if type(db.dm2Height) == "number" then db.dmHeight2 = db.dm2Height end
+    elseif db.dm2Show == false then
+        l[2] = nil
+    end
+    for _, key in ipairs(LEGACY_KEYS) do db[key] = nil end
+end
+
+-- Lage eines Frames in UIParent-Einheiten (nil, wenn nicht lesbar)
+local function Rect(f)
+    local l, r, t, b = f:GetLeft(), f:GetRight(), f:GetTop(), f:GetBottom()
+    local s, u = f:GetEffectiveScale(), UIParent:GetEffectiveScale()
+    if not (PlainNumber(l) and PlainNumber(r) and PlainNumber(t) and PlainNumber(b)
+            and PlainNumber(s) and PlainNumber(u) and u > 0) then
+        return nil
+    end
+    local k = s / u
+    return l * k, r * k, t * k, b * k
+end
+
+-- Breite angedockter Fenster folgt der Wurzel; für Lösen und Bearbeitungsmodus mitschreiben
+local function SyncWidths()
+    for n = 1, MAX_WINDOWS do
+        local w = windows[n]
+        if w and IsOpen(n) and GetDock(n) then
+            local root = windows[RootOf(n)]
+            if root and root ~= w then ns.db[w.widthKey] = Clamp(ns.db[root.widthKey], MIN_W, MAX_W, DEFAULT_W) end
+        end
+    end
+end
 
 ---------------------------------------------------------------------------
--- Fabrik: ein Meterfenster mit eigenem Zustand
---
--- cfg: name, menuName, posKey, label, defaultPoint, modeKey, defaultMode, widthKey, heightKey,
---      showKey (zusätzlicher Schalter, nur Fenster 2), dockable (nur Fenster 2)
+-- Fabrik: ein Meterfenster mit eigenem Zustand (n = 1–5)
 ---------------------------------------------------------------------------
 
-local function CreateMeter(cfg)
-    local win = { cfg = cfg, view = "overall", viewLabel = nil }
+local function CreateMeter(n)
+    local win = { n = n, view = "overall", viewLabel = nil }
+    win.posKey = (n == 1) and "damagemeter" or ("damagemeter" .. n)
+    win.widthKey = (n == 1) and "dmWidth" or ("dmWidth" .. n)
+    win.heightKey = (n == 1) and "dmHeight" or ("dmHeight" .. n)
     local moving, sizing = false, false
     local manualSizing = false
 
-    local main = CreateFrame("Frame", cfg.name, UIParent)
+    local main = CreateFrame("Frame", (n == 1) and "strayDamageMeter" or ("strayDamageMeter" .. n), UIParent)
     win.frame = main
     main:SetSize(DEFAULT_W, DEFAULT_H)
     main:SetFrameStrata("MEDIUM")
@@ -493,14 +702,33 @@ local function CreateMeter(cfg)
     headerLine:SetPoint("TOPRIGHT", main, "TOPRIGHT", 0, -HEADER_H)
     headerLine:SetHeight(1)
 
-    ns.MakeMovable(main, cfg.posKey, cfg.defaultPoint)
+    -- Größe anwenden (Bearbeitungsmodus, Anmelden). Angedockt gilt die Breite für die ganze Kette.
+    function win.ApplySize()
+        if not ns.db then return end
+        local w = Clamp(ns.db[win.widthKey], MIN_W, MAX_W, DEFAULT_W)
+        local h = Clamp(ns.db[win.heightKey], MIN_H, MAX_H, DEFAULT_H)
+        ns.db[win.widthKey], ns.db[win.heightKey] = w, h
+        if GetDock(n) then
+            main:SetHeight(h)
+            local root = windows[RootOf(n)]
+            if root and root ~= win then
+                ns.db[root.widthKey] = w
+                root.frame:SetWidth(w)
+            end
+        else
+            main:SetSize(w, h)
+        end
+        SyncWidths()
+    end
+
+    ns.MakeMovable(main, win.posKey, { "BOTTOMRIGHT", "BOTTOMRIGHT", -260, 180 + (n - 1) * 210 })
     -- Breite/Höhe auch im Fenster des Bearbeitungsmodus (ab 0.22.0)
-    ns.RegisterMovable(main, cfg.label, nil, {
-        widthKey = cfg.widthKey, heightKey = cfg.heightKey,
+    ns.RegisterMovable(main, "DMG-Meter " .. n, nil, {
+        widthKey = win.widthKey, heightKey = win.heightKey,
         widthMin = MIN_W, widthMax = MAX_W, heightMin = MIN_H, heightMax = MAX_H,
         onSize = function()
             if InCombatLockdown() then return end
-            main:SetSize(ns.db[cfg.widthKey] or DEFAULT_W, ns.db[cfg.heightKey] or DEFAULT_H)
+            win.ApplySize()
         end,
     })
 
@@ -511,15 +739,11 @@ local function CreateMeter(cfg)
         if main.SetMaxResize then pcall(main.SetMaxResize, main, MAX_W, MAX_H) end
     end
 
-    function win.Mode()
-        local m = ns.db and ns.db[cfg.modeKey]
-        if m == "damage" or m == "healing" then return m end
-        return cfg.defaultMode
-    end
+    function win.Mode() return ModeOf(n) end
 
     function win.Docked()
-        if not cfg.dockable then return nil end
-        return DockState()
+        local _, side = GetDock(n)
+        return side
     end
 
     -- Verschieben (Shift + ziehen) und Größenziehen schließen sich aus: Merker um die Skripte
@@ -565,18 +789,15 @@ local function CreateMeter(cfg)
     local function MainTooltip(owner)
         GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
         local a, t, d = C.accentText, C.text, C.textDim
-        GameTooltip:SetText(L[cfg.label], a[1], a[2], a[3])
+        GameTooltip:SetText((n == 1) and L["DMG-Meter"] or L("DMG-Meter %d", n), a[1], a[2], a[3])
         GameTooltip:AddLine(L["Klick auf den Titel: Gesamt, aktueller Kampf oder ein einzelner Kampf."], t[1], t[2], t[3], true)
         GameTooltip:AddLine(L["Werte: gesamt (pro Sekunde). Die Daten kommen aus dem eingebauten Schadensmesser des Spiels."], d[1], d[2], d[3], true)
         GameTooltip:AddLine(L["S || H oben rechts: Schaden oder Heilung."], d[1], d[2], d[3], true)
+        GameTooltip:AddLine(L["„+“ im Kopf: weiteres Fenster (bis zu 5), dockt oben an."], d[1], d[2], d[3], true)
         GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], d[1], d[2], d[3])
-        if cfg.dockable then
-            GameTooltip:AddLine(L["An die Ober- oder Unterkante des ersten DMG-Meters ziehen: andocken. Wegziehen löst es wieder."], d[1], d[2], d[3], true)
-            if win.Docked() then
-                GameTooltip:AddLine(L["Angedockt: Ziehgriff ändert nur die Höhe"], d[1], d[2], d[3])
-            else
-                GameTooltip:AddLine(L["Unten rechts ziehen: Größe ändern"], d[1], d[2], d[3])
-            end
+        GameTooltip:AddLine(L["An die Ober- oder Unterkante eines anderen DMG-Meters ziehen: andocken. Wegziehen löst es wieder."], d[1], d[2], d[3], true)
+        if win.Docked() then
+            GameTooltip:AddLine(L["Angedockt: Ziehgriff ändert nur die Höhe"], d[1], d[2], d[3])
         else
             GameTooltip:AddLine(L["Unten rechts ziehen: Größe ändern"], d[1], d[2], d[3])
         end
@@ -586,7 +807,18 @@ local function CreateMeter(cfg)
     main:SetScript("OnEnter", function(self) MainTooltip(self) end)
     main:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Kopfzeile rechts: Zurücksetzen (Symbol), davor der Umschalter S | H
+    -- Kopfzeile rechts: Schließen (nur Fenster 2–5), Zurücksetzen (Symbol), davor S | H und „+“
+    local closeButton = CreateFrame("Button", nil, main)
+    closeButton:SetSize(14, 16)
+    closeButton.text = Text(closeButton, 14, C.textSide, FONT_BODY)
+    closeButton.text:SetPoint("CENTER", closeButton, "CENTER", 0, 0)
+    closeButton.text:SetJustifyH("CENTER")
+    closeButton.text:SetText("×")
+    local closeHover = closeButton:CreateTexture(nil, "HIGHLIGHT")
+    closeHover:SetAllPoints()
+    closeHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
+    closeButton:Hide()
+
     local resetButton = CreateFrame("Button", nil, main)
     resetButton:SetSize(14, 14)
     resetButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", -4, -3)
@@ -613,9 +845,23 @@ local function CreateMeter(cfg)
     modeSeparator:SetText("||") -- „||“ = ein sichtbarer Strich (| ist WoWs Steuerzeichen)
     local damageButton = LetterButton(main, "S")
     damageButton:SetPoint("RIGHT", modeSeparator, "LEFT", 0, 0)
+
+    local plusButton = CreateFrame("Button", nil, main)
+    plusButton:SetSize(14, 16)
+    plusButton:SetPoint("RIGHT", damageButton, "LEFT", -6, 0)
+    plusButton.text = Text(plusButton, 14, C.textSide, FONT_BODY)
+    plusButton.text:SetPoint("CENTER", plusButton, "CENTER", 0, 0)
+    plusButton.text:SetJustifyH("CENTER")
+    plusButton.text:SetText("+")
+    local plusHover = plusButton:CreateTexture(nil, "HIGHLIGHT")
+    plusHover:SetAllPoints()
+    plusHover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
+
     ForwardDrag(damageButton)
     ForwardDrag(healingButton)
     ForwardDrag(resetButton)
+    ForwardDrag(plusButton)
+    ForwardDrag(closeButton)
 
     damageButton:SetScript("OnEnter", function(self) ModeTooltip(self, "Schaden anzeigen") end)
     damageButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -625,7 +871,7 @@ local function CreateMeter(cfg)
     -- Titel links (klickbar: Ansicht wählen)
     local titleButton = CreateFrame("Button", nil, main)
     titleButton:SetPoint("TOPLEFT", main, "TOPLEFT", 3, -2)
-    titleButton:SetPoint("TOPRIGHT", damageButton, "TOPLEFT", -4, 0)
+    titleButton:SetPoint("TOPRIGHT", plusButton, "TOPLEFT", -4, 0)
     titleButton:SetHeight(HEADER_H - 4)
     local titleHover = titleButton:CreateTexture(nil, "HIGHLIGHT")
     titleHover:SetAllPoints()
@@ -687,13 +933,13 @@ local function CreateMeter(cfg)
     local function VisibleRows()
         local h = main:GetHeight()
         if IsSecret(h) or type(h) ~= "number" then h = DEFAULT_H end
-        local n = math.floor((h - TOP_H - BOTTOM_PAD + ROW_GAP) / (ROW_H + ROW_GAP))
-        n = math.max(1, math.min(MAX_ROWS, n))
-        for i = #rows + 1, n do NewRow(i) end
-        return n
+        local count = math.floor((h - TOP_H - BOTTOM_PAD + ROW_GAP) / (ROW_H + ROW_GAP))
+        count = math.max(1, math.min(MAX_ROWS, count))
+        for i = #rows + 1, count do NewRow(i) end
+        return count
     end
 
-    -- Ziehgriff unten rechts (angedockt oben: oben rechts, gespiegelt)
+    -- Ziehgriff unten rechts (oben angedockt: oben rechts, gespiegelt)
     local grip = CreateFrame("Button", nil, main)
     grip:SetSize(16, 16)
     grip:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", -1, 1)
@@ -704,18 +950,26 @@ local function CreateMeter(cfg)
     -- Leicht zurückgenommen, damit er den Wert der untersten Zeile kaum verdeckt
     grip:SetAlpha(0.5)
 
-    -- Griff und Zurücksetzen-Knopf passend zum Andock-Zustand setzen
+    -- Griff, Schließen und Zurücksetzen passend zum Andock-Zustand setzen
     function win.LayoutGrip()
         local top = win.Docked() == "top"
         grip:ClearAllPoints()
         resetButton:ClearAllPoints()
+        closeButton:ClearAllPoints()
+        local x = top and -20 or -4
         if top then
-            -- Unterkante hängt an Fenster 1: Höhe wächst nach oben, Griff sitzt oben rechts
+            -- Unterkante hängt an einem anderen Fenster: Höhe wächst nach oben, Griff sitzt oben rechts
             grip:SetPoint("TOPRIGHT", main, "TOPRIGHT", -1, -1)
-            resetButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", -20, -3)
         else
             grip:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", -1, 1)
-            resetButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", -4, -3)
+        end
+        if n > 1 then
+            closeButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", x, -2)
+            closeButton:Show()
+            resetButton:SetPoint("RIGHT", closeButton, "LEFT", -4, 0)
+        else
+            closeButton:Hide()
+            resetButton:SetPoint("TOPRIGHT", main, "TOPRIGHT", x, -3)
         end
         local textures = { grip:GetNormalTexture(), grip:GetPushedTexture(), grip:GetHighlightTexture() }
         for i = 1, 3 do
@@ -729,15 +983,16 @@ local function CreateMeter(cfg)
     local function SaveSizeAndPosition()
         local w, h = main:GetSize()
         if not IsSecret(w) and not IsSecret(h) then
-            -- Angedockt folgt die Breite Fenster 1; beim Lösen übernimmt Fenster 2 diese Breite
-            if not win.Docked() then ns.db[cfg.widthKey] = Clamp(w, MIN_W, MAX_W, DEFAULT_W) end
-            ns.db[cfg.heightKey] = Clamp(h, MIN_H, MAX_H, DEFAULT_H)
+            -- Angedockt folgt die Breite der Wurzel; beim Lösen übernimmt das Fenster diese Breite
+            if not win.Docked() then ns.db[win.widthKey] = Clamp(w, MIN_W, MAX_W, DEFAULT_W) end
+            ns.db[win.heightKey] = Clamp(h, MIN_H, MAX_H, DEFAULT_H)
         end
-        -- Angedockt hängt die Position an Fenster 1, nichts zu speichern
+        SyncWidths()
+        -- Angedockt hängt die Position an einem anderen Fenster, nichts zu speichern
         if win.Docked() then return end
         -- Wie ns.MakeMovable beim Verschieben: Ankerpunkt nach StopMovingOrSizing übernehmen
         local point, _, relPoint, x, y = main:GetPoint()
-        if point then ns.db.positions[cfg.posKey] = { point, relPoint, x, y } end
+        if point then ns.db.positions[win.posKey] = { point, relPoint, x, y } end
     end
 
     -- Angedockt nur die Höhe ändern: Mausweg selbst verfolgen (StartSizing würde die Anker lösen)
@@ -801,7 +1056,8 @@ local function CreateMeter(cfg)
     -- Auswahlmenü (Klick auf den Titel)
     -----------------------------------------------------------------------
 
-    local menu = CreateFrame("Frame", cfg.menuName, main)
+    local menuName = (n == 1) and "strayDamageMeterMenu" or ("strayDamageMeterMenu" .. n)
+    local menu = CreateFrame("Frame", menuName, main)
     win.menu = menu
     menu:SetFrameStrata("DIALOG")
     menu:SetClampedToScreen(true)
@@ -812,7 +1068,7 @@ local function CreateMeter(cfg)
     menuBg:SetAllPoints()
     menuBg:SetColorTexture(C.menuBg[1], C.menuBg[2], C.menuBg[3], C.menuBg[4])
     Border(menu, C.border)
-    if UISpecialFrames then table.insert(UISpecialFrames, cfg.menuName) end
+    if UISpecialFrames then table.insert(UISpecialFrames, menuName) end
 
     local menuItems = {}
 
@@ -892,14 +1148,41 @@ local function CreateMeter(cfg)
     resetButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText(L["Zurücksetzen"], C.accentText[1], C.accentText[2], C.accentText[3])
-        GameTooltip:AddLine(L["Löscht alle Kämpfe in beiden DMG-Meter-Fenstern – auch in Blizzards eigenem Schadensmesser. Geht nur außerhalb des Kampfes."], C.text[1], C.text[2], C.text[3], true)
+        GameTooltip:AddLine(L["Löscht alle Kämpfe in allen DMG-Meter-Fenstern – auch in Blizzards eigenem Schadensmesser. Geht nur außerhalb des Kampfes."], C.text[1], C.text[2], C.text[3], true)
         GameTooltip:Show()
     end)
     resetButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+    plusButton:SetScript("OnClick", function()
+        Click()
+        menu:Hide()
+        GameTooltip:Hide()
+        AddWindow(n)
+    end)
+    plusButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["Weiteres Fenster"], C.accentText[1], C.accentText[2], C.accentText[3])
+        GameTooltip:AddLine(L["Öffnet eine Kopie dieses Fensters (gleiche Größe, gleicher Modus) und dockt sie oben an. Bis zu 5 Fenster."], C.text[1], C.text[2], C.text[3], true)
+        GameTooltip:Show()
+    end)
+    plusButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    closeButton:SetScript("OnClick", function()
+        Click()
+        GameTooltip:Hide()
+        CloseWindow(n)
+    end)
+    closeButton:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["Fenster schließen"], C.accentText[1], C.accentText[2], C.accentText[3])
+        GameTooltip:AddLine(L["Schließt dieses DMG-Meter-Fenster. Angedockte Fenster rücken nach."], C.text[1], C.text[2], C.text[3], true)
+        GameTooltip:Show()
+    end)
+    closeButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
     local function SetMode(mode)
         Click()
-        ns.db[cfg.modeKey] = mode
+        SetModeOf(n, mode)
         Request()
     end
     damageButton:SetScript("OnClick", function() SetMode("damage") end)
@@ -927,9 +1210,7 @@ local function CreateMeter(cfg)
     end
 
     function win.Wanted()
-        if not (ns.db and ns.db.dmShow and HAS_API) then return false end
-        if cfg.showKey and not ns.db[cfg.showKey] then return false end
-        return true
+        return (ns.db and ns.db.dmShow and HAS_API and IsOpen(n)) and true or false
     end
 
     local function UpdateHeader(mode, demo)
@@ -938,6 +1219,7 @@ local function CreateMeter(cfg)
         title:SetText(text)
         damageButton:SetActive(mode == "damage")
         healingButton:SetActive(mode == "healing")
+        plusButton:SetShown(OpenCount() < MAX_WINDOWS)
         if HAS_RESET then
             resetButton:Enable()
             resetButton:SetAlpha(1)
@@ -994,144 +1276,49 @@ local function CreateMeter(cfg)
         end
     end
 
-    -- Beim Anmelden: gespeicherte Werte prüfen, Größe und Position setzen
+    -- Beim Anmelden bzw. Öffnen: gespeicherte Werte prüfen, Größe und Position setzen
     function win.Restore()
-        local m = ns.db[cfg.modeKey]
-        if m ~= "damage" and m ~= "healing" then ns.db[cfg.modeKey] = cfg.defaultMode end
-        ns.db[cfg.widthKey] = Clamp(ns.db[cfg.widthKey], MIN_W, MAX_W, DEFAULT_W)
-        ns.db[cfg.heightKey] = Clamp(ns.db[cfg.heightKey], MIN_H, MAX_H, DEFAULT_H)
-        main:SetSize(ns.db[cfg.widthKey], ns.db[cfg.heightKey])
-        ns.RestorePosition(main)
-    end
-
-    windows[#windows + 1] = win
-    return win
-end
-
----------------------------------------------------------------------------
--- Die beiden Fenster (Fenster 1 behält die bisherigen Schlüssel und Namen)
----------------------------------------------------------------------------
-
-local win1 = CreateMeter({
-    name = "strayDamageMeter",
-    menuName = "strayDamageMeterMenu",
-    posKey = "damagemeter",
-    label = "DMG-Meter",
-    defaultPoint = { "BOTTOMRIGHT", "BOTTOMRIGHT", -260, 180 },
-    modeKey = "dmMode",
-    defaultMode = "damage",
-    widthKey = "dmWidth",
-    heightKey = "dmHeight",
-})
-
-local win2 = CreateMeter({
-    name = "strayDamageMeter2",
-    menuName = "strayDamageMeterMenu2",
-    posKey = "damagemeter2",
-    label = "DMG-Meter 2",
-    defaultPoint = { "BOTTOMRIGHT", "BOTTOMRIGHT", -260, 390 },
-    modeKey = "dm2Mode",
-    defaultMode = "healing",
-    widthKey = "dm2Width",
-    heightKey = "dm2Height",
-    showKey = "dm2Show",
-    dockable = true,
-})
-
-Flush = function()
-    local cache = {}
-    for _, win in ipairs(windows) do
-        if not pcall(win.Update, cache) then
-            NoticeLocked()
-            pcall(win.ShowEmpty, L["Werte gerade nicht anzeigbar."])
+        if n == 1 then
+            local m = ns.db.dmMode
+            if m ~= "damage" and m ~= "healing" then ns.db.dmMode = "damage" end
         end
+        ns.db[win.widthKey] = Clamp(ns.db[win.widthKey], MIN_W, MAX_W, DEFAULT_W)
+        ns.db[win.heightKey] = Clamp(ns.db[win.heightKey], MIN_H, MAX_H, DEFAULT_H)
+        main:SetSize(ns.db[win.widthKey], ns.db[win.heightKey])
+        ns.RestorePosition(main) -- der Haken unten dockt bei Bedarf an
     end
-end
 
----------------------------------------------------------------------------
--- Andocken: Fenster 2 an Ober- oder Unterkante von Fenster 1
---
--- Angedockt hängt Fenster 2 mit zwei Ankern an Fenster 1 (links und rechts bündig). Damit
--- laufen Position und Breite von selbst mit, auch beim Verschieben im Bearbeiten-Modus.
--- Erkannt wird das Andocken in StopMovingOrSizing von Fenster 2 – das rufen sowohl
--- ns.MakeMovable (Shift + ziehen) als auch der Bearbeiten-Modus auf.
----------------------------------------------------------------------------
+    -----------------------------------------------------------------------
+    -- Andocken: eigene Methoden auf dem eigenen Fenster umhüllen (kein Blizzard-Rahmen).
+    -- Erkannt wird das Andocken in StopMovingOrSizing – das rufen sowohl ns.MakeMovable
+    -- (Shift + ziehen) als auch der Bearbeiten-Modus auf.
+    -----------------------------------------------------------------------
 
-local f1, f2 = win1.frame, win2.frame
-
--- Fenster 2 an Fenster 1 hängen (1 px Überlappung, damit die Ränder zu einer Linie werden)
-local function ApplyDock()
-    if not ns.db then return end
-    local dock = DockState()
-    if dock then
-        f2:ClearAllPoints()
-        if dock == "top" then
-            f2:SetPoint("BOTTOMLEFT", f1, "TOPLEFT", 0, -1)
-            f2:SetPoint("BOTTOMRIGHT", f1, "TOPRIGHT", 0, -1)
-        else
-            f2:SetPoint("TOPLEFT", f1, "BOTTOMLEFT", 0, 1)
-            f2:SetPoint("TOPRIGHT", f1, "BOTTOMRIGHT", 0, 1)
-        end
-        f2:SetHeight(Clamp(ns.db.dm2Height, MIN_H, MAX_H, DEFAULT_H))
-    end
-    win2.LayoutGrip()
-end
-
--- Liegt Fenster 2 gerade nah genug an Fenster 1? Ergebnis "top", "bottom" oder nil
-local function FindDock()
-    if not f1:IsShown() then return nil end
-    local l1, r1, t1, b1 = f1:GetLeft(), f1:GetRight(), f1:GetTop(), f1:GetBottom()
-    local l2, r2, t2, b2 = f2:GetLeft(), f2:GetRight(), f2:GetTop(), f2:GetBottom()
-    for _, v in ipairs({ l1, r1, t1, b1, l2, r2, t2, b2 }) do
-        if not PlainNumber(v) then return nil end
-    end
-    -- Nur wenn sich die Fenster waagerecht überlappen
-    if r2 < l1 or l2 > r1 then return nil end
-    if math.abs(b2 - t1) < SNAP then return "top" end
-    if math.abs(t2 - b1) < SNAP then return "bottom" end
-    return nil
-end
-
-do
-    -- Eigene Methoden auf dem eigenen Fenster umhüllen (kein Blizzard-Rahmen)
-    local baseStartMoving = f2.StartMoving
-    local baseStopMoving = f2.StopMovingOrSizing
+    local baseStartMoving = main.StartMoving
+    local baseStopMoving = main.StopMovingOrSizing
     local dragging = false
 
-    f2.StartMoving = function(self, ...)
-        -- Angedockt: erst auf einen festen Punkt am Bildschirm setzen, dann frei ziehen
-        if DockState() then
-            local l, b, w = self:GetLeft(), self:GetBottom(), self:GetWidth()
-            if PlainNumber(l) and PlainNumber(b) and PlainNumber(w) then
-                self:ClearAllPoints()
-                self:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l, b)
-                self:SetWidth(w)
+    main.StartMoving = function(self, ...)
+        -- Angedockt: erst auf einen festen Punkt am Bildschirm setzen und lösen, dann frei ziehen
+        if ns.db then
+            local to, side = GetDock(n)
+            if to then
+                local l, b, w = self:GetLeft(), self:GetBottom(), self:GetWidth()
+                if PlainNumber(l) and PlainNumber(b) and PlainNumber(w) then
+                    self:ClearAllPoints()
+                    self:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l, b)
+                    self:SetWidth(w)
+                end
+                win.lastDock = { to, side }
+                SetDock(n, nil)
+                win.LayoutGrip()
             end
         end
         dragging = true
         return baseStartMoving(self, ...)
     end
 
-    -- Nach dem Loslassen entscheiden: andocken oder gelöst. later = Andocken erst im nächsten Bild.
-    local function Decide(later)
-        local was = DockState()
-        local dock = FindDock()
-        ns.db.dm2Dock = dock
-        if not dock then
-            -- Gelöst: die aktuelle Breite wird die eigene Breite
-            local w = f2:GetWidth()
-            if PlainNumber(w) then ns.db.dm2Width = Clamp(w, MIN_W, MAX_W, DEFAULT_W) end
-            if was then win2.LayoutGrip() end
-            return
-        end
-        if later and C_Timer and C_Timer.After then
-            C_Timer.After(0, ApplyDock)
-        else
-            ApplyDock()
-        end
-    end
-
-    f2.StopMovingOrSizing = function(self, ...)
+    main.StopMovingOrSizing = function(self, ...)
         baseStopMoving(self, ...)
         if not dragging or not ns.db then return end
         dragging = false
@@ -1139,31 +1326,299 @@ do
         if ns.editMode then return end
         -- Shift + ziehen: Andocken erst im nächsten Bild, denn ns.MakeMovable speichert danach
         -- noch die Position (lesbar, weil das Fenster dann noch am Bildschirm verankert ist).
-        Decide(true)
+        Decide(win, true)
     end
 
     -- Haken des Bearbeiten-Modus: läuft nach Einrasten, Raster und Speichern der Position
-    f2.strayOnDragStop = function()
-        if ns.db then Decide(false) end
+    main.strayOnDragStop = function()
+        if ns.db then Decide(win, false) end
+    end
+
+    windows[n] = win
+    byFrame[main] = win
+    return win
+end
+
+---------------------------------------------------------------------------
+-- Andocken: an Ober- oder Unterkante eines beliebigen anderen Fensters
+--
+-- Angedockt hängt ein Fenster mit zwei Ankern an seinem Ziel (links und rechts bündig). Damit
+-- laufen Position und Breite von selbst mit – auch ganze Ketten, beim Verschieben im
+-- Bearbeiten-Modus ebenso. Je Kante höchstens ein Fenster, keine Ringe.
+---------------------------------------------------------------------------
+
+local function ApplyAll()
+    for n = 1, MAX_WINDOWS do
+        local w = windows[n]
+        if w and IsOpen(n) then ApplyDock(w) end
     end
 end
 
--- Position von Fenster 2 zurückgesetzt (Anmelden, Rechtsklick oder „Alles zurücksetzen“ im
--- Bearbeiten-Modus): Ohne gespeicherte Position gilt der Standard „oben angedockt“.
+-- Fenster an sein Ziel hängen (1 px Überlappung, damit die Ränder zu einer Linie werden)
+ApplyDock = function(win)
+    if not ns.db or not win then return end
+    local n, f = win.n, win.frame
+    local to, side = GetDock(n)
+    local target = to and windows[to]
+    if target and IsOpen(to) and not MovesWith(n, to) then
+        local t = target.frame
+        f:ClearAllPoints()
+        if side == "top" then
+            f:SetPoint("BOTTOMLEFT", t, "TOPLEFT", 0, -1)
+            f:SetPoint("BOTTOMRIGHT", t, "TOPRIGHT", 0, -1)
+        else
+            f:SetPoint("TOPLEFT", t, "BOTTOMLEFT", 0, 1)
+            f:SetPoint("TOPRIGHT", t, "BOTTOMRIGHT", 0, 1)
+        end
+        f:SetHeight(Clamp(ns.db[win.heightKey], MIN_H, MAX_H, DEFAULT_H))
+        -- Angedockte Fenster haben keine eigene Position (Rückgängig/Zurücksetzen docken neu an)
+        ns.db.positions[win.posKey] = nil
+        SyncWidths()
+    elseif to then
+        SetDock(n, nil) -- Ziel fehlt oder würde einen Ring bilden
+    end
+    win.LayoutGrip()
+end
+
+-- Liegt das Fenster gerade nah genug an einem anderen? Ergebnis Ziel und Seite oder nil.
+-- Die eigene Andock-Angabe ist vorher gelöscht; mitlaufende Fenster zählen nicht als Ziel.
+local function FindDock(win)
+    local n = win.n
+    local l2, r2, t2, b2 = Rect(win.frame)
+    if not l2 then return nil end
+    local bottomFree = not Dependent(n, "bottom")
+    local topFree = not Dependent(n, "top")
+    local best, bestSide, bestDist
+    for m = 1, MAX_WINDOWS do
+        local other = windows[m]
+        if m ~= n and other and IsOpen(m) and other.frame:IsShown() and not MovesWith(n, m) then
+            local l1, r1, t1, b1 = Rect(other.frame)
+            -- Nur wenn sich die Fenster waagerecht überlappen
+            if l1 and not (r2 < l1 or l2 > r1) then
+                if bottomFree and SideFree(m, "top", n) then
+                    local d = math.abs(b2 - t1)
+                    if d < SNAP and (not bestDist or d < bestDist) then best, bestSide, bestDist = m, "top", d end
+                end
+                if topFree and SideFree(m, "bottom", n) then
+                    local d = math.abs(t2 - b1)
+                    if d < SNAP and (not bestDist or d < bestDist) then best, bestSide, bestDist = m, "bottom", d end
+                end
+            end
+        end
+    end
+    return best, bestSide
+end
+
+-- Nach dem Loslassen entscheiden: andocken oder gelöst. later = Andocken erst im nächsten Bild.
+Decide = function(win, later)
+    local n, f = win.n, win.frame
+    local old, oldSide = GetDock(n)
+    if old then win.lastDock = { old, oldSide } end
+    SetDock(n, nil)
+    local to, side = FindDock(win)
+    if not to then
+        -- Gelöst: die aktuelle Breite wird die eigene Breite
+        local w = f:GetWidth()
+        if PlainNumber(w) then ns.db[win.widthKey] = Clamp(w, MIN_W, MAX_W, DEFAULT_W) end
+        win.LayoutGrip()
+        return
+    end
+    SetDock(n, to, side)
+    if later and C_Timer and C_Timer.After then
+        C_Timer.After(0, function() ApplyDock(win) end)
+    else
+        ApplyDock(win)
+    end
+end
+
+-- Andocken versuchen, wenn die Kanten frei sind
+local function TryDock(win, to, side)
+    local n = win.n
+    if type(to) ~= "number" or to == n or not IsOpen(to) or not windows[to] or MovesWith(n, to) then return false end
+    if Dependent(n, (side == "top") and "bottom" or "top") or not SideFree(to, side, n) then return false end
+    SetDock(n, to, side)
+    ApplyDock(win)
+    return true
+end
+
+-- Keine Position und nicht angedockt (Zurücksetzen, Rückgängig): an die letzte Andockstelle,
+-- sonst oben auf den Stapel von Fenster 1 (früherer Standard des zweiten Fensters)
+local function DefaultDock(win)
+    local last = win.lastDock
+    if last and TryDock(win, last[1], last[2]) then return end
+    TryDock(win, TopOf(1), "top")
+end
+
+-- Nach jedem ns.RestorePosition (Anmelden, Zurücksetzen, Rückgängig, Verwerfen) neu andocken
 hooksecurefunc(ns, "RestorePosition", function(frame)
-    if frame ~= f2 or not ns.db then return end
-    if ns.db.positions[f2.strayKey] == nil then ns.db.dm2Dock = "top" end
-    ApplyDock()
+    local win = byFrame[frame]
+    if not win or not ns.db or not IsOpen(win.n) then return end
+    local n = win.n
+    if GetDock(n) then
+        if ns.editMode and ns.db.positions[win.posKey] ~= nil then
+            -- Rückgängig im Bearbeitungsmodus: an der gespeicherten Stelle lassen, danach entscheidet
+            -- strayOnDragStop nach der Lage. Breite der bisherigen Kette übernehmen.
+            local root = windows[RootOf(n)]
+            local w = root and root.frame:GetWidth()
+            if PlainNumber(w) then frame:SetWidth(w) end
+            return
+        end
+        ApplyDock(win)
+        return
+    end
+    if n > 1 and ns.db.positions[win.posKey] == nil then DefaultDock(win) end
+    win.LayoutGrip()
 end)
 
+-- Fenster x vom Ziel lösen und an seiner jetzigen Stelle festhalten
+local function MakeRoot(x)
+    local w = windows[x]
+    if not w then
+        SetDock(x, nil)
+        return
+    end
+    local f = w.frame
+    local l, b, wd = f:GetLeft(), f:GetBottom(), f:GetWidth()
+    SetDock(x, nil)
+    if PlainNumber(l) and PlainNumber(b) then
+        f:ClearAllPoints()
+        f:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", l, b)
+        if PlainNumber(wd) then
+            f:SetWidth(wd)
+            ns.db[w.widthKey] = Clamp(wd, MIN_W, MAX_W, DEFAULT_W)
+        end
+        ns.db.positions[w.posKey] = { "BOTTOMLEFT", "BOTTOMLEFT", l, b }
+    end
+    w.LayoutGrip()
+end
+
+-- „+“ an Fenster m: Kopie (Größe, Modus) im ersten freien Platz, oben an m angedockt.
+-- Ist die Oberkante von m schon belegt, schiebt sich das neue Fenster dazwischen.
+AddWindow = function(m)
+    if not ns.db or not windows[m] or OpenCount() >= MAX_WINDOWS then return end
+    local n
+    for i = 2, MAX_WINDOWS do
+        if not IsOpen(i) then n = i break end
+    end
+    if not n then return end
+    local src = windows[m]
+    List()[n] = { mode = src.Mode() }
+    local win = windows[n] or CreateMeter(n)
+    win.lastDock, win.view, win.viewLabel = nil, "overall", nil
+    ns.db.positions[win.posKey] = nil
+    if type(ns.db.scales) == "table" then ns.db.scales[win.posKey] = ns.db.scales[src.posKey] end
+    local w, h = src.frame:GetWidth(), src.frame:GetHeight()
+    ns.db[win.widthKey] = Clamp(PlainNumber(w) and w or ns.db[src.widthKey], MIN_W, MAX_W, DEFAULT_W)
+    ns.db[win.heightKey] = Clamp(PlainNumber(h) and h or ns.db[src.heightKey], MIN_H, MAX_H, DEFAULT_H)
+
+    local up = Dependent(m, "top")
+    local to, side = GetDock(m)
+    if up then
+        SetDock(up, n, "top")
+        SetDock(n, m, "top")
+    elseif to and side == "bottom" then
+        SetDock(n, to, "bottom")
+        SetDock(m, n, "bottom")
+    else
+        SetDock(n, m, "top")
+    end
+    win.Restore()
+    ApplyAll()
+    PublishInstances()
+    Request()
+end
+
+-- „ד an Fenster k (nicht Fenster 1): angedockte Fenster rücken nach
+CloseWindow = function(k)
+    if k == 1 or not IsOpen(k) or not ns.db then return end
+    local to, side = GetDock(k)
+    local up, down = Dependent(k, "top"), Dependent(k, "bottom")
+    if to then
+        -- An der freien Seite hängendes Fenster übernimmt den Platz am Ziel
+        local j = (side == "top") and up or down
+        if j then SetDock(j, to, side) end
+    elseif up then
+        MakeRoot(up)
+        if down then SetDock(down, up, "bottom") end
+    elseif down then
+        MakeRoot(down)
+    end
+    List()[k] = nil
+    local win = windows[k]
+    if win then
+        ns.db.positions[win.posKey] = nil
+        if type(ns.db.scales) == "table" then ns.db.scales[win.posKey] = nil end
+        win.lastDock = nil
+        win.Hide()
+    end
+    ApplyAll()
+    PublishInstances()
+    Request()
+end
+
 ---------------------------------------------------------------------------
--- Zurücksetzen (betrifft beide Fenster, die Daten sind dieselben)
+-- Auswahl je Fenster (Auswahlliste im stray-Fenster, falls ui.lua sie anbietet)
+---------------------------------------------------------------------------
+
+local selectedWin = 1
+
+local function GetSelected()
+    if not IsOpen(selectedWin) then selectedWin = 1 end
+    return selectedWin
+end
+
+local function SetSelected(id)
+    id = tonumber(id)
+    if id and IsOpen(id) then selectedWin = id end
+end
+
+PublishInstances = function()
+    if type(ns.RegisterInstances) ~= "function" or not ns.db then return end
+    local list = {}
+    for n = 1, MAX_WINDOWS do
+        if IsOpen(n) then list[#list + 1] = { id = n, label = L("DMG-Meter %d", n) } end
+    end
+    local ok, err = pcall(ns.RegisterInstances, "DMG-Meter", list, GetSelected, SetSelected)
+    if not ok then geterrorhandler()(err) end
+end
+
+-- Im Bearbeitungsmodus angeklicktes Fenster wird das gewählte
+local function OnEditSelect(arg)
+    local key = ns.EditSelected
+    if type(key) ~= "string" then key = arg end
+    if type(key) ~= "string" then return end
+    if key == "damagemeter" then
+        SetSelected(1)
+    else
+        SetSelected(key:match("^damagemeter(%d)$"))
+    end
+end
+
+Flush = function()
+    local cache = {}
+    for n = 1, MAX_WINDOWS do
+        local win = windows[n]
+        if win and not pcall(win.Update, cache) then
+            NoticeLocked()
+            pcall(win.ShowEmpty, L["Werte gerade nicht anzeigbar."])
+        end
+    end
+end
+
+-- Fenster 1 gleich beim Laden bauen (Name strayDamageMeter wie bisher), die übrigen beim Anmelden
+CreateMeter(1)
+
+---------------------------------------------------------------------------
+-- Zurücksetzen (betrifft alle Fenster, die Daten sind dieselben)
 ---------------------------------------------------------------------------
 
 local function ResetViews()
-    for _, win in ipairs(windows) do
-        win.view, win.viewLabel = "overall", nil
-        win.menu:Hide()
+    for n = 1, MAX_WINDOWS do
+        local win = windows[n]
+        if win then
+            win.view, win.viewLabel = "overall", nil
+            win.menu:Hide()
+        end
     end
 end
 
@@ -1286,7 +1741,7 @@ events:SetScript("OnEvent", function(_, event)
             if ns.db.dmAutoReset then pcall(DoReset, true) end
         end
     elseif event == "DAMAGE_METER_RESET" then
-        for _, win in ipairs(windows) do
+        for _, win in pairs(windows) do
             if win.view ~= "overall" and win.view ~= "current" then win.view, win.viewLabel = "overall", nil end
             win.menu:Hide()
         end
@@ -1329,13 +1784,24 @@ local function RefreshEvents()
     Request()
 end
 
+
 ns.OnConfig(function() Request() end)
 
 ns.On("PLAYER_LOGIN", function()
-    -- Erst Fenster 1, dann Fenster 2 (dessen Andocken braucht die Lage von Fenster 1)
-    win1.Restore()
-    win2.Restore()
+    Migrate()
+    Sanitize()
+    -- Erst alle offenen Fenster bauen, dann Größe/Position setzen (Andocken braucht die Ziele)
+    for n = 2, MAX_WINDOWS do
+        if IsOpen(n) and not windows[n] then CreateMeter(n) end
+    end
+    for n = 1, MAX_WINDOWS do
+        local win = windows[n]
+        if win and IsOpen(n) then win.Restore() end
+    end
+    ApplyAll()
     RefreshEvents()
+    PublishInstances()
+    if type(ns.OnEditSelect) == "function" then pcall(ns.OnEditSelect, OnEditSelect) end
 end)
 
 ---------------------------------------------------------------------------
@@ -1347,10 +1813,14 @@ local function Setter(key)
         ns.db[key] = value
         RefreshEvents()
         if not value and key == "dmShow" then
-            for _, win in ipairs(windows) do win.Hide() end
+            for _, win in pairs(windows) do win.Hide() end
         end
         Request()
     end
+end
+
+local function ShowEnabled()
+    return HAS_API and ns.db and ns.db.dmShow and true or false
 end
 
 ns.AddOption(2, "DMG-Meter", {
@@ -1362,20 +1832,55 @@ ns.AddOption(2, "DMG-Meter", {
     set = Setter("dmShow"),
 })
 
+-- Ersetzt „Zweites Fenster“ (bis 0.22.x). Nicht im Profil: dort steht die Fensterliste selbst.
 ns.AddOption(2, "DMG-Meter", {
-    key = "dm2Show",
-    label = L["Zweites Fenster"],
-    tooltip = L["Zeigt ein zweites DMG-Meter-Fenster mit eigenem Modus (Standard: Heilung), eigener Ansicht und eigener Größe – zum Beispiel oben Heilung und unten Schaden.\n\nZiehst du es mit Shift an die Ober- oder Unterkante des ersten Fensters, dockt es an: gleiche Breite, links bündig, und es wandert mit dem ersten Fenster mit. Angedockt änderst du nur seine Höhe. Wegziehen löst es wieder. Beim ersten Einschalten sitzt es angedockt über dem ersten Fenster. Zurücksetzen gilt für beide Fenster."],
-    isEnabled = function() return HAS_API and ns.db and ns.db.dmShow and true or false end,
+    key = "dmWindowCount",
+    type = "slider",
+    min = 1, max = MAX_WINDOWS, step = 1,
+    label = L["Anzahl Fenster"],
+    tooltip = L["Wie viele DMG-Meter-Fenster offen sind (1–5). Weitere Fenster öffnest du auch mit „+“ im Kopf eines Fensters, schließen mit „ד. Ein neues Fenster ist eine Kopie (gleiche Größe, gleicher Modus) und dockt oben an. Mit Shift + ziehen oder im Bearbeitungsmodus löst du ein Fenster; an Ober- oder Unterkante eines anderen Fensters gezogen, dockt es wieder an. Angedockte Fenster wandern mit, angedockt änderst du nur die Höhe. Zurücksetzen gilt für alle Fenster."],
+    keywords = { "fenster", "window", "windows", "anzahl", "count", "zweites", "second", "andocken", "dock", "damage", "meter" },
+    noExport = true,
+    isEnabled = ShowEnabled,
     disabledHint = L["Erst „DMG-Meter anzeigen“ einschalten (direkt darüber)."],
+    get = function() return ns.db and OpenCount() or 1 end,
     set = function(value)
-        ns.db.dm2Show = value
-        -- Erstes Einschalten (noch nie verschoben): oben angedockt
-        if value and DockState() == nil and ns.db.positions[f2.strayKey] == nil then
-            ns.db.dm2Dock = "top"
+        if not ns.db then return end
+        value = Clamp(value, 1, MAX_WINDOWS, 1)
+        for _ = 1, MAX_WINDOWS do
+            if OpenCount() >= value then break end
+            AddWindow(TopOf(1))
         end
-        ApplyDock()
-        if not value then win2.Hide() end
+        for n = MAX_WINDOWS, 2, -1 do
+            if OpenCount() <= value then break end
+            if IsOpen(n) then CloseWindow(n) end
+        end
+        -- „Rückgängig“ schreibt die Fensterliste direkt zurück: fehlende Fenster bauen, Lage neu setzen
+        for n = 2, MAX_WINDOWS do
+            if IsOpen(n) and not windows[n] then CreateMeter(n).Restore() end
+        end
+        ApplyAll()
+        PublishInstances()
+        Request()
+    end,
+})
+
+-- Modus des gewählten Fensters (Auswahlliste oben auf der Seite; ohne Auswahl Fenster 1)
+ns.AddOption(2, "DMG-Meter", {
+    key = "dmSelMode",
+    type = "choice",
+    values = { "damage", "healing" },
+    labels = { L["Schaden"], L["Heilung"] },
+    label = L["Modus"],
+    tooltip = L["Schaden oder Heilung im gewählten DMG-Meter-Fenster – dasselbe wie S || H im Fenster selbst."],
+    keywords = { "modus", "mode", "schaden", "damage", "heilung", "healing" },
+    noExport = true,
+    isEnabled = ShowEnabled,
+    disabledHint = L["Erst „DMG-Meter anzeigen“ einschalten (direkt darüber)."],
+    get = function() return ns.db and ModeOf(GetSelected()) or "damage" end,
+    set = function(value)
+        if not ns.db then return end
+        SetModeOf(GetSelected(), value)
         Request()
     end,
 })

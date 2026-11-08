@@ -2,8 +2,10 @@
 -- Blendet alle eingeschalteten stray-Anzeigen mit Beispielinhalt ein und macht sie ohne Shift
 -- verschiebbar: lila Fläche mit Namen darüber, ziehen zum Verschieben, Shift + Rechtsklick setzt eine
 -- Anzeige ganz auf Standard zurück (einfacher Rechtsklick tut nichts, kein Versehen). Oben mittig eine
--- verschiebbare Werkzeugleiste (stray-Lila, Logo) mit Zurück (Rückgängig), Raster, Einrasten,
--- Alles zurücksetzen (Symbol) und „Fertig“, darunter eine Hinweiszeile mit allen Bedienwegen.
+-- schlanke, verschiebbare Werkzeugleiste (seit 0.23): „Bearbeiten · Zurück · ☐ Raster · ☑ Einrasten ·
+-- Alles zurücksetzen · Tasten belegen · Fertig“, darunter eine kompakte Hinweiszeile.
+-- Die gewählte Anzeige trägt einen lila Umriss mit Eck-Griffen; ns.EditSelected / ns.OnEditSelect melden
+-- die Auswahl an ui.lua. Anzeigen dürfen jederzeit dazukommen oder verschwinden (Flächen je Eintrag).
 -- Esc beendet den Modus (Leiste steht in UISpecialFrames).
 -- Nur außerhalb des Kampfes (die Gruppenrahmen hängen an Blizzards geschützten Rahmen).
 --
@@ -115,12 +117,16 @@ local function Closest(own, targets)
     return best
 end
 
--- Hängt other mit einem Ankerpunkt an frame (z. B. angedocktes DMG-Meter-Fenster 2)? Dann kein Einrast-Ziel.
-local function AnchoredTo(other, frame)
-    local n = other.GetNumPoints and other:GetNumPoints() or 0
+-- Hängt other (auch über eine Kette, z. B. angedockte DMG-Meter-Fenster 2–5) an frame? Dann kein
+-- Einrast-Ziel, weil es beim Ziehen mitwandert.
+local function AnchoredTo(other, frame, depth)
+    depth = depth or 0
+    if depth > 8 or not other or not other.GetNumPoints then return false end
+    local n = other:GetNumPoints() or 0
     for i = 1, n do
         local _, rel = other:GetPoint(i)
         if rel == frame then return true end
+        if rel and rel ~= UIParent and AnchoredTo(rel, frame, depth + 1) then return true end
     end
     return false
 end
@@ -203,6 +209,20 @@ local function MoveTo(frame, cx, cy)
     local x, y = Center(frame)
     if not x then return end
     MoveBy(frame, cx and (cx - x) or 0, cy and (cy - y) or 0)
+end
+
+-- Für das stray-Fenster (Abschnitt POSITION): Mitte ab Bildschirmmitte lesen und setzen, gleiche
+-- Werte wie X/Y im Bearbeitungsmodus. Setzen speichert und ruft frame.strayOnDragStop auf.
+function ns.GetMovableCenter(frame)
+    if not frame then return end
+    local x, y = Center(frame)
+    if not x then return end
+    return RoundInt(x), RoundInt(y)
+end
+
+function ns.SetMovableCenter(frame, cx, cy)
+    if not frame or not frame.strayKey or InCombatLockdown() or not ns.db then return end
+    MoveTo(frame, cx, cy)
 end
 
 -- Größe in Prozent setzen; der Ankerpunkt bleibt an seiner Stelle am Bildschirm
@@ -464,20 +484,38 @@ end
 -- Lila Flächen über den Anzeigen
 ---------------------------------------------------------------------------
 
--- Gewählte Fläche heller und mit weißem Rand
+-- Gewählte Anzeige: kräftiger lila Umriss (2 px) mit kleinen Eck-Griffen, Fläche dezenter
 local function StyleOverlay(o, isSelected)
     if isSelected then
-        o.bg:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.34)
-        Recolor(o.edges, { 1, 1, 1, 1 })
+        o.bg:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.12)
+        Recolor(o.edges, ACCENT)
+        o.sel:Show()
     else
         o.bg:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.18)
         Recolor(o.edges, { ACCENT[1], ACCENT[2], ACCENT[3], 0.9 })
+        o.sel:Hide()
     end
 end
 
 local function RestyleOverlays()
-    for i, o in pairs(overlays) do
-        StyleOverlay(o, selected ~= nil and ns.movables[i] == selected)
+    for entry, o in pairs(overlays) do
+        StyleOverlay(o, selected ~= nil and entry == selected)
+    end
+end
+
+-- Auswahl nach außen melden (ui.lua: „Im Spiel ausgewählt“, Sprung zur Seite).
+-- ns.EditSelected = strayKey der gewählten Anzeige; bleibt nach „Fertig“ als letzte Auswahl stehen.
+local selectCallbacks = {}
+function ns.OnEditSelect(fn)
+    if type(fn) == "function" then table.insert(selectCallbacks, fn) end
+end
+local function NotifySelect(entry)
+    local key = entry and entry.frame and entry.frame.strayKey or nil
+    if key == ns.EditSelected then return end
+    ns.EditSelected = key
+    for _, fn in ipairs(selectCallbacks) do
+        local ok, err = pcall(fn, key, entry and entry.label)
+        if not ok then geterrorhandler()(err) end
     end
 end
 
@@ -486,6 +524,7 @@ local function Select(entry)
     selected = entry
     RestyleOverlays()
     RefreshPanel(true)
+    NotifySelect(entry)
 end
 
 local function CreateOverlay(entry)
@@ -500,6 +539,20 @@ local function CreateOverlay(entry)
     o.bg = o:CreateTexture(nil, "BACKGROUND")
     o.bg:SetAllPoints()
     o.edges = Border(o, { ACCENT[1], ACCENT[2], ACCENT[3], 0.9 })
+    -- Auswahl-Umriss: zweite Linie außen (zusammen 2 px) und vier Eck-Griffe
+    o.sel = CreateFrame("Frame", nil, o)
+    o.sel:SetPoint("TOPLEFT", -1, 1)
+    o.sel:SetPoint("BOTTOMRIGHT", 1, -1)
+    Border(o.sel, ACCENT)
+    for _, corner in ipairs({ "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }) do
+        local grip = Tex(o.sel, "OVERLAY", ACCENT)
+        grip:SetSize(7, 7)
+        grip:SetPoint("CENTER", o.sel, corner, 0, 0)
+        local dot = Tex(o.sel, "OVERLAY", { 1, 1, 1, 0.9 })
+        dot:SetDrawLayer("OVERLAY", 1)
+        dot:SetSize(3, 3)
+        dot:SetPoint("CENTER", grip, "CENTER")
+    end
     StyleOverlay(o, false)
 
     o.label = Text(o, 12, { 1, 1, 1 }, nil, "OUTLINE")
@@ -553,14 +606,18 @@ local function CreateOverlay(entry)
     return o
 end
 
+-- Flächen hängen am Eintrag (nicht an seiner Nummer): Anzeigen dürfen jederzeit dazukommen oder aus
+-- ns.movables verschwinden (z. B. DMG-Meter-Fenster 2–5).
 function UpdateOverlays()
-    for i, entry in ipairs(ns.movables) do
+    local present = {}
+    for _, entry in ipairs(ns.movables) do
+        present[entry] = true
         local frame = entry.frame
-        local o = overlays[i]
+        local o = overlays[entry]
         if ns.editMode and frame and frame:IsShown() then
             if not o then
                 o = CreateOverlay(entry)
-                overlays[i] = o
+                overlays[entry] = o
                 StyleOverlay(o, entry == selected)
             end
             frame:SetMovable(true)
@@ -570,6 +627,18 @@ function UpdateOverlays()
         else
             if o then o:Hide() end
             -- Gewählte Anzeige verschwunden (z. B. ausgeschaltet): Auswahl aufheben
+            if entry == selected then Deselect() end
+        end
+    end
+    -- Abgemeldete Anzeigen: Fläche weg, Auswahl aufheben
+    for entry, o in pairs(overlays) do
+        if not present[entry] then
+            if o.moving then
+                o.moving = false
+                if entry.frame then pcall(entry.frame.StopMovingOrSizing, entry.frame) end
+            end
+            o:Hide()
+            overlays[entry] = nil
             if entry == selected then Deselect() end
         end
     end
@@ -606,46 +675,12 @@ local function CreateGrid()
 end
 
 ---------------------------------------------------------------------------
--- Symbole aus einfachen Flächen (keine Atlas-Abhängigkeit)
----------------------------------------------------------------------------
-
--- Raster: Kästchen mit je zwei Linien quer und längs
-local function GridIcon(parent)
-    local f = CreateFrame("Frame", nil, parent)
-    f:SetSize(12, 12)
-    f.parts = Border(f, C.textSide)
-    for _, pos in ipairs({ 4, 8 }) do
-        local v = Tex(f, "ARTWORK", C.textSide)
-        v:SetPoint("TOPLEFT", pos, 0); v:SetPoint("BOTTOMLEFT", pos, 0); v:SetWidth(1)
-        local hz = Tex(f, "ARTWORK", C.textSide)
-        hz:SetPoint("TOPLEFT", 0, -pos); hz:SetPoint("TOPRIGHT", 0, -pos); hz:SetHeight(1)
-        f.parts[#f.parts + 1] = v
-        f.parts[#f.parts + 1] = hz
-    end
-    return f
-end
-
--- Einrasten: senkrechte Führungslinie, links und rechts je ein Block daran
-local function SnapIcon(parent)
-    local f = CreateFrame("Frame", nil, parent)
-    f:SetSize(12, 12)
-    local line = Tex(f, "ARTWORK", C.textSide)
-    line:SetPoint("TOP"); line:SetPoint("BOTTOM"); line:SetWidth(1)
-    local a = Tex(f, "ARTWORK", C.textSide)
-    a:SetSize(5, 4); a:SetPoint("TOPRIGHT", line, "TOPLEFT", 0, -1)
-    local b = Tex(f, "ARTWORK", C.textSide)
-    b:SetSize(5, 4); b:SetPoint("BOTTOMLEFT", line, "BOTTOMRIGHT", 0, 1)
-    f.parts = { line, a, b }
-    return f
-end
-
----------------------------------------------------------------------------
 -- Knöpfe der Leiste
 ---------------------------------------------------------------------------
 
 local BTN_H = 22      -- Knöpfe im Fenster je Anzeige
-local BAR_BTN_H = 28  -- Knöpfe der Werkzeugleiste (größer und deutlicher)
-local BAR_FONT = 14
+local BAR_BTN_H = 24  -- Knöpfe der Werkzeugleiste (schlank)
+local BAR_FONT = 13
 
 local function ShowTip(owner, title, line)
     GameTooltip:SetOwner(owner, "ANCHOR_BOTTOM")
@@ -675,36 +710,45 @@ local function TextWidth(fs, s, perChar)
     return w
 end
 
--- Schalter mit Symbol und Text; isOn() liefert den Zustand, toggle() schaltet um
-local function ToggleButton(label, makeIcon, isOn, toggle, tipTitle, tipLine)
-    local b = BaseButton(10)
-    b.icon = makeIcon(b)
-    b.icon:SetPoint("LEFT", 10, 0)
-    b.text = Text(b, BAR_FONT, C.textSide, FONT_BODY)
-    b.text:SetPoint("LEFT", b.icon, "RIGHT", 6, 0)
+-- Häkchen mit Text (Raster, Einrasten); isOn() liefert den Zustand, toggle() schaltet um
+local function CheckToggle(label, isOn, toggle, tipTitle, tipLine)
+    local b = CreateFrame("Button", nil, bar)
+    b:SetHeight(BAR_BTN_H)
+    local box = CreateFrame("Frame", nil, b)
+    box:SetSize(14, 14)
+    box:SetPoint("LEFT", 0, 0)
+    local boxBg = Tex(box, "BACKGROUND", C.card)
+    boxBg:SetAllPoints()
+    local edges = Border(box, C.textSide)
+    local mark = box:CreateTexture(nil, "OVERLAY")
+    mark:SetSize(12, 12)
+    mark:SetPoint("CENTER")
+    mark:SetTexture(MEDIA .. "icons\\check")
+    b.text = Text(b, BAR_FONT, C.text, FONT_BODY)
+    b.text:SetPoint("LEFT", box, "RIGHT", 7, 0)
     b.text:SetText(label)
-    b:SetWidth(math.floor(10 + 12 + 6 + TextWidth(b.text, label, 7) + 11 + 0.5))
+    b:SetWidth(math.floor(14 + 7 + TextWidth(b.text, label, 7) + 2 + 0.5))
     function b:Refresh()
         local on = isOn()
-        if on then
-            self.bg:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.22)
-            Recolor(self.edges, ACCENT)
-            Recolor(self.icon.parts, { 1, 1, 1 })
-            self.text:SetTextColor(1, 1, 1)
-        else
-            self.bg:SetColorTexture(C.card[1], C.card[2], C.card[3], 1)
-            Recolor(self.edges, C.border)
-            Recolor(self.icon.parts, C.textDim)
-            self.text:SetTextColor(C.textSide[1], C.textSide[2], C.textSide[3])
-        end
+        boxBg:SetColorTexture(on and ACCENT[1] or C.card[1], on and ACCENT[2] or C.card[2], on and ACCENT[3] or C.card[3], 1)
+        Recolor(edges, on and ACCENT or C.textSide)
+        mark:SetShown(on and true or false)
+    end
+    local function Tip(self)
+        ShowTip(self, isOn() and L("%s: an", tipTitle) or L("%s: aus", tipTitle), tipLine)
     end
     b:SetScript("OnClick", function(self)
         toggle()
         self:Refresh()
-        ShowTip(self, isOn() and L("%s: an", tipTitle) or L("%s: aus", tipTitle), tipLine)
+        Tip(self)
     end)
     b:SetScript("OnEnter", function(self)
-        ShowTip(self, isOn() and L("%s: an", tipTitle) or L("%s: aus", tipTitle), tipLine)
+        self.text:SetTextColor(1, 1, 1)
+        Tip(self)
+    end)
+    b:SetScript("OnLeave", function(self)
+        self.text:SetTextColor(C.text[1], C.text[2], C.text[3])
+        GameTooltip:Hide()
     end)
     b:Refresh()
     return b
@@ -1094,9 +1138,11 @@ function RefreshPanel(relayout)
     end
 end
 
-function Deselect()
+-- keep = true (Ende des Modus): letzte Auswahl bleibt als ns.EditSelected stehen
+function Deselect(keep)
     selected = nil
     RestyleOverlays()
+    if not keep then NotifySelect(nil) end
     if ns.editMode then SetBarKeys(true) end
     if not panel then return end
     for _, f in ipairs({ panel.xBox, panel.yBox, panel.scaleBox, panel.sizeRows.width.box, panel.sizeRows.height.box }) do
@@ -1122,9 +1168,9 @@ local function RestoreBar()
 end
 
 local BAR_PAD = 12
-local BAR_TOP_H = 48   -- obere Reihe: Logo, Titel, Knöpfe
-local BAR_HINT_H = 28  -- Hinweiszeile darunter
-local LOGO_SIZE = 30
+local BAR_TOP_H = 36   -- obere Reihe: Logo, Titel, Knöpfe
+local BAR_HINT_H = 22  -- Hinweiszeile darunter
+local LOGO_SIZE = 20
 
 -- Farbe als Hex für |cff…-Codes
 local function Hex(c)
@@ -1188,6 +1234,7 @@ end
 local function CreateBar()
     -- Benannt, damit die Leiste in UISpecialFrames stehen kann (Esc versteckt sie → Modus endet).
     -- Ist eine Anzeige gewählt, fängt das Fenster je Anzeige das Esc vorher ab (hebt nur die Auswahl auf).
+    -- Schlank nach Leons Vorlage: Bearbeiten · Zurück · ☐ Raster · ☑ Einrasten · ⟳ · Tasten belegen · Fertig
     bar = CreateFrame("Frame", "strayEditBar", UIParent)
     bar:SetFrameStrata("FULLSCREEN_DIALOG")
     bar:SetClampedToScreen(true)
@@ -1198,9 +1245,6 @@ local function CreateBar()
     bg:SetAllPoints()
     bg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4] or 1)
     Border(bar, C.border)
-    -- 2-px-lila Kante oben (stray-Look)
-    local top = Tex(bar, "ARTWORK", ACCENT)
-    top:SetPoint("TOPLEFT", 1, -1); top:SetPoint("TOPRIGHT", -1, -1); top:SetHeight(2)
 
     -- Hinweiszeile: eigene, leicht abgesetzte Fläche unter der Knopfreihe
     local hintBg = Tex(bar, "BORDER", C.card)
@@ -1209,39 +1253,42 @@ local function CreateBar()
     local hintLine = Tex(bar, "ARTWORK", C.border)
     hintLine:SetPoint("BOTTOMLEFT", 1, BAR_HINT_H); hintLine:SetPoint("BOTTOMRIGHT", -1, BAR_HINT_H)
     hintLine:SetHeight(1)
-    local hint = Text(bar, 13, C.text, FONT_BODY)
+    local hint = Text(bar, 11, C.textSide, FONT_BODY)
     hint:SetPoint("CENTER", bar, "BOTTOM", 0, BAR_HINT_H / 2)
     hint:SetWordWrap(false)
     local hintText, hintPlain = HintLine()
     hint:SetText(hintText)
 
     local function Place(f, x)
-        f:SetPoint("LEFT", bar, "TOPLEFT", x, -BAR_TOP_H / 2 - 1)
+        f:SetPoint("LEFT", bar, "TOPLEFT", x, -BAR_TOP_H / 2)
+    end
+    -- Trennpunkt „·“
+    local function Dot(x)
+        local d = Text(bar, BAR_FONT, C.textDim, FONT_BODY)
+        d:SetText("·")
+        Place(d, x)
+        return x + 4 + 12
     end
 
-    -- Links: stray-Logo und Titel
+    -- Links: kleines Logo und „Bearbeiten“
     local logo = bar:CreateTexture(nil, "ARTWORK")
     logo:SetTexture(MEDIA .. "logo")
     logo:SetSize(LOGO_SIZE, LOGO_SIZE)
     Place(logo, BAR_PAD)
-    local title = Text(bar, 17, C.text, FONT_BODY)
-    title:SetPoint("LEFT", logo, "RIGHT", 8, 0)
-    title:SetText(L["Bearbeitungsmodus"])
-    local x = BAR_PAD + LOGO_SIZE + 8 + TextWidth(title, L["Bearbeitungsmodus"], 8) + 16
-
-    local sep = Tex(bar, "ARTWORK", C.border)
-    sep:SetSize(1, 24)
-    Place(sep, x)
-    x = x + 1 + 16
+    local title = Text(bar, BAR_FONT + 1, C.text, FONT_BODY)
+    title:SetPoint("LEFT", logo, "RIGHT", 7, 0)
+    title:SetText(L["Bearbeiten"])
+    local x = BAR_PAD + LOGO_SIZE + 7 + TextWidth(title, L["Bearbeiten"], 8) + 12
+    x = Dot(x)
 
     -- Zurück (Rückgängig): aktiv, sobald etwas im Verlauf ist
-    local undo = BaseButton(10)
+    local undo = BaseButton(10, nil, BAR_BTN_H)
     undo.icon = UndoIcon(undo)
-    undo.icon:SetPoint("LEFT", 9, 0)
+    undo.icon:SetPoint("LEFT", 7, 0)
     undo.text = Text(undo, BAR_FONT, C.textSide, FONT_BODY)
-    undo.text:SetPoint("LEFT", undo.icon, "RIGHT", 5, 0)
+    undo.text:SetPoint("LEFT", undo.icon, "RIGHT", 4, 0)
     undo.text:SetText(L["Zurück"])
-    undo:SetWidth(math.floor(9 + 16 + 5 + TextWidth(undo.text, L["Zurück"], 7) + 12 + 0.5))
+    undo:SetWidth(math.floor(7 + 16 + 4 + TextWidth(undo.text, L["Zurück"], 7) + 10 + 0.5))
     function undo:Refresh()
         local on = #history > 0
         self:SetEnabled(on)
@@ -1270,26 +1317,27 @@ local function CreateBar()
     undo:SetScript("OnEnter", UndoTip)
     if undo.SetMotionScriptsWhileDisabled then undo:SetMotionScriptsWhileDisabled(true) end
     Place(undo, x)
-    x = x + undo:GetWidth() + 6
+    x = x + undo:GetWidth() + 14
     undoButton = undo
 
-    local gridButton = ToggleButton(L["Raster"], GridIcon, GridOn, function()
+    local gridButton = CheckToggle(L["Raster"], GridOn, function()
         ns.db.editGrid = not GridOn()
         if grid then grid:SetShown(GridOn()) end
     end, L["Raster"], L("Zeigt ein Hilfsraster. Ohne Einrasten landen Anzeigen beim Loslassen auf dem %d-px-Raster.", GRID))
     Place(gridButton, x)
-    x = x + gridButton:GetWidth() + 6
+    x = x + gridButton:GetWidth() + 14
 
-    local snapButton = ToggleButton(L["Einrasten"], SnapIcon, SnapOn, function()
+    local snapButton = CheckToggle(L["Einrasten"], SnapOn, function()
         ns.db.editSnap = not SnapOn()
     end, L["Einrasten"], L["Beim Loslassen rastet eine Anzeige an Kanten und Mitten anderer stray-Anzeigen und an der Bildschirmmitte ein. Geht vor dem Raster."])
     Place(snapButton, x)
-    x = x + snapButton:GetWidth() + 6
+    x = x + snapButton:GetWidth() + 10
 
-    local reset = BaseButton(BAR_BTN_H + 4)
+    -- Alles zurücksetzen (Symbol)
+    local reset = BaseButton(BAR_BTN_H, nil, BAR_BTN_H)
     local icon = reset:CreateTexture(nil, "ARTWORK")
     icon:SetTexture("Interface\\Buttons\\UI-RefreshButton")
-    icon:SetSize(16, 16)
+    icon:SetSize(14, 14)
     icon:SetPoint("CENTER")
     pcall(icon.SetDesaturated, icon, true)
     icon:SetVertexColor(C.textSide[1], C.textSide[2], C.textSide[3])
@@ -1303,29 +1351,53 @@ local function CreateBar()
         icon:SetVertexColor(C.textSide[1], C.textSide[2], C.textSide[3])
         GameTooltip:Hide()
     end)
-    x = x + reset:GetWidth() + 16
+    x = x + reset:GetWidth() + 6
 
-    -- Fertig: lila Hauptknopf (flach, ohne Verlauf), rechts bündig
-    local done = CreateFrame("Button", nil, bar)
-    local dbg = done:CreateTexture(nil, "BACKGROUND")
-    dbg:SetAllPoints()
-    dbg:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 1)
-    local dhl = done:CreateTexture(nil, "HIGHLIGHT")
-    dhl:SetAllPoints()
-    dhl:SetColorTexture(1, 1, 1, 0.10)
-    local dtext = Text(done, BAR_FONT + 1, { 1, 1, 1 }, FONT_BODY)
+    -- Tasten belegen (keybinds.lua): Modus beenden, dann Belegen starten
+    if ns.StartKeybindMode then
+        local keys = BaseButton(10, nil, BAR_BTN_H)
+        keys.text = Text(keys, BAR_FONT, C.textSide, FONT_BODY)
+        keys.text:SetPoint("CENTER")
+        keys.text:SetText(L["Tasten belegen"])
+        keys:SetWidth(math.floor(TextWidth(keys.text, L["Tasten belegen"], 7) + 20 + 0.5))
+        keys:SetScript("OnClick", function()
+            if InCombatLockdown() then return end
+            ExitEditMode()
+            if ns.StartKeybindMode then
+                local ok, err = pcall(ns.StartKeybindMode)
+                if not ok then geterrorhandler()(err) end
+            end
+        end)
+        keys:SetScript("OnEnter", function(self)
+            self.text:SetTextColor(1, 1, 1)
+            ShowTip(self, L["Tasten belegen"], L["Beendet den Bearbeitungsmodus und startet das Belegen: über einen Knopf der stray-Aktionsleisten fahren und eine Taste drücken. Auch per /stray keys."])
+        end)
+        keys:SetScript("OnLeave", function(self)
+            self.text:SetTextColor(C.textSide[1], C.textSide[2], C.textSide[3])
+            GameTooltip:Hide()
+        end)
+        Place(keys, x)
+        x = x + keys:GetWidth() + 10
+    else
+        x = x + 4
+    end
+    x = Dot(x)
+
+    -- Fertig: dunkler Knopf mit lila Rand
+    local done = BaseButton(10, nil, BAR_BTN_H)
+    Recolor(done.edges, ACCENT)
+    local dtext = Text(done, BAR_FONT, { 1, 1, 1 }, FONT_BODY)
     dtext:SetPoint("CENTER")
     dtext:SetText(L["Fertig"])
-    local doneW = math.max(84, math.floor(TextWidth(dtext, L["Fertig"], 8) + 32 + 0.5))
-    done:SetSize(doneW, BAR_BTN_H)
-    done:SetPoint("RIGHT", bar, "TOPRIGHT", -BAR_PAD, -BAR_TOP_H / 2 - 1)
+    local doneW = math.max(70, math.floor(TextWidth(dtext, L["Fertig"], 8) + 28 + 0.5))
+    done:SetWidth(doneW)
+    Place(done, x)
     done:SetScript("OnClick", function() ExitEditMode() end)
     done:SetScript("OnEnter", function(self) ShowTip(self, L["Fertig"], L["Positionen speichern und den Bearbeitungsmodus beenden (auch mit Esc)."]) end)
-    done:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Breite: Knopfreihe oder Hinweiszeile, je nachdem, was länger ist
     local rowW = x + doneW + BAR_PAD
-    local hintW = TextWidth(hint, hintPlain, 6) + 2 * BAR_PAD + 8
+    local hintW = TextWidth(hint, hintPlain, 5) + 2 * BAR_PAD + 8
     bar:SetSize(math.floor(math.max(rowW, hintW) + 0.5), BAR_TOP_H + BAR_HINT_H)
 
     -- Leiste selbst verschieben und Position merken
@@ -1372,6 +1444,11 @@ function ns.EnterEditMode()
         ns.Print(L["Der Bearbeitungsmodus geht nur außerhalb des Kampfes."])
         return
     end
+    -- Nicht gleichzeitig mit der Tastenbelegung (beide nehmen die Tastatur)
+    if ns.KeybindModeActive and ns.KeybindModeActive() then
+        ns.Print(L["Erst die Tastenbelegung beenden (Speichern, Abbrechen oder Esc)."])
+        return
+    end
     if not bar then CreateBar() end
     if not grid then CreateGrid() end
     if strayFrame and strayFrame:IsShown() then strayFrame:Hide() end
@@ -1396,7 +1473,7 @@ end
 
 function ExitEditMode()
     if not ns.editMode then return end
-    Deselect()
+    Deselect(true)
     ns.editMode = false
     StaticPopup_Hide("STRAY_EDIT_RESET")
     if ticker then ticker:Cancel(); ticker = nil end

@@ -7,14 +7,18 @@
 -- Blizzard-Tabellen werden nicht verändert: nur hooksecurefunc und Hide() auf die Taschenrahmen.
 -- Größe unten rechts ziehen: Breite rastet auf Spalten ein (bagColumns), Höhe ist frei (bagHeight).
 -- Passt nicht alles hinein, wird zeilenweise geblättert (Knöpfe neu setzen statt ScrollFrame).
--- Ansicht „Alle“: oben eine Anheft-Leiste (so viele Plätze wie Spalten). Gegenstand hineinziehen
--- heftet ihn an (bagPinned.slots[Platz] = Item-ID); der echte Taschenknopf rückt dann in die
--- Leiste und fehlt unten im Raster. Shift+Rechtsklick oder Herausziehen löst ihn.
+-- Ansicht „Alle“: oben eine Anheft-Leiste (höchstens 5 Plätze). Gegenstand hineinziehen heftet
+-- ihn an (bagPinned.slots[Platz] = Item-ID). Oben sitzt dann ein eigener Gegenstandsknopf
+-- (gleiche Blizzard-Vorlage, zeigt auf Tasche/Platz des ersten Stapels); der echte Taschenknopf
+-- bleibt zusätzlich unten im Raster. Shift+Rechtsklick oder Herausziehen löst ihn.
+-- Optional links unten die Taschenplätze (Rucksack + ausgerüstete Taschen): Tooltip, Hover hebt
+-- die Plätze der Tasche hervor, Tasche ablegen, und Tasche tauschen mit automatischem Umpacken.
 
 local _, ns = ...
 local L = ns.L
 
 ns.defaults.bagHeight = 0 -- 0 = Höhe automatisch nach Inhalt
+ns.defaults.bagSlotsBar = false -- Taschenplätze unten in der Seitenleiste
 
 local IsSecret = ns.IsSecret
 
@@ -24,9 +28,9 @@ local IsSecret = ns.IsSecret
 
 local FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local FONT_BODY = "Fonts\\ARIALN.TTF"
-local QUEST_BANG = TEXTURE_ITEM_QUEST_BANG or "Interface\\ContainerFrame\\UI-Icon-QuestBang"
-local QUEST_BORDER = TEXTURE_ITEM_QUEST_BORDER or "Interface\\ContainerFrame\\UI-Icon-QuestBorder"
 
+local C
+do
 local PALETTE = type(ns.Colors) == "table" and ns.Colors or {}
 local function Col(key, fallback)
     local c = PALETTE[key]
@@ -34,7 +38,7 @@ local function Col(key, fallback)
     return fallback
 end
 
-local C = {
+C = {
     bg         = Col("bg", { 0.078, 0.078, 0.098, 0.96 }),
     side       = Col("card", { 0.094, 0.094, 0.118, 1 }),
     hover      = Col("hover", { 0.122, 0.122, 0.153, 1 }),
@@ -52,6 +56,7 @@ local C = {
     quest      = { 1, 0.82, 0, 1 },
     triage     = { 1, 0.32, 0.22, 1 },
 }
+end
 
 local SLOT, GAP = 34, 4
 local SIDE_W = 122
@@ -63,10 +68,6 @@ local MIN_W = 440
 local BAR_W = 6 -- zusätzlicher Rand rechts für den Scrollbalken
 local MIN_COLS, MAX_COLS = 6, 16
 local MAX_H = 900
-local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
-local GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down"
-local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
-local SORT_ATLAS = "bags-button-autosort-up"
 
 local FIRST_BAG = 0
 local LAST_BAG = (type(NUM_BAG_SLOTS) == "number" and NUM_BAG_SLOTS) or 4
@@ -81,13 +82,15 @@ local CATEGORIES = {
     { key = "new", label = "Neu" },
 }
 
-local ITEM_CLASS = (Enum and Enum.ItemClass) or {}
-local CL_CONSUMABLE = ITEM_CLASS.Consumable or 0
-local CL_WEAPON = ITEM_CLASS.Weapon or 2
-local CL_ARMOR = ITEM_CLASS.Armor or 4
-local CL_REAGENT = ITEM_CLASS.Reagent or 5
-local CL_TRADE = ITEM_CLASS.Tradegoods or 7
-local CL_QUEST = ITEM_CLASS.Questitem or 12
+local CL -- Itemklassen
+do
+    local IC = (Enum and Enum.ItemClass) or {}
+    CL = {
+        consumable = IC.Consumable or 0, weapon = IC.Weapon or 2, armor = IC.Armor or 4,
+        reagent = IC.Reagent or 5, trade = IC.Tradegoods or 7, quest = IC.Questitem or 12,
+        container = IC.Container or 1, quiver = IC.Quiver or 11,
+    }
+end
 
 ---------------------------------------------------------------------------
 -- API-Hüllen (C_Container auf modernem Client, sonst alte Globale)
@@ -197,8 +200,8 @@ end
 -- Die Liste [Item-ID] = true bleibt mit, weil triage.lua angeheftete Gegenstände so erkennt.
 ---------------------------------------------------------------------------
 
-local HEARTHSTONE = 6948
-local MAX_PINS = MAX_COLS
+local MAX_PINS = 5 -- fest, unabhängig von der Fensterbreite
+local trimmedSlots -- Tabelle, die schon auf MAX_PINS gekürzt wurde
 
 local function SyncPinMap(p)
     for k in pairs(p) do
@@ -214,6 +217,7 @@ end
 -- Ruhestein auf Platz 1, bisher angeheftete Gegenstände dahinter.
 local function PinSlots()
     if not ns.db then return {} end
+    local HEARTHSTONE = 6948
     local p = ns.db.bagPinned
     if type(p) ~= "table" then
         p = {}
@@ -233,7 +237,37 @@ local function PinSlots()
         p.slots = slots
         SyncPinMap(p)
     end
+    -- Seit 0.23: höchstens 5 Plätze, Plätze 6+ (und kaputte Schlüssel) verwerfen
+    if trimmedSlots ~= p.slots then
+        local drop = false
+        for k, v in pairs(p.slots) do
+            if type(k) ~= "number" or k < 1 or k > MAX_PINS or k % 1 ~= 0 or type(v) ~= "number" then
+                drop = true
+                break
+            end
+        end
+        if drop then
+            local keep = {}
+            for i = 1, MAX_PINS do
+                local v = p.slots[i]
+                if type(v) == "number" then keep[i] = v end
+            end
+            wipe(p.slots)
+            for i, v in pairs(keep) do p.slots[i] = v end
+            SyncPinMap(p)
+        end
+        trimmedSlots = p.slots
+    end
     return p.slots
+end
+
+local function IsPinnedID(itemID)
+    if not itemID then return false end
+    local slots = PinSlots()
+    for i = 1, MAX_PINS do
+        if slots[i] == itemID then return true end
+    end
+    return false
 end
 
 local function PinIndexOf(itemID)
@@ -257,6 +291,34 @@ end
 local CAT_TOTAL = #CATEGORIES * CAT_H
 local MIN_H = HEAD + PAD + CAT_TOTAL + PAD + FOOT
 
+-- Taschenplätze unten in der Seitenleiste (Option bagSlotsBar)
+local BS_SIZE, BS_GAP, BS_PER_ROW, BS_LABEL = 24, 4, 4, 16
+
+local function BagSlotsOn()
+    return ns.db and ns.db.bagSlotsBar and true or false
+end
+
+-- Taschen-IDs der Leiste: Rucksack, normale Taschen, Reagenzientasche (falls es den Platz gibt).
+-- Anzahl zur Laufzeit aus Constants.InventoryConstants (auf Forever per Konstante vorhanden).
+local function BagSlotIDs()
+    local inv = Constants and Constants.InventoryConstants
+    local nb = inv and tonumber(inv.NumBagSlots) or tonumber(NUM_BAG_SLOTS) or 4
+    local nr = inv and tonumber(inv.NumReagentBagSlots) or tonumber(NUM_REAGENTBAG_SLOTS) or 0
+    local ids = { 0 }
+    for i = 1, nb + nr do ids[#ids + 1] = i end
+    return ids
+end
+
+local function BagSlotsHeight()
+    if not BagSlotsOn() then return 0 end
+    local rows = math.ceil(#BagSlotIDs() / BS_PER_ROW)
+    return BS_LABEL + rows * BS_SIZE + (rows - 1) * BS_GAP + PAD
+end
+
+local function MinH()
+    return MIN_H + BagSlotsHeight()
+end
+
 local function GridSize(n)
     if n < 1 then return 0 end
     return n * SLOT + (n - 1) * GAP
@@ -270,8 +332,8 @@ local MAX_W = WidthFor(MAX_COLS)
 
 local function MaxHeight()
     local h = UIParent and UIParent:GetHeight()
-    if type(h) ~= "number" or IsSecret(h) or h <= MIN_H then return MAX_H end
-    return math.max(MIN_H, math.min(MAX_H, math.floor(h - 20)))
+    if type(h) ~= "number" or IsSecret(h) or h <= MinH() then return MAX_H end
+    return math.max(MinH(), math.min(MAX_H, math.floor(h - 20)))
 end
 
 -- Wie viele ganze Spalten passen in diese Fensterbreite?
@@ -281,8 +343,9 @@ local function ColumnsForWidth(w)
     return n
 end
 
--- Höhe der Anheft-Leiste samt Abstand und lila Linie darunter
-local PIN_H = SLOT + GAP * 2 + 1
+-- Höhe der Anheft-Leiste samt Abstand zum Raster (feine Linie mittig im Abstand)
+local PIN_GAP = 12
+local PIN_H = SLOT + PIN_GAP
 
 -- Wie viele ganze Reihen passen in diese Fensterhöhe? (pinH = Höhe der Anheft-Leiste oder 0)
 local function RowsForHeight(h, pinH)
@@ -294,7 +357,7 @@ end
 local function FixedHeight()
     local h = ns.db and tonumber(ns.db.bagHeight)
     if not h or h <= 0 then return nil end
-    return math.max(MIN_H, math.min(MaxHeight(), math.floor(h + 0.5)))
+    return math.max(MinH(), math.min(MaxHeight(), math.floor(h + 0.5)))
 end
 
 ---------------------------------------------------------------------------
@@ -378,8 +441,10 @@ head:SetScript("OnDragStop", function()
     SavePosition()
 end)
 
-local headLine = Tex(frame, "BORDER", C.line)
-headLine:SetPoint("TOPLEFT", 1, -HEAD); headLine:SetPoint("TOPRIGHT", -1, -HEAD); headLine:SetHeight(1)
+do
+    local headLine = Tex(frame, "BORDER", C.line)
+    headLine:SetPoint("TOPLEFT", 1, -HEAD); headLine:SetPoint("TOPRIGHT", -1, -HEAD); headLine:SetHeight(1)
+end
 
 local title = Text(head, 14, C.text)
 title:SetPoint("LEFT", 12, 0)
@@ -391,12 +456,14 @@ local close = CreateFrame("Button", nil, head)
 close:SetSize(22, 22)
 close:SetPoint("RIGHT", -8, 0)
 Border(close, C.border)
-local closeText = Text(close, 12, C.textDim, FONT_BODY)
-closeText:SetPoint("CENTER", 1, 0)
-closeText:SetText("X")
-local closeHover = close:CreateTexture(nil, "HIGHLIGHT")
-closeHover:SetAllPoints()
-closeHover:SetColorTexture(1, 1, 1, 0.07)
+do
+    local closeText = Text(close, 12, C.textDim, FONT_BODY)
+    closeText:SetPoint("CENTER", 1, 0)
+    closeText:SetText("X")
+    local closeHover = close:CreateTexture(nil, "HIGHLIGHT")
+    closeHover:SetAllPoints()
+    closeHover:SetColorTexture(1, 1, 1, 0.07)
+end
 close:SetScript("OnClick", function() frame:Hide() end)
 
 local search = CreateFrame("EditBox", "strayBagSearch", head)
@@ -417,6 +484,8 @@ search:SetScript("OnEditFocusGained", function() placeholder:Hide() end)
 search:SetScript("OnEditFocusLost", function(self) placeholder:SetShown(self:GetText() == "") end)
 
 -- „Sortieren“ links neben der Suche (Besen wie bei Blizzards Taschen)
+do
+local SORT_ATLAS = "bags-button-autosort-up"
 local sortButton = CreateFrame("Button", nil, head)
 sortButton:SetSize(22, 22)
 sortButton:SetPoint("RIGHT", search, "LEFT", -6, 0)
@@ -466,8 +535,10 @@ sortButton:SetScript("OnClick", function()
     if not ok then ns.Print(L["Sortieren hat nicht geklappt."]) end
     -- Neu gezeichnet wird über BAG_UPDATE_DELAYED, sobald WoW die Gegenstände verschoben hat
 end)
+end
 
 -- Seitenleiste
+do
 local sideBg = Tex(frame, "BACKGROUND", C.side, 1)
 sideBg:SetPoint("TOPLEFT", 1, -HEAD - 1)
 sideBg:SetPoint("BOTTOMLEFT", 1, FOOT + 1)
@@ -476,6 +547,7 @@ local sideLine = Tex(frame, "BORDER", C.line)
 sideLine:SetPoint("TOPLEFT", SIDE_W, -HEAD - 1)
 sideLine:SetPoint("BOTTOMLEFT", SIDE_W, FOOT + 1)
 sideLine:SetWidth(1)
+end
 
 -- Raster
 local grid = CreateFrame("Frame", nil, frame)
@@ -494,11 +566,13 @@ scrollTrack:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, FOOT + PAD)
 scrollTrack:SetWidth(10)
 scrollTrack:SetFrameLevel(frame:GetFrameLevel() + 20)
 scrollTrack:EnableMouseWheel(true)
-local trackLine = scrollTrack:CreateTexture(nil, "ARTWORK")
-trackLine:SetPoint("TOP")
-trackLine:SetPoint("BOTTOM")
-trackLine:SetWidth(4)
-trackLine:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.6)
+do
+    local trackLine = scrollTrack:CreateTexture(nil, "ARTWORK")
+    trackLine:SetPoint("TOP")
+    trackLine:SetPoint("BOTTOM")
+    trackLine:SetWidth(4)
+    trackLine:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.6)
+end
 scrollTrack:Hide()
 
 local scrollThumb = CreateFrame("Button", nil, scrollTrack)
@@ -517,20 +591,27 @@ local grip = CreateFrame("Button", nil, frame)
 grip:SetSize(16, 16)
 grip:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
 grip:SetFrameLevel(frame:GetFrameLevel() + 30)
-grip:SetNormalTexture(GRIP_UP)
-grip:SetPushedTexture(GRIP_DOWN)
-grip:SetHighlightTexture(GRIP_HIGHLIGHT)
+grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
 grip:SetAlpha(0.5)
 
 frame:SetResizable(true)
-if not pcall(frame.SetResizeBounds, frame, MIN_W, MIN_H, MAX_W, MAX_H) then
-    if frame.SetMinResize then pcall(frame.SetMinResize, frame, MIN_W, MIN_H) end
-    if frame.SetMaxResize then pcall(frame.SetMaxResize, frame, MAX_W, MAX_H) end
+-- Untergrenze hängt davon ab, ob die Taschenplätze gezeigt werden
+local function UpdateResizeBounds()
+    local minH = MinH()
+    if not pcall(frame.SetResizeBounds, frame, MIN_W, minH, MAX_W, MAX_H) then
+        if frame.SetMinResize then pcall(frame.SetMinResize, frame, MIN_W, minH) end
+        if frame.SetMaxResize then pcall(frame.SetMaxResize, frame, MAX_W, MAX_H) end
+    end
 end
+UpdateResizeBounds()
 
 -- Fuß
-local footLine = Tex(frame, "BORDER", C.line)
-footLine:SetPoint("BOTTOMLEFT", 1, FOOT); footLine:SetPoint("BOTTOMRIGHT", -1, FOOT); footLine:SetHeight(1)
+do
+    local footLine = Tex(frame, "BORDER", C.line)
+    footLine:SetPoint("BOTTOMLEFT", 1, FOOT); footLine:SetPoint("BOTTOMRIGHT", -1, FOOT); footLine:SetHeight(1)
+end
 
 local moneyText = Text(frame, 12, C.text, FONT_BODY)
 moneyText:SetPoint("BOTTOMLEFT", 12, 8)
@@ -544,9 +625,11 @@ local triageButton = CreateFrame("Button", nil, frame)
 triageButton:SetHeight(18)
 triageButton:SetPoint("RIGHT", hintText, "LEFT", -12, 0)
 Border(triageButton, { C.triage[1], C.triage[2], C.triage[3], 0.8 })
-local triageHover = triageButton:CreateTexture(nil, "HIGHLIGHT")
-triageHover:SetAllPoints()
-triageHover:SetColorTexture(1, 1, 1, 0.07)
+do
+    local triageHover = triageButton:CreateTexture(nil, "HIGHLIGHT")
+    triageHover:SetAllPoints()
+    triageHover:SetColorTexture(1, 1, 1, 0.07)
+end
 local triageLabel = Text(triageButton, 11, C.text, FONT_BODY)
 triageLabel:SetPoint("CENTER", 0, 0)
 triageButton:SetWidth(150)
@@ -610,14 +693,18 @@ local function PaintCategories(counts)
 end
 
 ---------------------------------------------------------------------------
--- Anheft-Leiste (nur in „Alle“): eigene Plätze als Unterlage und Ablagefläche.
--- Liegt der Gegenstand in den Taschen, rückt sein echter (sicherer) Taschenknopf auf den
--- Platz – Benutzen, Tooltip, Abklingzeit und Anzahl wie überall im Fenster. Fehlt er,
--- zeigt der Platz das Symbol ausgegraut.
+-- Anheft-Leiste (nur in „Alle“, höchstens 5 Plätze): eigene Plätze als Unterlage und
+-- Ablagefläche. Liegt der Gegenstand in den Taschen, steht auf dem Platz ein eigener
+-- Gegenstandsknopf (Blizzards ContainerFrameItemButtonTemplate, nicht geschützt), der auf
+-- Tasche/Platz des ersten Stapels zeigt – Benutzen, Tooltip, Abklingzeit wie in der Tasche.
+-- Der echte Taschenknopf bleibt unten im Raster. Fehlt der Gegenstand, zeigt der Platz das
+-- Symbol ausgegraut.
 ---------------------------------------------------------------------------
 
-local pinOf = {}       -- [Taschenknopf] = Platz in der Anheft-Leiste (aus dem letzten Layout)
 local pinSlots = {}    -- [Platz] = Unterlage
+local pinButtons = {}  -- [Platz] = eigener Gegenstandsknopf (in Build angelegt)
+local pinTarget = {}   -- [Anheft-Knopf] = Taschenknopf im Raster, auf den er zeigt
+local isPinButton = {} -- [Anheft-Knopf] = true
 local UpdateCatchers
 
 local pinBar = CreateFrame("Frame", nil, frame)
@@ -625,8 +712,9 @@ pinBar:SetPoint("TOPLEFT", SIDE_W + PAD, -HEAD - PAD)
 pinBar:SetSize(SLOT, PIN_H)
 pinBar:Hide()
 
-local pinLine = Tex(pinBar, "ARTWORK", { C.accent[1], C.accent[2], C.accent[3], 0.45 })
-pinLine:SetPoint("TOPLEFT", 0, -(SLOT + GAP))
+-- Feine Linie mittig im Abstand zwischen Anheft-Leiste und Raster
+local pinLine = Tex(pinBar, "ARTWORK", { C.accent[1], C.accent[2], C.accent[3], 0.30 })
+pinLine:SetPoint("TOPLEFT", 0, -(SLOT + math.floor(PIN_GAP / 2)))
 pinLine:SetHeight(1)
 pinLine:SetWidth(SLOT)
 
@@ -754,11 +842,13 @@ local function PaintPinSlot(s, itemID, present)
 end
 
 -- Cursor-Wechsel: Ablageflächen an/aus (Ereignisse gibt es nicht in jedem Client)
+do
 local cursorWatch = CreateFrame("Frame")
 for _, event in ipairs({ "CURSOR_CHANGED", "CURSOR_UPDATE" }) do
     pcall(cursorWatch.RegisterEvent, cursorWatch, event)
 end
 cursorWatch:SetScript("OnEvent", function() if frame:IsShown() then UpdateCatchers() end end)
+end
 
 ---------------------------------------------------------------------------
 -- Gegenstandsknöpfe
@@ -852,6 +942,12 @@ local function StyleButton(b)
     b.strayPin:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
     b.strayPin:Hide()
 
+    -- Hervorhebung, wenn die Maus über dem Taschenplatz dieser Tasche steht
+    b.strayHover = holder:CreateTexture(nil, "OVERLAY", nil, 4)
+    b.strayHover:SetAllPoints()
+    b.strayHover:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.28)
+    b.strayHover:Hide()
+
     b.strayDim = holder:CreateTexture(nil, "OVERLAY", nil, 7)
     b.strayDim:SetAllPoints()
     b.strayDim:SetColorTexture(0, 0, 0, 0.7)
@@ -876,7 +972,7 @@ local function TogglePin(b)
         return
     end
     local slots = PinSlots()
-    for i = 1, Columns() do
+    for i = 1, MAX_PINS do
         if not slots[i] then
             SetPin(i, d.itemID)
             ns.Print(L("%s angeheftet.", d.link or L["Gegenstand"]))
@@ -899,19 +995,10 @@ local function CreateItemButton(bag, slot)
     if b.SetBagID then pcall(b.SetBagID, b, bag) end
     b.strayBag, b.straySlot = bag, slot
     pcall(StyleButton, b)
-    -- Nach Blizzards Klick: Alt+Rechtsklick heftet an/ab; in der Anheft-Leiste löst
-    -- Shift+Rechtsklick (beides sind „modifizierte“ Klicks, Blizzard benutzt dabei nichts)
+    -- Nach Blizzards Klick: Alt+Rechtsklick heftet an/ab („modifizierter“ Klick, Blizzard
+    -- benutzt dabei nichts)
     b:HookScript("OnClick", function(self, mouse)
-        if mouse ~= "RightButton" then return end
-        if IsAltKeyDown() then
-            TogglePin(self)
-        elseif IsShiftKeyDown() and pinOf[self] then
-            SetPin(pinOf[self], nil)
-        end
-    end)
-    -- Aus der Anheft-Leiste herausziehen löst den Gegenstand (er hängt dann am Mauszeiger)
-    b:HookScript("OnDragStart", function(self)
-        if pinOf[self] then SetPin(pinOf[self], nil) end
+        if mouse == "RightButton" and IsAltKeyDown() then TogglePin(self) end
     end)
     -- „Neu“-Markierung beim Verlassen entfernen (wie Blizzard nach dem Ansehen)
     b:HookScript("OnLeave", function(self)
@@ -920,6 +1007,44 @@ local function CreateItemButton(bag, slot)
             pcall(C_NewItems.RemoveNewItem, self.strayBag, self.straySlot)
             RequestUpdate(0.1)
         end
+    end)
+    b:Hide()
+    return b
+end
+
+-- Eigener Gegenstandsknopf für einen Platz der Anheft-Leiste. Gleiche Blizzard-Vorlage wie
+-- im Raster; Tasche/Platz werden im Layout auf den ersten Stapel gesetzt (SetBagID + SetID).
+local pinHolder = CreateFrame("Frame", "strayBagPinContainer", pinBar)
+pinHolder:SetAllPoints(pinBar)
+pinHolder:SetID(0)
+pinHolder.GetBagID = function(self) return self:GetID() end
+pinHolder.IsCombinedBagContainer = function() return false end
+
+local function CreatePinButton(index)
+    local name = "strayBagPin" .. index
+    local b
+    for _, kind in ipairs({ "ItemButton", "Button" }) do
+        local ok, result = pcall(CreateFrame, kind, name, pinHolder, "ContainerFrameItemButtonTemplate")
+        if ok and result then b = result break end
+    end
+    if not b then return nil end
+    b:SetID(1)
+    if b.SetBagID then pcall(b.SetBagID, b, 0) end
+    b.strayBag, b.straySlot = 0, 1
+    b.strayPinIndex = index
+    isPinButton[b] = true
+    pcall(b.SetFrameLevel, b, frame:GetFrameLevel() + 3) -- über der Unterlage, unter der Ablagefläche
+    pcall(StyleButton, b)
+    -- Shift+Rechtsklick oder Alt+Rechtsklick löst den Gegenstand aus der Leiste
+    b:HookScript("OnClick", function(self, mouse)
+        if mouse == "RightButton" and (IsShiftKeyDown() or IsAltKeyDown()) then
+            GameTooltip:Hide()
+            SetPin(self.strayPinIndex, nil)
+        end
+    end)
+    -- Herausziehen löst ihn ebenfalls (Blizzards Vorlage legt den Gegenstand dabei an den Mauszeiger)
+    b:HookScript("OnDragStart", function(self)
+        SetPin(self.strayPinIndex, nil)
     end)
     b:Hide()
     return b
@@ -958,6 +1083,12 @@ local function Build()
         end
         builtSize[bag] = n
     end
+    for i = 1, MAX_PINS do
+        if not pinButtons[i] then
+            local b = CreatePinButton(i)
+            if b then pinButtons[i] = b end
+        end
+    end
     built = true
     return true
 end
@@ -984,7 +1115,7 @@ local function ScanButton(b, counts)
     local classID = ClassOf(itemID, link)
     local isQuestItem, questID, isActive = QuestInfo(bag, slot)
     if questID and not isActive then d.questStarter = true end
-    if classID == CL_QUEST or isQuestItem then d.questItem = true end
+    if classID == CL.quest or isQuestItem then d.questItem = true end
     if ns.QuestForItemLink and link then
         local ok, quest = pcall(ns.QuestForItemLink, link)
         if ok and quest then d.questNeeded = true end
@@ -996,9 +1127,9 @@ local function ScanButton(b, counts)
     if d.questStarter or d.questItem or d.questNeeded then
         d.cats.quest = true
     else
-        if classID == CL_WEAPON or classID == CL_ARMOR then d.cats.gear = true end
-        if classID == CL_CONSUMABLE then d.cats.consumable = true end
-        if classID == CL_TRADE or classID == CL_REAGENT then d.cats.trade = true end
+        if classID == CL.weapon or classID == CL.armor then d.cats.gear = true end
+        if classID == CL.consumable then d.cats.consumable = true end
+        if classID == CL.trade or classID == CL.reagent then d.cats.trade = true end
     end
 
     d.isNew = IsNew(bag, slot)
@@ -1110,10 +1241,10 @@ local function Paint(b, d, dimByCategory)
 
     if b.strayQuest then
         if d.questStarter or questNeeded then
-            b.strayQuest:SetTexture(QUEST_BANG)
+            b.strayQuest:SetTexture(TEXTURE_ITEM_QUEST_BANG or "Interface\\ContainerFrame\\UI-Icon-QuestBang")
             b.strayQuest:Show()
         elseif d.questItem then
-            b.strayQuest:SetTexture(QUEST_BORDER)
+            b.strayQuest:SetTexture(TEXTURE_ITEM_QUEST_BORDER or "Interface\\ContainerFrame\\UI-Icon-QuestBorder")
             b.strayQuest:Show()
         else
             b.strayQuest:Hide()
@@ -1121,7 +1252,7 @@ local function Paint(b, d, dimByCategory)
     end
     if b.strayTriage then b.strayTriage:SetShown(isTriage and true or false) end
     if b.strayNew then b.strayNew:SetShown(d.isNew) end
-    if b.strayPin then b.strayPin:SetShown(pinOf[b] ~= nil) end
+    if b.strayPin then b.strayPin:SetShown((not isPinButton[b] and hasItem and IsPinnedID(d.itemID)) and true or false) end
 
     local dim = not MatchesSearch(d) or (dimByCategory and not Matches(d, selected))
     if b.strayDim then b.strayDim:SetShown(dim and true or false) end
@@ -1175,6 +1306,414 @@ local function UpdateScrollBar()
     scrollTrack:Show()
 end
 
+-- Anheft-Knöpfe wie ihren Stapel im Raster zeichnen; Anzahl = alles in den Taschen
+local GetCount = (C_Item and C_Item.GetItemCount) or GetItemCount
+
+local function PaintPins()
+    for _, pb in ipairs(pinButtons) do
+        local target = pinTarget[pb]
+        local d = target and data[target]
+        if d and pb:IsShown() then
+            pcall(Paint, pb, d, false)
+            if pb.strayHover then pb.strayHover:Hide() end
+            if GetCount and d.itemID then
+                local ok, total = pcall(GetCount, d.itemID)
+                if ok and not IsSecret(total) and type(total) == "number" and SetItemButtonCount then
+                    pcall(SetItemButtonCount, pb, total)
+                end
+            end
+        end
+    end
+end
+
+---------------------------------------------------------------------------
+-- Taschenplätze (Option bagSlotsBar): Rucksack + ausgerüstete Taschen unten in der
+-- Seitenleiste. Tooltip mit Name/Größe/frei, Hover hebt die Plätze im Raster hervor,
+-- Tasche auf leeren Platz ablegen, Tasche auf belegten Platz = tauschen mit Umpacken.
+---------------------------------------------------------------------------
+
+local UpdateBagSlots
+do
+local BACKPACK_ICON = "Interface\\Buttons\\Button-Backpack-Up"
+local EMPTY_BAG_ICON = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
+
+local bagSlotBox = CreateFrame("Frame", nil, frame)
+bagSlotBox:SetPoint("BOTTOMLEFT", frame, "BOTTOMLEFT", 6, FOOT + PAD)
+bagSlotBox:SetSize(SIDE_W - 12, 1)
+bagSlotBox:SetFrameLevel(frame:GetFrameLevel() + 5)
+bagSlotBox:Hide()
+
+local bagSlotTitle = Text(bagSlotBox, 10, C.textFaint, FONT_BODY)
+bagSlotTitle:SetPoint("TOPLEFT", 2, 0)
+
+local bagSlotButtons = {} -- [Index] = Knopf
+local hoverBag            -- Tasche, deren Plätze gerade hervorgehoben sind
+local swap                -- laufender Taschentausch (Zustand) oder nil
+
+-- Inventarplatz einer Tasche (z. B. Tasche 1 → 20 auf Classic); Rucksack hat keinen
+local function InvID(bag)
+    if bag == 0 then return nil end
+    local fn = Container.ContainerIDToInventoryID or ContainerIDToInventoryID
+    if fn then
+        local ok, id = pcall(fn, bag)
+        if ok and not IsSecret(id) and type(id) == "number" then return id end
+    end
+    return nil
+end
+
+local function InvItemID(inv)
+    if not inv or not GetInventoryItemID then return nil end
+    local ok, id = pcall(GetInventoryItemID, "player", inv)
+    if not ok or IsSecret(id) or type(id) ~= "number" then return nil end
+    return id
+end
+
+local function InvLocked(inv)
+    if not inv or not IsInventoryItemLocked then return false end
+    local ok, locked = pcall(IsInventoryItemLocked, inv)
+    return ok and not IsSecret(locked) and locked and true or false
+end
+
+local function HasItemAt(bag, slot)
+    local icon, _, _, _, link, itemID = SlotInfo(bag, slot)
+    return (icon or link or itemID) and true or false
+end
+
+local function UsedSlots(bag)
+    local used = 0
+    for slot = 1, NumSlots(bag) do
+        if HasItemAt(bag, slot) then used = used + 1 end
+    end
+    return used
+end
+
+local function IsBagItem(itemID)
+    local classID = ClassOf(itemID)
+    return classID == CL.container or classID == CL.quiver
+end
+
+local function CursorHas()
+    if not CursorHasItem then return CursorItemID() ~= nil end
+    local ok, has = pcall(CursorHasItem)
+    return ok and not IsSecret(has) and has and true or false
+end
+
+local function SafeClearCursor()
+    if ClearCursor then pcall(ClearCursor) end
+end
+
+local function Pickup(bag, slot)
+    local fn = Container.PickupContainerItem or PickupContainerItem
+    if not fn then return false end
+    return pcall(fn, bag, slot)
+end
+
+-- Freie Plätze in normalen Taschen (Familie 0), außer in Tasche „except“
+local function FreeNormalSlots(except)
+    local list = {}
+    for bag = FIRST_BAG, LAST_BAG do
+        if bag ~= except then
+            local _, family = FreeSlots(bag)
+            if family == 0 then
+                for slot = 1, NumSlots(bag) do
+                    if not HasItemAt(bag, slot) then list[#list + 1] = { bag = bag, slot = slot } end
+                end
+            end
+        end
+    end
+    return list
+end
+
+local function HighlightBag(bag)
+    hoverBag = bag
+    ActiveButtons(function(b)
+        if b.strayHover then b.strayHover:SetShown(bag ~= nil and b.strayBag == bag) end
+    end)
+end
+
+-- Wo liegt der Gegenstand, der gerade am Mauszeiger hängt? (gesperrter Platz mit dieser ID)
+local function CursorSource(itemID)
+    for bag = FIRST_BAG, LAST_BAG do
+        for slot = 1, NumSlots(bag) do
+            local _, _, locked, _, _, id = SlotInfo(bag, slot)
+            if locked and id == itemID then return bag, slot end
+        end
+    end
+end
+
+local StartSwap
+do
+local SWAP_STEP = 0.2   -- Wartezeit zwischen den Schritten
+local SWAP_TRIES = 15   -- so oft auf einen Schritt warten (≈ 3 s), dann abbrechen
+
+local function SwapStatus()
+    if not swap then return end
+    if swap.phase == "move" then
+        hintText:SetText(L("Packe um … %d / %d", math.min(swap.i - 1, #swap.moves), #swap.moves))
+    else
+        hintText:SetText(L["Tausche Tasche …"])
+    end
+end
+
+local function SwapEnd(message)
+    if not swap then return end
+    swap = nil
+    if CursorHas() then SafeClearCursor() end
+    if message then ns.Print(message) end
+    hintText:SetText(L["In die obere Reihe ziehen: anheften"])
+    RequestUpdate(0.1)
+end
+
+local SwapStep
+
+local function SwapNext()
+    if swap then C_Timer.After(SWAP_STEP, SwapStep) end
+end
+
+-- Ein Schritt des Tauschs: erst alle Gegenstände der alten Tasche umlagern, dann die neue
+-- Tasche einsetzen, zuletzt die alte Tasche (falls sie am Mauszeiger hängt) ablegen.
+function SwapStep()
+    local s = swap
+    if not s then return end
+    if InCombatLockdown() then
+        SwapEnd(L["Kampf – Taschentausch abgebrochen. Bereits umgelagerte Gegenstände bleiben, wo sie sind."])
+        return
+    end
+    SwapStatus()
+    if s.phase == "move" then
+        local m, d = s.moves[s.i], s.dests[s.i]
+        if not m then
+            s.phase, s.issued, s.tries = "insert", false, 0
+            return SwapNext()
+        end
+        if s.issued then
+            local _, _, locked = SlotInfo(d.bag, d.slot)
+            if not HasItemAt(m.bag, m.slot) and HasItemAt(d.bag, d.slot) and not locked then
+                s.i, s.issued, s.tries = s.i + 1, false, 0
+            else
+                s.tries = s.tries + 1
+                if s.tries > SWAP_TRIES then
+                    SwapEnd(L["Umpacken hat nicht geklappt (Gegenstand gesperrt?). Abgebrochen."])
+                    return
+                end
+            end
+            return SwapNext()
+        end
+        if CursorHas() then SafeClearCursor() end
+        Pickup(m.bag, m.slot)
+        if CursorHas() then Pickup(d.bag, d.slot) end
+        -- Die neue Tasche lag in der alten? Dann merken, wohin sie umgezogen ist
+        if m.bag == s.srcBag and m.slot == s.srcSlot then s.srcBag, s.srcSlot = d.bag, d.slot end
+        s.issued = true
+        return SwapNext()
+    elseif s.phase == "insert" then
+        if not s.issued then
+            if UsedSlots(s.bag) > 0 then
+                SwapEnd(L["Die alte Tasche ist noch nicht leer. Abgebrochen."])
+                return
+            end
+            if CursorHas() then SafeClearCursor() end
+            Pickup(s.srcBag, s.srcSlot)
+            if CursorItemID() ~= s.newID or not PutItemInBag then
+                SwapEnd(L["Die neue Tasche wurde nicht gefunden. Abgebrochen."])
+                return
+            end
+            pcall(PutItemInBag, s.inv)
+            s.issued, s.tries = true, 0
+            return SwapNext()
+        end
+        if InvItemID(s.inv) == s.newID and not InvLocked(s.inv) then
+            s.phase, s.issued, s.tries = "stow", false, 0
+        else
+            s.tries = s.tries + 1
+            if s.tries > SWAP_TRIES then
+                SwapEnd(L["Einsetzen hat nicht geklappt – WoW hat die Tasche nicht angenommen."])
+                return
+            end
+        end
+        return SwapNext()
+    else
+        -- Alte Tasche: WoW legt sie meist auf den Platz der neuen; hängt sie am Mauszeiger,
+        -- in einen freien Platz legen (auch die neue Tasche zählt jetzt mit)
+        if CursorHas() then
+            local free = FreeNormalSlots(nil)
+            local target = free[1]
+            if target then
+                Pickup(target.bag, target.slot)
+            elseif PutItemInBackpack then
+                pcall(PutItemInBackpack)
+            end
+        end
+        SwapEnd(L["Tasche getauscht – die alte liegt jetzt in deinen Taschen."])
+    end
+end
+
+function StartSwap(bag, inv, newID)
+    if InCombatLockdown() then
+        SafeClearCursor()
+        ns.Print(L["Taschen tauschen geht erst nach dem Kampf."])
+        return
+    end
+    local srcBag, srcSlot = CursorSource(newID)
+    SafeClearCursor() -- neue Tasche zurück an ihren Platz, stray holt sie später selbst
+    if not srcBag then
+        ns.Print(L["Zieh die neue Tasche aus deinen Taschen auf den Taschenplatz."])
+        return
+    end
+    local moves = {}
+    for slot = 1, NumSlots(bag) do
+        if HasItemAt(bag, slot) then moves[#moves + 1] = { bag = bag, slot = slot } end
+    end
+    local dests = FreeNormalSlots(bag)
+    if #dests < #moves then
+        ns.Print(L("Es fehlen %d freie Plätze – erst Platz schaffen.", #moves - #dests))
+        return
+    end
+    swap = {
+        bag = bag, inv = inv, newID = newID, srcBag = srcBag, srcSlot = srcSlot,
+        moves = moves, dests = dests, i = 1, phase = "move", issued = false, tries = 0,
+    }
+    HighlightBag(nil)
+    SwapStatus()
+    SwapStep()
+end
+end
+
+-- Gegenstand vom Mauszeiger auf einen Taschenplatz fallen lassen
+local function DropOnBagSlot(self)
+    local id = CursorItemID()
+    if not id then return end
+    if swap then
+        ns.Print(L["stray tauscht gerade schon eine Tasche."])
+        return
+    end
+    local bag = self.bag
+    if bag == 0 then
+        if PutItemInBackpack then pcall(PutItemInBackpack) end
+        return
+    end
+    local inv = InvID(bag)
+    if not inv or not PutItemInBag then return end
+    -- Leerer Platz, keine Tasche am Mauszeiger, dieselbe Tasche zurück oder alte Tasche leer:
+    -- das erledigt WoW selbst (Tasche anlegen bzw. Gegenstand in diese Tasche legen)
+    if not InvItemID(inv) or not IsBagItem(id) or InvLocked(inv) or UsedSlots(bag) == 0 then
+        pcall(PutItemInBag, inv)
+        return
+    end
+    StartSwap(bag, inv, id)
+end
+
+local function BagSlotTooltip(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    local bag = self.bag
+    local n = NumSlots(bag)
+    local free = FreeSlots(bag)
+    local inv = InvID(bag)
+    local shown = false
+    if bag == 0 then
+        GameTooltip:SetText(L["Rucksack"], 1, 1, 1)
+        shown = true
+    elseif inv and InvItemID(inv) then
+        shown = pcall(GameTooltip.SetInventoryItem, GameTooltip, "player", inv) and GameTooltip:NumLines() > 0
+        if not shown then
+            local name = Container.GetBagName and select(2, pcall(Container.GetBagName, bag))
+            GameTooltip:SetText((type(name) == "string" and not IsSecret(name)) and name or L["Tasche"], 1, 1, 1)
+            shown = true
+        end
+    end
+    if bag ~= 0 and not InvItemID(inv) then
+        GameTooltip:SetText(L["Leerer Taschenplatz"], 1, 1, 1)
+        GameTooltip:AddLine(L["Tasche hierher ziehen, um sie anzulegen."], C.textDim[1], C.textDim[2], C.textDim[3], true)
+    else
+        if n > 0 then
+            GameTooltip:AddLine(L("%d Plätze, davon %d frei", n, type(free) == "number" and free or 0), C.text[1], C.text[2], C.text[3])
+        end
+        if bag ~= 0 then
+            GameTooltip:AddLine(L["Neue Tasche hierher ziehen: stray räumt die alte aus, setzt die neue ein und legt die alte in deine Taschen (nur außerhalb des Kampfes)."], C.accentText[1], C.accentText[2], C.accentText[3], true)
+        end
+    end
+    GameTooltip:Show()
+end
+
+local function CreateBagSlotButton(index)
+    local s = CreateFrame("Button", nil, bagSlotBox)
+    s:SetSize(BS_SIZE, BS_SIZE)
+    local row, col = math.floor((index - 1) / BS_PER_ROW), (index - 1) % BS_PER_ROW
+    s:SetPoint("TOPLEFT", bagSlotBox, "TOPLEFT", col * (BS_SIZE + BS_GAP), -BS_LABEL - row * (BS_SIZE + BS_GAP))
+    Tex(s, "BACKGROUND", C.slot):SetAllPoints()
+    s.edges = Border(s, C.slotEdge)
+    s.icon = s:CreateTexture(nil, "ARTWORK")
+    s.icon:SetPoint("TOPLEFT", 1, -1)
+    s.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    s.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    s.free = s:CreateFontString(nil, "OVERLAY")
+    s.free:SetFont(FONT_BODY, 10, "OUTLINE")
+    s.free:SetPoint("BOTTOMRIGHT", -1, 1)
+    s.free:SetTextColor(C.text[1], C.text[2], C.text[3])
+    local hl = s:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(1, 1, 1, 0.08)
+    s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    s:RegisterForDrag("LeftButton")
+    s:SetScript("OnEnter", function(self)
+        for _, e in ipairs(self.edges) do e:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1) end
+        HighlightBag(self.bag)
+        BagSlotTooltip(self)
+    end)
+    s:SetScript("OnLeave", function(self)
+        for _, e in ipairs(self.edges) do e:SetColorTexture(C.slotEdge[1], C.slotEdge[2], C.slotEdge[3], 1) end
+        HighlightBag(nil)
+        GameTooltip:Hide()
+    end)
+    s:SetScript("OnClick", function(self, mouse)
+        if mouse == "LeftButton" and CursorItemID() then DropOnBagSlot(self) end
+    end)
+    s:SetScript("OnReceiveDrag", DropOnBagSlot)
+    -- Ausgerüstete Tasche herausziehen (wie an Blizzards Taschenleiste)
+    s:SetScript("OnDragStart", function(self)
+        if swap or self.bag == 0 or not PickupBagFromSlot then return end
+        local inv = InvID(self.bag)
+        if inv and InvItemID(inv) then pcall(PickupBagFromSlot, inv) end
+    end)
+    return s
+end
+
+function UpdateBagSlots()
+    local on = BagSlotsOn()
+    bagSlotBox:SetShown(on)
+    if not on then
+        if hoverBag then HighlightBag(nil) end
+        return
+    end
+    bagSlotTitle:SetText(L["TASCHEN"])
+    local ids = BagSlotIDs()
+    local rows = math.ceil(#ids / BS_PER_ROW)
+    bagSlotBox:SetHeight(BS_LABEL + rows * BS_SIZE + (rows - 1) * BS_GAP)
+    for i, bag in ipairs(ids) do
+        local s = bagSlotButtons[i] or CreateBagSlotButton(i)
+        bagSlotButtons[i] = s
+        s.bag = bag
+        local inv = InvID(bag)
+        local equipped = bag == 0 or InvItemID(inv) ~= nil
+        local icon
+        if bag == 0 then
+            icon = BACKPACK_ICON
+        elseif equipped and GetInventoryItemTexture then
+            local ok, tex = pcall(GetInventoryItemTexture, "player", inv)
+            if ok and not IsSecret(tex) then icon = tex end
+        end
+        s.icon:SetTexture(icon or EMPTY_BAG_ICON)
+        s.icon:SetDesaturated(not equipped)
+        s.icon:SetAlpha(equipped and 1 or 0.35)
+        local free = equipped and FreeSlots(bag) or nil
+        s.free:SetText(type(free) == "number" and free or "")
+        s:Show()
+    end
+    for i = #ids + 1, #bagSlotButtons do bagSlotButtons[i]:Hide() end
+    if hoverBag then HighlightBag(hoverBag) end
+end
+end
+
 local liveCols -- Spalten während des Ziehens
 
 -- live = true: während des Ziehens, Fenstergröße nicht anfassen.
@@ -1182,14 +1721,13 @@ local liveCols -- Spalten während des Ziehens
 local function Layout(live, keepTopLeft)
     local cols = (live and liveCols) or Columns()
 
-    -- Anheft-Leiste nur in „Alle“: so viele Plätze wie Spalten; je Platz der erste
-    -- Taschenknopf mit dieser Item-ID (weitere Stapel bleiben unten im Raster)
+    -- Anheft-Leiste nur in „Alle“: höchstens 5 Plätze; je Platz zeigt ein eigener Knopf auf
+    -- den ersten Stapel mit dieser Item-ID. Alle Stapel bleiben zusätzlich unten im Raster.
     local showPins = selected == "all"
     local pinCount = showPins and math.min(cols, MAX_PINS) or 0
     local pinH = showPins and PIN_H or 0
     local slots = PinSlots()
-    local pinButton = {}
-    wipe(pinOf)
+    wipe(pinTarget)
     if showPins then
         local firstByID = {}
         ActiveButtons(function(b)
@@ -1198,17 +1736,15 @@ local function Layout(live, keepTopLeft)
         end)
         for i = 1, pinCount do
             local id = slots[i]
-            local b = id and firstByID[id]
-            if b then
-                pinButton[i] = b
-                pinOf[b] = i
-            end
+            local target = id and firstByID[id]
+            local pb = pinButtons[i]
+            if target and pb then pinTarget[pb] = target end
         end
     end
 
     local shown = {}
     ActiveButtons(function(b)
-        if not pinOf[b] and Matches(data[b], selected) then shown[#shown + 1] = b end
+        if Matches(data[b], selected) then shown[#shown + 1] = b end
     end)
     -- Plätze kleiner gewordener Taschen ausblenden
     for bag = FIRST_BAG, LAST_BAG do
@@ -1227,8 +1763,8 @@ local function Layout(live, keepTopLeft)
     else
         height = FixedHeight()
         if not height then
-            local auto = HEAD + PAD + math.max(pinH + GridSize(rows), CAT_TOTAL) + PAD + FOOT
-            height = math.max(MIN_H, math.min(MaxHeight(), auto))
+            local auto = HEAD + PAD + math.max(pinH + GridSize(rows), CAT_TOTAL + BagSlotsHeight()) + PAD + FOOT
+            height = math.max(MinH(), math.min(MaxHeight(), auto))
         end
     end
     totalRows = rows
@@ -1243,23 +1779,28 @@ local function Layout(live, keepTopLeft)
     local visible = {}
     pinBar:SetShown(showPins)
     if showPins then
-        local w = math.max(1, GridSize(pinCount))
-        pinBar:SetSize(w, PIN_H)
-        pinLine:SetWidth(w)
-        for i, s in ipairs(pinSlots) do
-            local on = i <= pinCount
-            s:SetShown(on)
-            if on then
-                local b = pinButton[i]
-                if b then
-                    visible[b] = true
-                    b:ClearAllPoints()
-                    b:SetPoint("TOPLEFT", s, "TOPLEFT", 0, 0)
-                    b:Show()
-                end
-                PaintPinSlot(s, slots[i], b ~= nil)
+        pinBar:SetSize(math.max(1, GridSize(pinCount)), PIN_H)
+        pinLine:SetWidth(math.max(1, GridSize(cols)))
+    end
+    for i, s in ipairs(pinSlots) do
+        local on = showPins and i <= pinCount
+        s:SetShown(on)
+        local pb = pinButtons[i]
+        local target = pb and pinTarget[pb]
+        if pb then
+            if on and target then
+                -- Auf Tasche/Platz des ersten Stapels zeigen (Knopf ist nicht geschützt)
+                pb.strayBag, pb.straySlot = target.strayBag, target.straySlot
+                if pb.SetBagID then pcall(pb.SetBagID, pb, target.strayBag) end
+                pb:SetID(target.straySlot)
+                pb:ClearAllPoints()
+                pb:SetPoint("TOPLEFT", s, "TOPLEFT", 0, 0)
+                pb:Show()
+            else
+                pb:Hide()
             end
         end
+        if on then PaintPinSlot(s, slots[i], target ~= nil) end
     end
     UpdateCatchers()
 
@@ -1275,7 +1816,7 @@ local function Layout(live, keepTopLeft)
         end
     end
     ActiveButtons(function(b) if not visible[b] then b:Hide() end end)
-    emptyText:SetShown(#shown == 0 and next(pinButton) == nil)
+    emptyText:SetShown(#shown == 0)
 
     grid:SetSize(math.max(1, GridSize(cols)), math.max(1, GridSize(viewRows)))
     if not live then
@@ -1312,7 +1853,9 @@ local function Update()
         local d = data[b]
         if d then pcall(Paint, b, d, not canLayout) end
     end)
+    PaintPins()
     UpdateHeader()
+    UpdateBagSlots()
 end
 
 function RequestUpdate(delay)
@@ -1343,6 +1886,7 @@ end)
 -- Blättern: Mausrad, Scrollbalken ziehen oder in die Spur klicken
 ---------------------------------------------------------------------------
 
+do
 local function SetScrollRow(n)
     n = math.floor((tonumber(n) or 0) + 0.5)
     if n > scrollMax then n = scrollMax end
@@ -1404,11 +1948,13 @@ scrollTrack:SetScript("OnMouseDown", function(self, button)
     local pos = top - CursorY() - (scrollThumb:GetHeight() or 0) / 2
     SetScrollRow(math.max(0, math.min(free, pos)) / free * scrollMax)
 end)
+end
 
 ---------------------------------------------------------------------------
 -- Größe ziehen: Breite rastet auf Spalten ein, Höhe frei
 ---------------------------------------------------------------------------
 
+do
 local startW, startH, startCols
 
 -- Fenster an die linke obere Ecke hängen, damit nur die rechte untere Ecke wandert
@@ -1448,7 +1994,7 @@ local function StopSizing()
         end
         -- Nur wer die Höhe wirklich verändert, legt eine feste Höhe fest
         if math.abs(h - startH) >= 19 then -- etwa eine halbe Reihe; schräges Ziehen an der Breite ändert die Höhe nicht
-            ns.db.bagHeight = math.max(MIN_H, math.min(MaxHeight(), math.floor(h + 0.5)))
+            ns.db.bagHeight = math.max(MinH(), math.min(MaxHeight(), math.floor(h + 0.5)))
         end
     end
     liveCols = nil
@@ -1500,6 +2046,7 @@ grip:SetScript("OnLeave", function(self)
     self:SetAlpha(0.5)
     GameTooltip:Hide()
 end)
+end
 
 ---------------------------------------------------------------------------
 -- Öffnen und Schließen
@@ -1559,6 +2106,8 @@ local function ShowWindow()
     return true
 end
 
+local Request, InstallHooks
+do
 local suppress = false
 
 local function HideBlizzardBags()
@@ -1605,14 +2154,14 @@ local function Resolve()
     end
 end
 
-local function Request(action, name)
+function Request(action, name)
     if suppress or not Usable() then return end
     HideBlizzardBags()
     if not intent then C_Timer.After(0, Resolve) end
     intent, intentName = action, name
 end
 
-local function InstallHooks()
+function InstallHooks()
     local function Hook(fnName, handler)
         if type(_G[fnName]) == "function" then
             hooksecurefunc(fnName, function(...)
@@ -1660,16 +2209,18 @@ local function InstallHooks()
         ContainerFrameCombinedBags:HookScript("OnShow", OnBlizzardShow)
     end
 end
+end
 
 -- Höhe im Bearbeitungsmodus: bagHeight 0 = automatisch (nach Inhalt). Untergrenze 0, damit
 -- „Zurücksetzen“ (Standard 0) nicht auf die kleinste feste Höhe geklemmt wird.
+do
 local function NormalizeHeight()
     if not ns.db then return end
     local h = tonumber(ns.db.bagHeight)
     if not h or IsSecret(h) or h <= 0 then
         ns.db.bagHeight = 0
     else
-        ns.db.bagHeight = math.max(MIN_H, math.min(MaxHeight(), math.floor(h + 0.5)))
+        ns.db.bagHeight = math.max(MinH(), math.min(MaxHeight(), math.floor(h + 0.5)))
     end
 end
 
@@ -1691,6 +2242,7 @@ end, {
         RequestUpdate(0)
     end,
 })
+end
 
 ---------------------------------------------------------------------------
 -- Ereignisse
@@ -1698,8 +2250,9 @@ end, {
 
 ns.On("PLAYER_LOGIN", function()
     local h = tonumber(ns.db.bagHeight)
-    ns.db.bagHeight = (h and h > 0) and math.max(MIN_H, math.min(MAX_H, math.floor(h + 0.5))) or 0
-    PinSlots() -- altes Anheft-Format umstellen, Ruhestein auf Platz 1
+    ns.db.bagHeight = (h and h > 0) and math.max(MinH(), math.min(MAX_H, math.floor(h + 0.5))) or 0
+    PinSlots() -- altes Anheft-Format umstellen, Ruhestein auf Platz 1, Plätze 6+ verwerfen
+    UpdateResizeBounds()
     ns.RestorePosition(frame)
     pcall(InstallHooks)
 end)
@@ -1723,9 +2276,11 @@ ns.On("BAG_UPDATE_COOLDOWN", function() RequestUpdate(0.1) end)
 ns.On("PLAYER_MONEY", function() if frame:IsShown() then UpdateHeader() end end)
 ns.On("QUEST_LOG_UPDATE", function() RequestUpdate(0.5) end)
 -- Quest abgegeben/abgebrochen: questitems.lua baut seine Liste nach 0,2 s neu, danach einordnen
-local function AfterQuestGone() C_Timer.After(0.6, function() RequestUpdate(0) end) end
-ns.On("QUEST_TURNED_IN", AfterQuestGone)
-ns.On("QUEST_REMOVED", AfterQuestGone)
+do
+    local function AfterQuestGone() C_Timer.After(0.6, function() RequestUpdate(0) end) end
+    ns.On("QUEST_TURNED_IN", AfterQuestGone)
+    ns.On("QUEST_REMOVED", AfterQuestGone)
+end
 -- Optionen wie „Questgegenstände markieren“ wirken sofort, wenn das stray-Fenster auf/zu geht
 ns.OnConfig(function() RequestUpdate(0) end)
 
@@ -1734,11 +2289,13 @@ ns.On("MERCHANT_SHOW", function() Request("openBy", "MerchantFrame") end)
 ns.On("MERCHANT_CLOSED", function() Request("closeBy", "MerchantFrame") end)
 
 -- Ereignisse, die es nicht in jedem Client gibt
+do
 local optional = CreateFrame("Frame")
-for _, event in ipairs({ "BAG_NEW_ITEMS_UPDATED", "INVENTORY_SEARCH_UPDATE" }) do
+for _, event in ipairs({ "BAG_NEW_ITEMS_UPDATED", "INVENTORY_SEARCH_UPDATE", "BAG_CONTAINER_UPDATE", "PLAYER_EQUIPMENT_CHANGED" }) do
     pcall(optional.RegisterEvent, optional, event)
 end
 optional:SetScript("OnEvent", function() RequestUpdate(0.1) end)
+end
 
 ---------------------------------------------------------------------------
 -- Optionen
@@ -1747,7 +2304,7 @@ optional:SetScript("OnEvent", function() RequestUpdate(0.1) end)
 ns.AddOption(1, "Taschen", {
     key = "bagWindow",
     label = L["Eigenes Taschenfenster"],
-    tooltip = L["Zeigt alle Taschen in einem Fenster mit Suche und Kategorien (Ausrüstung, Verbrauchbar, Handwerk, Quest, Neu). B-Taste, Rucksack-Knopf und Händler öffnen dann dieses Fenster statt Blizzards Taschen.\n\nQuestgegenstände stehen nur unter „Quest“, bis die Quest abgegeben ist.\n\nIn „Alle“ steht oben eine Anheft-Leiste (der Ruhestein sitzt anfangs auf Platz 1): Gegenstand hineinziehen heftet ihn an, Shift+Rechtsklick oder Herausziehen löst ihn. Angeheftetes benutzt du dort wie in der Tasche. Auch Alt+Rechtsklick auf einen Gegenstand heftet ihn an oder löst ihn. Kopfzeile ziehen verschiebt das Fenster, der Griff unten rechts ändert die Größe. Passt nicht alles hinein, blätterst du mit dem Mausrad. Der Besen neben der Suche sortiert die Taschen.\n\nAusschalten wirkt sofort; ganz sauber wird es nach Neuladen (/reload)."],
+    tooltip = L["Zeigt alle Taschen in einem Fenster mit Suche und Kategorien (Ausrüstung, Verbrauchbar, Handwerk, Quest, Neu). B-Taste, Rucksack-Knopf und Händler öffnen dann dieses Fenster statt Blizzards Taschen.\n\nQuestgegenstände stehen nur unter „Quest“, bis die Quest abgegeben ist.\n\nIn „Alle“ steht oben eine Anheft-Leiste mit 5 Plätzen (der Ruhestein sitzt anfangs auf Platz 1): Gegenstand hineinziehen heftet ihn an, Shift+Rechtsklick oder Herausziehen löst ihn. Angeheftetes benutzt du dort wie in der Tasche; unten im Raster steht es zusätzlich. Auch Alt+Rechtsklick auf einen Gegenstand heftet ihn an oder löst ihn. Kopfzeile ziehen verschiebt das Fenster, der Griff unten rechts ändert die Größe. Passt nicht alles hinein, blätterst du mit dem Mausrad. Der Besen neben der Suche sortiert die Taschen.\n\nAusschalten wirkt sofort; ganz sauber wird es nach Neuladen (/reload)."],
     set = function(value)
         ns.db.bagWindow = value
         if value then
@@ -1772,3 +2329,16 @@ ns.AddOption(1, "Taschen", {
     end,
 })
 
+ns.AddOption(1, "Taschen", {
+    key = "bagSlotsBar",
+    label = L["Taschenplätze im Taschenfenster"],
+    tooltip = L["Zeigt links unten im stray-Taschenfenster den Rucksack und deine Taschenplätze. Tooltip: Name, Größe und freie Plätze; die Plätze dieser Tasche leuchten im Raster auf.\n\nTasche auf einen leeren Platz ziehen legt sie an. Neue Tasche auf einen belegten Platz ziehen: stray räumt die alte Tasche Schritt für Schritt in deine anderen Taschen aus, setzt die neue ein und legt die alte in deine Taschen. Nur außerhalb des Kampfes; Kampfbeginn bricht ab. Reicht der Platz nicht, sagt stray, wie viele Plätze fehlen."],
+    keywords = { "taschenplätze", "tasche tauschen", "umpacken", "rucksack", "bag slots", "swap bag", "bags", "backpack" },
+    isEnabled = function() return ns.db and ns.db.bagWindow and true or false end,
+    disabledHint = L["Erst „Eigenes Taschenfenster“ einschalten (weiter oben)."],
+    set = function(value)
+        ns.db.bagSlotsBar = value
+        UpdateResizeBounds()
+        RequestUpdate(0)
+    end,
+})
