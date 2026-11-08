@@ -139,7 +139,7 @@ local function SetAnchorVisual(on)
 end
 SetAnchorVisual(false)
 
-ns.RegisterMovable(anchor, "Abklingzeiten")
+ns.RegisterMovable(anchor, "Abklingzeiten", nil, { noScale = true }) -- Größe über cdSize, der Anker skaliert Blizzards Viewer nicht
 
 local function FindBarFrame()
     for _, name in ipairs(BAR_FRAMES) do
@@ -512,7 +512,7 @@ end
 ns.AddOption(2, "Abklingzeiten", {
     key = "cdManager",
     label = "Abklingzeiten über den Leisten",
-    tooltip = "Zeigt über den Aktionsleisten eine Reihe mit deinen wichtigen Fähigkeiten und ihren Abklingzeiten – große Restzeit in der Mitte jedes Symbols.\n\nDafür nutzt stray Blizzards eingebauten Cooldown-Manager und schaltet ihn ein. Welche Fähigkeiten er zeigt (und ob immer oder nur im Kampf), stellst du in Blizzards eigenem Cooldown-Manager-Fenster bzw. im Edit Mode ein (Spielmenü). stray gestaltet ihn nur um (quadratische Symbole, schmaler Rand) und platziert ihn: wichtige Fähigkeiten unten, weitere direkt darüber.\n\nVerschieben mit Shift + Ziehen bei offenem stray-Fenster oder im Bearbeiten-Modus. Position und Größe ändern sich nur außerhalb des Kampfes.\n\nAusschalten: Blizzards eigene Optik und Position kommen erst nach /reload zurück.",
+    tooltip = "Zeigt über den Aktionsleisten eine Reihe mit deinen wichtigen Fähigkeiten und ihren Abklingzeiten – große Restzeit in der Mitte jedes Symbols.\n\nDafür nutzt stray Blizzards eingebauten Cooldown-Manager und schaltet ihn ein. Welche Fähigkeiten er zeigt (und ob immer oder nur im Kampf), stellst du in Blizzards eigenem Cooldown-Manager-Fenster bzw. im Edit Mode ein (Spielmenü). stray gestaltet ihn nur um (quadratische Symbole, schmaler Rand) und platziert ihn: wichtige Fähigkeiten unten, weitere direkt darüber.\n\nVerschieben mit Shift + Ziehen bei offenem stray-Fenster oder im Bearbeitungsmodus. Position und Größe ändern sich nur außerhalb des Kampfes.\n\nAusschalten: Blizzards eigene Optik und Position kommen erst nach /reload zurück.",
     isEnabled = function() return Available() end,
     disabledHint = NOT_AVAILABLE,
     set = function(value)

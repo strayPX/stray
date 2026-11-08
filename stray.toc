@@ -1,13 +1,21 @@
 ## Interface: 16001
 ## Title: stray
 ## IconTexture: Interface\AddOns\stray\media\minimap_icon
-## Notes: Komfort-Optionen per /stray – Beute, Händler, Taschen, Chat, Quests, Filmsequenzen, Bedrohung, Kamera, Interface, Sozial.
+## Notes: All-in-one quality-of-life addon for WoW Forever – type /stray.
+## Notes-deDE: Komfort-Optionen per /stray – Beute, Händler, Taschen, Chat, Quests, Filmsequenzen, Bedrohung, Kamera, Interface, Sozial.
 ## Author: stray
-## Version: 0.21.0-alpha
+## Version: 0.22.0-alpha
 ## SavedVariables: strayDB
 ## X-Curse-Project-ID: 1790666
 
+locale.lua
+locale\enUS_1.lua
+locale\enUS_2.lua
+locale\enUS_3.lua
+locale\enUS_4.lua
+locale\enUS_5.lua
 stray.lua
+glow.lua
 loot.lua
 merchant.lua
 bags.lua
@@ -26,6 +34,7 @@ profiles.lua
 camera.lua
 minimap.lua
 hud.lua
+xptracker.lua
 actionbars.lua
 cooldowns.lua
 bagwindow.lua

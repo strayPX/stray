@@ -5,11 +5,18 @@
 -- MinimapCluster herausgelöst (SetParent auf UIParent) und oben rechts bündig gesetzt. Den Cluster
 -- selbst setzt stray nicht um, er wird nur durchsichtig und mausfrei (Zonentext, Verfolgung,
 -- Kalender, Post, Addon-Fach). Alles nur außerhalb des Kampfes; keine Felder auf Blizzard-Frames.
+-- Die eckige Karte ist ein Teil der „stray-Oberfläche“: Schalter und Größenregler stehen in hud.lua
+-- (Bereich „stray-Oberfläche“), hier nur der Umbau (ns.ApplySquareMinimap).
 
 local _, ns = ...
 
 ns.defaults.squareMinimap = false
 ns.defaults.squareMinimapSize = 200
+
+-- Wirksam nur mit Hauptoption „stray-Oberfläche“ (ns.db.strayUI) und eigenem Unterschalter
+local function SquareWanted()
+    return ns.db and ns.db.strayUI and ns.db.squareMinimap and true or false
+end
 
 local ICON = "Interface\\AddOns\\stray\\media\\minimap_icon"
 local WHITE = "Interface\\Buttons\\WHITE8X8"
@@ -604,7 +611,7 @@ local function ApplySquare()
         return
     end
     pendingApply = false
-    if ns.db.squareMinimap then
+    if SquareWanted() then
         local ok, err = pcall(BuildSquare)
         if not ok then
             ns.Print("Eckige Minimap ging nicht: " .. tostring(err))
@@ -618,6 +625,9 @@ end
 SafeOn("PLAYER_REGEN_ENABLED", function()
     if pendingApply then ApplySquare() end
 end)
+
+-- hud.lua ruft das beim Umschalten (Hauptoption, Unterschalter, Größe) auf
+ns.ApplySquareMinimap = ApplySquare
 
 -- Blizzard setzt die runde Maske neu, wenn sich „Minimap drehen“ ändert
 if Cluster() and type(Cluster().UpdateMinimapConfig) == "function" then
@@ -651,41 +661,16 @@ Minimap:HookScript("OnSizeChanged", function()
     end
 end)
 
-ns.AddOption(3, "Kamera & Karte", {
-    key = "squareMinimap",
-    label = "Eckige Minimap oben rechts",
-    tooltip = "Macht die Minimap viereckig mit schmalem stray-Rand und setzt sie bündig in die obere rechte Bildschirmecke. Darüber steht der Gebietsname (Klick: Weltkarte), links im Kopf ein Briefsymbol bei neuer Post, darunter die Koordinaten, wenn Blizzards Einstellung „Spielerkoordinaten“ an ist.\n\n"
-        .. "Blizzards runder Rahmen, Zoomknöpfe, Zonenleiste, Verfolgungs- und Kalenderknopf werden ausgeblendet. Verfolgung und Kalender erreichst du über den kleinen Kartenmenü-Knopf oben links in der Karte (bei eckiger Karte immer da) oder, falls eingeschaltet, über die mittlere Maustaste auf der Karte.\n\n"
-        .. "Blizzards Bearbeitungsmodus kann die Minimap dann nicht mehr anwählen. Die Größe stellst du mit dem Regler darunter ein, nicht im Bearbeitungsmodus.\n\n"
-        .. "Ausschalten stellt die runde Karte wieder her. Sitzt danach etwas schief, hilft /reload. Im Kampf wird erst danach umgebaut.",
-    set = function(value)
-        ns.db.squareMinimap = value
-        ApplySquare()
-    end,
-})
-
-ns.AddOption(3, "Kamera & Karte", {
-    key = "squareMinimapSize",
-    type = "slider",
-    label = "Größe eckige Minimap",
-    min = 140, max = 260, step = 10,
-    tooltip = "Kantenlänge der eckigen Minimap in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
-    isEnabled = function() return ns.db and ns.db.squareMinimap and true or false end,
-    disabledHint = "Erst „Eckige Minimap oben rechts“ einschalten (Oberfläche → Kamera & Karte).",
-    set = function(v)
-        ns.db.squareMinimapSize = math.max(140, math.min(260, math.floor((tonumber(v) or 200) + 0.5)))
-        if ns.db.squareMinimap then ApplySquare() end
-    end,
-})
+-- Schalter „Eckige Minimap oben rechts“ und Regler „Größe eckige Minimap“: hud.lua, Bereich „stray-Oberfläche“
 
 ns.On("PLAYER_LOGIN", function()
     -- Form früh melden, damit andere Addons ihre Knöpfe gleich richtig setzen
-    if ns.db.squareMinimap and _G.GetMinimapShape ~= SquareShape then
+    if SquareWanted() and _G.GetMinimapShape ~= SquareShape then
         prevShape = _G.GetMinimapShape
         _G.GetMinimapShape = SquareShape
     end
     Apply()
-    if ns.db.squareMinimap then C_Timer.After(0, ApplySquare) end
+    if SquareWanted() then C_Timer.After(0, ApplySquare) end
     -- Andere Addons (z. B. Leatrix) stellen die Minimap-Form evtl. erst nach dem Login um
     C_Timer.After(2, function()
         if ns.db.minimapButton then UpdatePosition() end

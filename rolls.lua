@@ -134,7 +134,7 @@ ns.OnConfig(function() UpdateHolder() end)
 ns.AddOption(3, "Interface", {
     key = "rollsMove",
     label = "Würfelfenster verschiebbar",
-    tooltip = "Die Bedarf-/Gier-Fenster erscheinen an einer Stelle deiner Wahl statt über den Aktionsleisten. Bei offenem stray-Fenster siehst du einen Platzhalter „Würfelfenster“, den du mit Shift + linker Maustaste oder im Bearbeiten-Modus verschiebst.\n\nAusschalten wirkt ganz nach /reload.",
+    tooltip = "Die Bedarf-/Gier-Fenster erscheinen an einer Stelle deiner Wahl statt über den Aktionsleisten. Bei offenem stray-Fenster siehst du einen Platzhalter „Würfelfenster“, den du mit Shift + linker Maustaste oder im Bearbeitungsmodus verschiebst.\n\nAusschalten wirkt ganz nach /reload.",
     set = function(value)
         ns.db.rollsMove = value
         Apply()

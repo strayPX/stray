@@ -67,6 +67,7 @@ ns.defaults = {
     threatTankWarn = false,
     threatAggroWarn = false,
     positions = {}, -- verschobene Anzeigen: [Schlüssel] = { Punkt, relPunkt, x, y }
+    scales = {},    -- Größe je Anzeige aus dem Bearbeitungsmodus: [Schlüssel] = Faktor (0.5–2), fehlt = 1
 }
 
 -- Einstellungen, die es nicht mehr gibt (Flugzeit, entfernt in 0.4.0-alpha)
@@ -202,7 +203,32 @@ function ns.MakeMovable(frame, key, defaultPoint)
     end)
 end
 
+-- Größe je Anzeige (ns.db.scales[strayKey]) anwenden. Ohne Eintrag bleibt der Maßstab unberührt,
+-- außer stray hat die Anzeige vorher vergrößert/verkleinert: dann zurück auf 1.
+-- Geschützte Rahmen (z. B. Aktionsleisten) nur außerhalb des Kampfes.
+local scaled = {} -- [frame] = true, solange stray einen Maßstab ungleich 1 gesetzt hat
+
+function ns.ApplyScale(frame)
+    local key = frame and frame.strayKey
+    if not key or not ns.db or type(ns.db.scales) ~= "table" then return end
+    local s = tonumber(ns.db.scales[key])
+    if s then
+        s = math.max(0.5, math.min(2, s))
+    elseif scaled[frame] then
+        s = 1
+    else
+        return
+    end
+    if InCombatLockdown() and frame.IsProtected and frame:IsProtected() then return end
+    if math.abs((frame:GetScale() or 1) - s) > 0.001 then
+        local ok, err = pcall(frame.SetScale, frame, s)
+        if not ok then geterrorhandler()(err) return end
+    end
+    scaled[frame] = (s ~= 1) or nil
+end
+
 function ns.RestorePosition(frame)
+    ns.ApplyScale(frame)
     local pos = (ns.db and ns.db.positions[frame.strayKey]) or frame.strayDefault
     frame:ClearAllPoints()
     frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
@@ -232,10 +258,17 @@ end
 -- Verschiebbare Anzeigen für den Bearbeiten-Modus.
 -- frame braucht strayKey/strayDefault (über ns.MakeMovable). preview(on) blendet bei Bedarf
 -- Beispielinhalt ein, den die Anzeige sonst nur bei offenem stray-Fenster zeigt.
+-- opts (optional) für das Fenster je Anzeige im Bearbeitungsmodus:
+--   widthKey / heightKey = Schlüssel einer vorhandenen Slider-Option (ns.AddOption, type="slider");
+--     das Fenster zeigt dann Breite/Höhe und ändert den Wert über deren set (Grenzen min/max/step).
+--     Gibt es keine solche Option, gelten widthMin/widthMax bzw. heightMin/heightMax: der Wert landet
+--     in ns.db[Schlüssel], danach läuft onSize(welche, wert) mit welche = "width" oder "height".
+--   noScale = true blendet „Größe %“ aus (für Anzeigen, bei denen SetScale nichts bewirkt).
 ns.movables = {}
 
-function ns.RegisterMovable(frame, label, preview)
-    table.insert(ns.movables, { frame = frame, label = label, preview = preview })
+function ns.RegisterMovable(frame, label, preview, opts)
+    if type(opts) ~= "table" then opts = nil end
+    table.insert(ns.movables, { frame = frame, label = label, preview = preview, opts = opts })
 end
 
 ---------------------------------------------------------------------------
@@ -260,6 +293,12 @@ function ns.AddOption(column, sectionName, option)
     end
     if not option.set then
         option.set = function(value) ns.db[option.key] = value end
+    end
+    -- Optionale Stichwörter für die Suche (deutsch + englisch): keywords = { "aggro", "threat" }
+    if type(option.keywords) == "string" then
+        option.keywords = { option.keywords }
+    elseif type(option.keywords) ~= "table" then
+        option.keywords = nil
     end
     table.insert(section.options, option)
 end

@@ -1,5 +1,7 @@
 -- stray – eigene Aktionsleisten
--- 5 Leisten à 12 Knöpfe statt Blizzards Leisten, frei verschiebbar über den Bearbeiten-Modus.
+-- 5 Leisten à 12 Knöpfe statt Blizzards Leisten, frei verschiebbar über den Bearbeitungsmodus.
+-- Teil der „stray-Oberfläche“: wirksam nur mit Hauptoption (ns.db.strayUI) und Unterschalter
+-- „Eigene Aktionsleisten“ (ns.db.abEnabled). Beide Schalter stehen in hud.lua.
 -- Jede Leiste einzeln an/aus, mit eigener Knopfgröße und Knöpfen pro Reihe (Raster).
 -- Optik: quadratische Knöpfe, 1-px-dunkler Rand, beschnittenes Symbol, Tastenkürzel oben rechts,
 -- Anzahl unten rechts, Abklingzeit mit großer Zahl, Reichweite rot, nicht nutzbar dunkel, kein Mana blau.
@@ -56,7 +58,7 @@ local showGrid = false       -- Blizzard meldet „Aktion auf dem Mauszeiger“ 
 local blizzardHidden = false
 
 local function Enabled()
-    return ns.db and ns.db.abEnabled and true or false
+    return ns.db and ns.db.strayUI and ns.db.abEnabled and true or false
 end
 
 -- Gespeicherter Wert, sonst Standardwert
@@ -813,7 +815,7 @@ local function Build()
             bar.buttons[i] = CreateButton(bar, l, i)
         end
         ns.MakeMovable(bar, "ab" .. l, DefaultPoint(l))
-        -- Verschieben nur über den Bearbeiten-Modus (die Leiste ist geschützt)
+        -- Verschieben nur über den Bearbeitungsmodus (die Leiste ist geschützt)
         bar:EnableMouse(false)
         ns.RegisterMovable(bar, "Aktionsleiste " .. l)
         if BARS[l].paging then SetupPaging(bar) end
@@ -1167,14 +1169,9 @@ local function Apply()
     end
 end
 
--- Taschen- und Menüleiste (hud.lua) folgt „Eigene Aktionsleisten“
-local function UpdateBottomBar()
-    if ns.HudUpdateBottomBar then pcall(ns.HudUpdateBottomBar) end
-end
-
+-- Taschen- und Menüleiste unten rechts hat seit 0.22 einen eigenen Unterschalter (hud.lua)
 ns.On("PLAYER_LOGIN", function()
     Apply()
-    UpdateBottomBar()
 end)
 
 ns.On("PLAYER_REGEN_ENABLED", function()
@@ -1217,7 +1214,7 @@ end
 
 local function IsOn() return Enabled() end
 
-local DISABLED_HINT = "Erst „Eigene Aktionsleisten“ einschalten (oben auf dieser Seite)."
+local DISABLED_HINT = "Erst „stray-Oberfläche“ und darunter „Eigene Aktionsleisten“ einschalten (Oberfläche → stray-Oberfläche)."
 
 -- Veralteter Zauberrang: Option im Bereich „Zaubern“ (der Bereich „Aktionsleisten“ ist voll)
 ns.AddOption(2, "Zaubern", {
@@ -1225,7 +1222,7 @@ ns.AddOption(2, "Zaubern", {
     label = "Veralteten Zauberrang zeigen",
     tooltip = "Markiert auf den stray-Aktionsleisten Zauber, von denen du schon einen höheren Rang kennst: kleiner grüner Pfeil oben links und im Tooltip die Zeile „stray: höherer Rang bekannt“ mit der Rangnummer.\n\nstray tauscht nichts aus – zieh den neuen Rang selbst aus dem Zauberbuch auf den Platz. Wer absichtlich einen niedrigen Rang nutzt (z. B. zum Manasparen), kann die Markierung einfach ignorieren.",
     isEnabled = function() return RANK_API and Enabled() end,
-    disabledHint = RANK_API and "Erst „Eigene Aktionsleisten“ einschalten (Aktionsleisten → Aktionsleisten)." or "Diese Spielversion liefert die nötigen Zauberbuch-Daten nicht.",
+    disabledHint = RANK_API and DISABLED_HINT or "Diese Spielversion liefert die nötigen Zauberbuch-Daten nicht.",
     set = function(value)
         ns.db.abRankCheck = value
         QueueRankScan()
@@ -1236,21 +1233,21 @@ ns.AddOption(2, "Zaubern", {
 -- Gerade bearbeitete Leiste (nur für diese Sitzung, nicht in ns.db, nicht im Profil)
 local selectedBar = 1
 
-ns.AddOption(2, "Aktionsleisten", {
-    key = "abEnabled",
-    label = "Eigene Aktionsleisten",
-    tooltip = "Ersetzt Blizzards Aktionsleisten durch bis zu 5 schlichte stray-Leisten à 12 Knöpfe. Deine Belegung und deine Tasten bleiben: Leiste 1 ist die Hauptleiste (mit Seitenwechsel bei Haltung, Gestalt, Verstohlenheit und Umschalt+Mausrad), Leiste 2 die untere linke, Leiste 3 die untere rechte, Leiste 4 die rechte und Leiste 5 die Leiste „Rechts 2“. Haltungs- und Begleiterleiste bleiben von Blizzard. Bringt unten rechts eine schlanke Taschenleiste mit (Menüknöpfe dort optional).\n\nUnter „Leiste bearbeiten“ wählst du eine Leiste und stellst ein, ob sie angezeigt wird, wie groß ihre Knöpfe sind und wie viele in einer Reihe stehen. Standard: Leisten 1–4 an, 5 aus.\n\nVerschieben über „Anzeigen verschieben“ (Bearbeiten-Modus); dort und bei offenem stray-Fenster siehst du auch die leeren Plätze. Änderungen wirken nur außerhalb des Kampfes.\n\nMit Blizzards Hauptleiste verschwindet auch die Blizzard-EP-Leiste: Schalte unter „Leisten & Minimap“ die stray-EP-Leiste ein.\n\nAusschalten erfordert Neuladen für Blizzards Aktionsleisten; Blizzards Taschenleiste und Menüknöpfe kommen sofort zurück.",
-    set = function(value)
-        ns.db.abEnabled = value
-        CombatNote()
-        Apply()
-        UpdateBottomBar()
-        if not value and blizzardHidden then
-            ns.Print("Blizzards Aktionsleisten kommen nach /reload zurück. Blizzards Taschenleiste und Menüknöpfe sind gleich wieder da (im Kampf erst danach).")
-            StaticPopup_Show("STRAY_AB_RELOAD")
-        end
-    end,
-})
+-- Schalter „Eigene Aktionsleisten“ steht seit 0.22 in hud.lua (Bereich „stray-Oberfläche“).
+-- hud.lua ruft das auf, wenn sich die Wirkung ändert (Unterschalter oder Hauptoption).
+function ns.ActionBarsToggled()
+    CombatNote()
+    Apply()
+    if Enabled() then return end
+    -- Leistenkunst von Mikromenü/Taschenleiste zurück, falls die Taschenleiste sie nicht braucht
+    if not (ns.db.strayUI and ns.db.bottomBar) and not InCombatLockdown() then
+        pcall(ns.ShowBlizzardBarArt)
+    end
+    if blizzardHidden then
+        ns.Print("Blizzards Aktionsleisten kommen nach /reload zurück.")
+        StaticPopup_Show("STRAY_AB_RELOAD")
+    end
+end
 
 ns.AddOption(2, "Aktionsleisten", {
     key = "abKeybinds",

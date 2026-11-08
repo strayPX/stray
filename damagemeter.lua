@@ -476,7 +476,15 @@ local function CreateMeter(cfg)
     headerLine:SetHeight(1)
 
     ns.MakeMovable(main, cfg.posKey, cfg.defaultPoint)
-    ns.RegisterMovable(main, cfg.label)
+    -- Breite/Höhe auch im Fenster des Bearbeitungsmodus (ab 0.22.0)
+    ns.RegisterMovable(main, cfg.label, nil, {
+        widthKey = cfg.widthKey, heightKey = cfg.heightKey,
+        widthMin = MIN_W, widthMax = MAX_W, heightMin = MIN_H, heightMax = MAX_H,
+        onSize = function()
+            if InCombatLockdown() then return end
+            main:SetSize(ns.db[cfg.widthKey] or DEFAULT_W, ns.db[cfg.heightKey] or DEFAULT_H)
+        end,
+    })
 
     -- Größe ziehen (unten rechts). Grenzen: neue API SetResizeBounds, sonst SetMinResize/SetMaxResize.
     main:SetResizable(true)

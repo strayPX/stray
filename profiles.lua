@@ -1,6 +1,9 @@
 -- stray – Profile: alle Einstellungen als Text exportieren und wieder importieren
 -- Format: "stray1:" gefolgt von Einträgen "schlüssel=typ:wert", getrennt durch ";".
 -- Typen: b (1/0), n (Zahl), s (Text, Sonderzeichen als %XX maskiert).
+-- Inhalt: alle Optionen aus dem Register, alle weiteren einfachen Werte aus ns.db, die ein
+-- Modul in ns.defaults anmeldet (außer Charakter-/Verlaufsdaten), Positionen (pos.*),
+-- Größen je Anzeige (scale.*), Minimap-Winkel und Werkzeugleisten-Punkt.
 
 local _, ns = ...
 
@@ -67,9 +70,10 @@ local function DecodePosition(text)
     return { p, rp, x, y }
 end
 
--- Alle exportierbaren Optionen aus dem Register: Schlüssel → Option
+-- Alle exportierbaren Optionen aus dem Register: Schlüssel → Option.
+-- blocked: Schlüssel von Knöpfen, Auswahlfeldern und noExport-Optionen (auch nicht über ns.db)
 local function CollectOptions()
-    local list, byKey = {}, {}
+    local list, byKey, blocked = {}, {}, {}
     for _, sections in ipairs(ns.columns) do
         for _, section in ipairs(sections) do
             for _, option in ipairs(section.options) do
@@ -77,11 +81,78 @@ local function CollectOptions()
                 if key and option.type ~= "button" and option.type ~= "choice" and not option.noExport and not SKIP_KEYS[key] and not byKey[key] then
                     byKey[key] = option
                     table.insert(list, option)
+                elseif key then
+                    blocked[key] = true
                 end
             end
         end
     end
-    return list, byKey
+    return list, byKey, blocked
+end
+
+---------------------------------------------------------------------------
+-- Weitere Werte direkt aus ns.db (ohne eigene Option, z. B. Fenstergrößen, Modus, Andocken).
+-- Grundsatz: alle einfachen Werte, die ein Modul in ns.defaults anmeldet, außer Charakter-,
+-- Verlaufs- und internen Daten. So kommen neue Einstellungen ohne Liste automatisch mit.
+---------------------------------------------------------------------------
+
+-- Nie exportieren: Twinks, Notizen, Post-Twinks, Flugzeiten, Kontodaten, interner Zustand
+local NO_EXPORT_DB = {
+    altData = true, playerNoteData = true, mailAltList = true, flightRouteTimes = true,
+    accountCVarData = true, bagPinned = true, cdCVarByStray = true,
+    flightTimer = true, flightTimes = true,
+}
+
+-- Namensmuster für Verläufe und Messdaten (z. B. EP-Verlauf), die nicht ins Profil gehören
+local HISTORY_PATTERNS = { "Data$", "History", "Hist$", "Log$", "List$", "Times$", "Session", "Played" }
+
+-- Positionen { Punkt, relPunkt, x, y } unter eigenem Schlüssel
+local POSITION_KEYS = { point = true, editBarPoint = true }
+
+-- Feste Auswahlwerte; NONE steht für „nicht gesetzt“ (nil)
+local NONE = "none"
+local ENUMS = {
+    dmMode = { damage = true, healing = true },
+    dm2Mode = { damage = true, healing = true },
+    dm2Dock = { top = true, bottom = true, [NONE] = true },
+}
+
+local function IsHistoryKey(key)
+    for _, pattern in ipairs(HISTORY_PATTERNS) do
+        if key:find(pattern) then return true end
+    end
+    return false
+end
+
+local function IsScalar(v)
+    local t = type(v)
+    return t == "boolean" or t == "string" or (t == "number" and IsFinite(v))
+end
+
+-- Darf dieser ns.db-Schlüssel als einfacher Wert ins Profil?
+local function IsGenericKey(key, byKey, blocked)
+    if type(key) ~= "string" or not key:match("^%a[%w_]*$") then return false end
+    if byKey[key] or blocked[key] or SKIP_KEYS[key] or NO_EXPORT_DB[key] then return false end
+    if POSITION_KEYS[key] or key == "positions" or key == "scales" or key == "minimapAngle" then return false end
+    if ENUMS[key] then return true end
+    if IsHistoryKey(key) then return false end
+    local default = ns.defaults[key]
+    return default ~= nil and type(default) ~= "table"
+end
+
+-- Passt der Wert zum Schlüssel (Typ wie Standardwert, Auswahlwerte)?
+local function ValidGeneric(key, value)
+    if not IsScalar(value) then return false end
+    if ENUMS[key] then return type(value) == "string" and ENUMS[key][value] == true end
+    return type(value) == type(ns.defaults[key])
+end
+
+-- Aktueller Wert für den Export (nil bei NONE-Schlüsseln wird zu NONE)
+local function GenericValue(key)
+    local v = ns.db[key]
+    if v == nil and ENUMS[key] and ENUMS[key][NONE] then return NONE end
+    if ValidGeneric(key, v) then return v end
+    return nil
 end
 
 -- Aktueller Wert einer Option (nil, wenn nicht lesbar oder kein einfacher Typ)
@@ -107,7 +178,7 @@ end
 
 local function BuildExport()
     local parts = {}
-    local options = CollectOptions()
+    local options, byKey, blocked = CollectOptions()
     for _, option in ipairs(options) do
         local value = OptionValue(option)
         if value ~= nil then
@@ -116,14 +187,57 @@ local function BuildExport()
     end
 
     local db = ns.db
-    if type(db.dmMode) == "string" then
-        table.insert(parts, "dmMode=s:" .. Escape(db.dmMode))
+
+    -- Einfache Werte ohne eigene Option (sortiert, damit der Text stabil bleibt)
+    local generic = {}
+    for key in pairs(db) do
+        if IsGenericKey(key, byKey, blocked) then table.insert(generic, key) end
     end
+    for key in pairs(ENUMS) do
+        if db[key] == nil and IsGenericKey(key, byKey, blocked) then table.insert(generic, key) end
+    end
+    table.sort(generic)
+    for _, key in ipairs(generic) do
+        local value = GenericValue(key)
+        if value ~= nil then
+            table.insert(parts, key .. "=" .. EncodeValue(value))
+        end
+    end
+
     if IsFinite(db.minimapAngle) then
         table.insert(parts, "minimapAngle=n:" .. FormatNumber(Round1(db.minimapAngle)))
     end
-    local point = EncodePosition(db.point)
-    if point then table.insert(parts, "point=s:" .. point) end
+    for _, key in ipairs({ "point", "editBarPoint" }) do
+        local pos = EncodePosition(db[key])
+        if pos then table.insert(parts, key .. "=s:" .. pos) end
+    end
+
+    -- Größen je Anzeige: scales[Anzeige] = Zahl oder { Feld = Zahl, … }
+    if type(db.scales) == "table" then
+        local keys = {}
+        for key in pairs(db.scales) do
+            if type(key) == "string" and key:match("^[%w_]+$") then table.insert(keys, key) end
+        end
+        table.sort(keys)
+        for _, key in ipairs(keys) do
+            local v = db.scales[key]
+            if IsFinite(v) then
+                table.insert(parts, "scale." .. key .. "=n:" .. FormatNumber(v))
+            elseif type(v) == "table" then
+                local fields = {}
+                for field, n in pairs(v) do
+                    local name = (type(field) == "number" and field == math.floor(field) and field >= 1) and tostring(field)
+                        or (type(field) == "string" and field:match("^[%a_][%w_]*$") and field)
+                    if name and IsFinite(n) then table.insert(fields, name) end
+                end
+                table.sort(fields)
+                for _, name in ipairs(fields) do
+                    local n = v[tonumber(name) or name]
+                    table.insert(parts, "scale." .. key .. "." .. name .. "=n:" .. FormatNumber(n))
+                end
+            end
+        end
+    end
 
     if type(db.positions) == "table" then
         local keys = {}
@@ -169,7 +283,7 @@ local function ParseImport(text)
     text = (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
     if text:sub(1, #PREFIX) ~= PREFIX then return nil end
 
-    local _, byKey = CollectOptions()
+    local _, byKey, blocked = CollectOptions()
     local db = ns.db
     local result = { changes = {}, unknown = 0, invalid = 0 }
     local seen = {}
@@ -184,9 +298,32 @@ local function ParseImport(text)
             local value = DecodeValue(t, raw)
             local option = byKey[key]
             local posKey = key:match("^pos%.([%w_]+)$")
+            local scaleKey, scaleField = key:match("^scale%.([%w_]+)%.([%w_]+)$")
+            if not scaleKey then scaleKey = key:match("^scale%.([%w_]+)$") end
 
             if seen[key] then
                 -- doppelte Einträge: nur den ersten verwenden
+            elseif scaleKey then
+                seen[key] = true
+                if type(value) ~= "number" or value <= 0 then
+                    result.invalid = result.invalid + 1
+                else
+                    local field = scaleField and (tonumber(scaleField) or scaleField) or nil
+                    local scales = type(db.scales) == "table" and db.scales or {}
+                    local current = scales[scaleKey]
+                    if field then current = type(current) == "table" and current[field] or nil end
+                    if not IsFinite(current) or FormatNumber(current) ~= FormatNumber(value) then
+                        table.insert(result.changes, { scaleKey = scaleKey, field = field, value = value })
+                    end
+                end
+            elseif not option and IsGenericKey(key, byKey, blocked) then
+                seen[key] = true
+                if not ValidGeneric(key, value) then
+                    result.invalid = result.invalid + 1
+                elseif value ~= GenericValue(key) then
+                    if value == NONE and ENUMS[key] and ENUMS[key][NONE] then value = nil end
+                    table.insert(result.changes, { dbKey = key, value = value })
+                end
             elseif option then
                 seen[key] = true
                 local current = OptionValue(option)
@@ -206,13 +343,6 @@ local function ParseImport(text)
                 elseif value ~= current then
                     table.insert(result.changes, { option = option, value = value })
                 end
-            elseif key == "dmMode" then
-                seen[key] = true
-                if value ~= "damage" and value ~= "healing" then
-                    result.invalid = result.invalid + 1
-                elseif value ~= db.dmMode then
-                    table.insert(result.changes, { dbKey = "dmMode", value = value })
-                end
             elseif key == "minimapAngle" then
                 seen[key] = true
                 if type(value) ~= "number" then
@@ -223,14 +353,14 @@ local function ParseImport(text)
                         table.insert(result.changes, { dbKey = "minimapAngle", value = value })
                     end
                 end
-            elseif key == "point" or posKey then
+            elseif POSITION_KEYS[key] or posKey then
                 seen[key] = true
                 local pos = (t == "s") and DecodePosition(value) or nil
                 if not pos then
                     result.invalid = result.invalid + 1
-                elseif key == "point" then
-                    if not SamePosition(db.point, pos) then
-                        table.insert(result.changes, { dbKey = "point", value = pos })
+                elseif POSITION_KEYS[key] then
+                    if not SamePosition(db[key], pos) then
+                        table.insert(result.changes, { dbKey = key, value = pos })
                     end
                 elseif not SamePosition(db.positions and db.positions[posKey], pos) then
                     table.insert(result.changes, { posKey = posKey, value = pos })
@@ -252,6 +382,18 @@ local function ApplyImport(result)
             if not ok then failed = failed + 1 end
         elseif change.dbKey then
             ns.db[change.dbKey] = change.value
+        elseif change.scaleKey then
+            if type(ns.db.scales) ~= "table" then ns.db.scales = {} end
+            if change.field then
+                local t = ns.db.scales[change.scaleKey]
+                if type(t) ~= "table" then
+                    t = {}
+                    ns.db.scales[change.scaleKey] = t
+                end
+                t[change.field] = change.value
+            else
+                ns.db.scales[change.scaleKey] = change.value
+            end
         elseif change.posKey then
             if type(ns.db.positions) ~= "table" then ns.db.positions = {} end
             ns.db.positions[change.posKey] = change.value

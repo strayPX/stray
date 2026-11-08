@@ -80,7 +80,7 @@ holder:Hide()
 ns.MakeMovable(holder, "swing", { "CENTER", "CENTER", 0, -170 })
 -- Klicks in die Welt nicht abfangen; Shift + ziehen nur bei offenem stray-Fenster
 holder:EnableMouse(false)
-ns.RegisterMovable(holder, "Swing-Timer")
+ns.RegisterMovable(holder, "Swing-Timer", nil, { widthKey = "swingWidth" })
 
 local function Edge(parent, p1, p2, horizontal)
     local t = parent:CreateTexture(nil, "BORDER")
@@ -524,7 +524,7 @@ local function IsOn() return Enabled() end
 ns.AddOption(2, "Kampfhilfen", {
     key = "swingTimer",
     label = "Swing-Timer",
-    tooltip = "Zeigt unter der Bildschirmmitte eine schmale Leiste je Waffe, die bis zu deinem nächsten automatischen Schlag von links nach rechts läuft, mit der Restzeit rechts. Haupthand immer, Nebenhand nur, wenn du mit zwei Waffen kämpfst.\n\nIst dein Ziel außer Reichweite, wird die Leiste rot und dunkler. Außerhalb des Kampfes und ohne laufenden Schlag ist sie unsichtbar.\n\nDie Zeiten meldet das Spiel selbst. Verschieben über „Anzeigen verschieben“ oder bei offenem stray-Fenster mit Shift + linker Maustaste.",
+    tooltip = "Zeigt unter der Bildschirmmitte eine schmale Leiste je Waffe, die bis zu deinem nächsten automatischen Schlag von links nach rechts läuft, mit der Restzeit rechts. Haupthand immer, Nebenhand nur, wenn du mit zwei Waffen kämpfst.\n\nIst dein Ziel außer Reichweite, wird die Leiste rot und dunkler. Außerhalb des Kampfes und ohne laufenden Schlag ist sie unsichtbar.\n\nDie Zeiten meldet das Spiel selbst. Verschieben über den „Bearbeitungsmodus“ oder bei offenem stray-Fenster mit Shift + linker Maustaste.",
     isEnabled = function() return HAS_API end,
     disabledHint = NO_API,
     set = function(value)

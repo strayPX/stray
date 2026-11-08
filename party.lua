@@ -18,6 +18,11 @@ local _, ns = ...
 local IsSecret = ns.IsSecret
 local Public = ns.Public
 
+-- Begleiter am Gruppenrahmen (Jäger-Tier, Wichtel …), neu in 0.22.0 – standardmäßig aus
+ns.defaults.partyPets = false
+ns.defaults.partyPetWidth = 70
+ns.defaults.partyPetHeight = 22
+
 local POWER_H = 4
 local MAX_TILES = 5
 local FADED = 0.4
@@ -46,6 +51,31 @@ end
 local function Enabled()
     return ns.db and ns.db.partyFrames and true or false
 end
+
+-- Begleiter: Größe des kleinen Fensters links neben dem Besitzer
+local PET_GAP = 4
+local function PetDims()
+    local db = ns.db or ns.defaults
+    local w = tonumber(db.partyPetWidth) or 70
+    local h = tonumber(db.partyPetHeight) or 22
+    w = math.max(40, math.min(160, math.floor(w + 0.5)))
+    h = math.max(14, math.min(60, math.floor(h + 0.5)))
+    return w, h
+end
+
+local function PetsWanted()
+    return ns.db and ns.db.partyPets and true or false
+end
+
+-- Echte Begleiter-Knöpfe nur zusammen mit den Gruppenrahmen
+local function PetsEnabled()
+    return Enabled() and PetsWanted()
+end
+
+-- Begleiter-Einheit je Platz in der Spalte (Platz 1 = du, dann party1–4; Sortierung INDEX)
+local PET_UNITS = { "pet", "partypet1", "partypet2", "partypet3", "partypet4" }
+-- Besitzer → Begleiter (für UNIT_PET, das die Besitzer-Einheit meldet)
+local OWNER_PET = { player = "pet", party1 = "partypet1", party2 = "partypet2", party3 = "partypet3", party4 = "partypet4" }
 
 -- Klassenfarbe, abgedunkelt nach „Helligkeit der Balken“ (Standard 60 %)
 local function ClassColor(class)
@@ -77,7 +107,8 @@ local anchor = CreateFrame("Frame", "strayPartyAnchor", UIParent)
 anchor:SetPoint("CENTER", UIParent, "CENTER", -220, 0)
 anchor:SetSize(96, 5 * 42 + 4 * 4)
 ns.MakeMovable(anchor, "party", { "CENTER", "CENTER", -220, 0 })
-ns.RegisterMovable(anchor, "Gruppenrahmen")
+-- opts (ab 0.22.0): Breite/Höhe im Bearbeiten-Modus über die vorhandenen Regler; ältere Fassung ignoriert sie
+ns.RegisterMovable(anchor, "Gruppenrahmen", nil, { widthKey = "partyWidth", heightKey = "partyHeight" })
 -- Der Anker selbst fängt keine Klicks ab; gezogen wird über die Kacheln
 anchor:EnableMouse(false)
 anchor:Hide()
@@ -738,12 +769,82 @@ local function PaintBuffIcons(t, unit)
 end
 
 ---------------------------------------------------------------------------
--- Sichere Knöpfe
+-- Begleiter-Optik und -Werte (kleine Kachel: Name, Lebensbalken, Prozent)
 ---------------------------------------------------------------------------
 
-local buttons = {}   -- Knöpfe des Headers in Erstellungsreihenfolge
-local needSetup = {} -- im Kampf erstellte Knöpfe: Klick-/Zieh-Einrichtung nach dem Kampf
+local function BuildPetTile(parent)
+    local art = CreateFrame("Frame", nil, parent)
+    art:SetAllPoints(parent)
+    art:SetFrameLevel(parent:GetFrameLevel() + 1)
 
+    local t = { art = art }
+
+    t.bg = art:CreateTexture(nil, "BACKGROUND")
+    t.bg:SetAllPoints()
+    t.bg:SetColorTexture(0.051, 0.067, 0.090, 0.75)
+
+    t.health = CreateFrame("StatusBar", nil, art)
+    t.health:SetPoint("TOPLEFT", art, "TOPLEFT", 1, -1)
+    t.health:SetPoint("BOTTOMRIGHT", art, "BOTTOMRIGHT", -1, 1)
+    t.health:SetStatusBarTexture(BAR_TEXTURE)
+    t.health:SetMinMaxValues(0, 1)
+    t.health:SetValue(1)
+    local healthBg = t.health:CreateTexture(nil, "BACKGROUND")
+    healthBg:SetAllPoints()
+    healthBg:SetColorTexture(0.110, 0.122, 0.149, 0.8)
+
+    local top = CreateFrame("Frame", nil, art)
+    top:SetAllPoints(art)
+    top:SetFrameLevel(t.health:GetFrameLevel() + 2)
+    t.top = top
+
+    t.pct = top:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    t.pct:SetPoint("RIGHT", top, "RIGHT", -3, 0)
+    t.pct:SetJustifyH("RIGHT")
+    t.pct:SetTextColor(0.85, 0.85, 0.85)
+    t.pct:SetShadowOffset(1, -1)
+
+    t.status = top:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    t.status:SetPoint("RIGHT", top, "RIGHT", -3, 0)
+    t.status:SetJustifyH("RIGHT")
+    t.status:SetTextColor(1, 0.35, 0.35)
+    t.status:SetShadowOffset(1, -1)
+    t.status:Hide()
+
+    t.name = top:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    t.name:SetPoint("LEFT", top, "LEFT", 3, 0)
+    t.name:SetPoint("RIGHT", top, "RIGHT", -30, 0)
+    t.name:SetJustifyH("LEFT")
+    t.name:SetWordWrap(false)
+    t.name:SetShadowOffset(1, -1)
+
+    t.target = MakeBorder(top, 1, 1, "OVERLAY", 7)
+    t.target:SetColor(1, 1, 1, 0.9)
+    return t
+end
+
+-- Leben des Begleiters: Rohwerte nur an SetMinMaxValues/SetValue, Prozent über SetPercent
+-- (lesbar selbst gerechnet, versiegelt über UnitHealthPercent mit Kurve) – nie vergleichen
+local function PaintPetHealth(t, unit)
+    pcall(t.health.SetMinMaxValues, t.health, 0, UnitHealthMax(unit))
+    pcall(t.health.SetValue, t.health, UnitHealth(unit))
+
+    local dead = UnitIsDeadOrGhost(unit)
+    if not IsSecret(dead) and dead then
+        t.status:SetText("Tot")
+        t.status:Show()
+        t.pct:Hide()
+        t.health:SetStatusBarColor(0.35, 0.35, 0.35)
+        return
+    end
+    t.status:Hide()
+    -- Begleiter haben keine Klassenfarbe: Grün, gedämpft wie die übrigen Balken
+    t.health:SetStatusBarColor(ClassColor(nil))
+    local ok, shown = pcall(SetPercent, t, unit)
+    t.pct:SetShown(ok and shown == true)
+end
+
+-- Einheit eines sicheren Knopfs, nur wenn sie existiert (für Gruppen- und Begleiter-Knöpfe)
 local function ButtonUnit(button)
     local unit = button:GetAttribute("unit")
     if type(unit) ~= "string" then return nil end
@@ -751,6 +852,31 @@ local function ButtonUnit(button)
     if IsSecret(exists) or not exists then return nil end
     return unit
 end
+
+local petButtons = {} -- Platz (1–5) → sicherer Begleiter-Knopf
+local petByUnit = {}  -- "pet"/"partypetN" → Knopf
+
+local function UpdatePet(button)
+    local t = button.stray
+    if not t or not button:IsShown() then return end
+    local unit = ButtonUnit(button)
+    if not unit then return end
+    pcall(PaintName, t, unit)
+    pcall(PaintPetHealth, t, unit)
+    pcall(PaintTarget, t, unit)
+    pcall(PaintRange, t, unit)
+end
+
+local function UpdatePets()
+    for _, button in ipairs(petButtons) do UpdatePet(button) end
+end
+
+---------------------------------------------------------------------------
+-- Sichere Knöpfe
+---------------------------------------------------------------------------
+
+local buttons = {}   -- Knöpfe des Headers in Erstellungsreihenfolge
+local needSetup = {} -- im Kampf erstellte Knöpfe: Klick-/Zieh-Einrichtung nach dem Kampf
 
 local function UpdateButton(button)
     local t = button.stray
@@ -771,6 +897,7 @@ local function UpdateAll()
     for _, button in ipairs(buttons) do
         if button:IsShown() then UpdateButton(button) end
     end
+    UpdatePets()
 end
 
 local requested = false
@@ -856,6 +983,85 @@ end
 header:Hide()
 
 ---------------------------------------------------------------------------
+-- Begleiter-Knöpfe: je Platz ein SecureUnitButton mit fester Einheit (pet, partypet1–4).
+-- Der Header ordnet nach INDEX: Platz 1 = du, Platz N+1 = partyN – die Position je Platz
+-- ist daher fest und muss im Kampf nicht umgesetzt werden. Ein-/Ausblenden übernimmt ein
+-- Zustandstreiber (sicher, auch im Kampf). Anlegen, Attribute, Größe, Position nur außerhalb
+-- des Kampfes.
+---------------------------------------------------------------------------
+
+local petsActive = false -- Zustandstreiber angemeldet
+
+-- Sichtbarkeit: wie der Header nur in einer 5er-Gruppe (nicht allein, nicht im Schlachtzug)
+local function PetCondition(unit)
+    return "[group:raid] hide; [nogroup] hide; [@" .. unit .. ",exists] show; hide"
+end
+
+-- Ecke oben rechts des Begleiters relativ zur oberen linken Ecke des Ankers, Platz 1–5
+local function PetOffset(slot)
+    local _, h, sp = Dims()
+    local _, ph = PetDims()
+    local y = -(slot - 1) * (h + sp) - math.floor((h - ph) / 2 + 0.5)
+    return -PET_GAP, y
+end
+
+local function EnsurePetButtons()
+    if #petButtons > 0 then return true end
+    if InCombatLockdown() then return false end
+    for slot, unit in ipairs(PET_UNITS) do
+        local ok, b = pcall(CreateFrame, "Button", "strayPartyPet" .. slot, anchor, "SecureUnitButtonTemplate")
+        if not ok or not b then return #petButtons > 0 end
+        b:SetAttribute("unit", unit)
+        b:SetAttribute("type1", "target")
+        b:SetAttribute("type2", "togglemenu")
+        pcall(b.RegisterForClicks, b, "AnyUp")
+        pcall(b.RegisterForDrag, b, "LeftButton")
+        pcall(b.HookScript, b, "OnDragStart", StartDrag)
+        pcall(b.HookScript, b, "OnDragStop", StopDrag)
+        pcall(b.HookScript, b, "OnEnter", OnButtonEnter)
+        pcall(b.HookScript, b, "OnLeave", function() GameTooltip:Hide() end)
+        pcall(b.HookScript, b, "OnShow", function(self) UpdatePet(self) end)
+        b.stray = BuildPetTile(b)
+        b:Hide()
+        petButtons[slot] = b
+        petByUnit[unit] = b
+    end
+    return true
+end
+
+-- Größe/Position (nur außerhalb des Kampfes)
+local function LayoutPetButtons()
+    if InCombatLockdown() then return end
+    local pw, ph = PetDims()
+    for slot, b in ipairs(petButtons) do
+        b:SetSize(pw, ph)
+        b:ClearAllPoints()
+        local x, y = PetOffset(slot)
+        b:SetPoint("TOPRIGHT", anchor, "TOPLEFT", x, y)
+    end
+end
+
+-- Begleiter ein-/ausschalten (nur außerhalb des Kampfes; sonst holt Refresh es nach)
+local function ApplyPets()
+    if InCombatLockdown() then return false end
+    local want = PetsEnabled()
+    if want and not EnsurePetButtons() then want = false end
+    LayoutPetButtons()
+    if want and not petsActive then
+        for slot, b in ipairs(petButtons) do
+            pcall(RegisterStateDriver, b, "visibility", PetCondition(PET_UNITS[slot]))
+        end
+    elseif not want and petsActive then
+        for _, b in ipairs(petButtons) do
+            pcall(UnregisterStateDriver, b, "visibility")
+            b:Hide()
+        end
+    end
+    petsActive = want
+    return true
+end
+
+---------------------------------------------------------------------------
 -- Beispielkacheln (nur solange das stray-Fenster offen ist und du in keiner Gruppe bist)
 ---------------------------------------------------------------------------
 
@@ -866,11 +1072,32 @@ local SAMPLES = {
     { name = "Kael", class = "MAGE", hp = 0.64, power = "MANA", mp = 0.45, dispel = "Poison", icon = "Interface\\Icons\\Ability_Creature_Poison_03", healOwn = 0.2, healOther = 0.1 },
     { name = "Mira", class = "DRUID", hp = 1.0, power = "MANA", mp = 0.9, faded = true },
     { name = "Brom", class = "WARRIOR", hp = 0, power = "RAGE", mp = 0, status = "Tot" },
-    -- Sera: Schild (gestreift) mit Schild-Symbol und „Geschwächte Seele“ (noch 9 von 15 s)
-    { name = "Sera", class = "ROGUE", hp = 0.38, power = "ENERGY", mp = 0.8, target = true, absorb = 0.25, soulLeft = 9, soulDuration = 15 },
+    -- Sera (Jägerin): Schild (gestreift) mit Schild-Symbol und „Geschwächte Seele“ (noch 9 von 15 s),
+    -- dazu ihr Begleiter links daneben (nur mit „Begleiter anzeigen“)
+    { name = "Sera", class = "HUNTER", hp = 0.38, power = "MANA", mp = 0.8, target = true, absorb = 0.25, soulLeft = 9, soulDuration = 15,
+      pet = { name = "Wolf", hp = 0.55 } },
 }
 
 local samples = {}
+
+local function SamplePetEnter(self)
+    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    GameTooltip:SetText("Begleiter – Beispiel", 1, 1, 1)
+    GameTooltip:AddLine("So erscheint das Tier oder der Dämon eines Gruppenmitglieds links neben seinem Rahmen. Breite und Höhe stellst du im stray-Fenster ein.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:Show()
+end
+
+local function PaintSamplePet(t, p)
+    t.name:SetText(p.name)
+    t.health:SetMinMaxValues(0, 1)
+    t.health:SetValue(p.hp)
+    t.health:SetStatusBarColor(ClassColor(nil))
+    t.status:Hide()
+    t.pct:SetText(("%.0f%%"):format(p.hp * 100))
+    t.pct:Show()
+    t.target:SetShown(false)
+    t.art:SetAlpha(1)
+end
 
 local function SampleEnter(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
@@ -950,6 +1177,7 @@ end
 local function RepaintSamples()
     for _, f in ipairs(samples) do
         if f.sample then PaintSample(f.stray, f.sample) end
+        if f.petFrame and f.sample and f.sample.pet then PaintSamplePet(f.petFrame.stray, f.sample.pet) end
     end
 end
 
@@ -962,6 +1190,13 @@ local function LayoutSamples()
         f:ClearAllPoints()
         f:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, -(i - 1) * (h + sp))
         ResizeTile(f.stray, h, w)
+        if f.petFrame then
+            local pw, ph = PetDims()
+            local x, y = PetOffset(i)
+            f.petFrame:SetSize(pw, ph)
+            f.petFrame:ClearAllPoints()
+            f.petFrame:SetPoint("TOPRIGHT", anchor, "TOPLEFT", x, y)
+        end
     end
 end
 
@@ -980,6 +1215,20 @@ local function EnsureSamples()
         f.sample = s
         PaintSample(f.stray, s)
         f:Hide()
+        if s.pet then
+            local p = CreateFrame("Frame", nil, anchor)
+            p:SetFrameStrata(anchor:GetFrameStrata())
+            p:EnableMouse(true)
+            p:RegisterForDrag("LeftButton")
+            p:SetScript("OnDragStart", StartDrag)
+            p:SetScript("OnDragStop", StopDrag)
+            p:SetScript("OnEnter", SamplePetEnter)
+            p:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            p.stray = BuildPetTile(p)
+            PaintSamplePet(p.stray, s.pet)
+            p:Hide()
+            f.petFrame = p
+        end
         samples[i] = f
     end
     LayoutSamples()
@@ -994,6 +1243,7 @@ local function UpdatePreview()
         -- Beim Einblenden neu zeichnen: startet die Abklinganzeige der Testgruppe neu
         if show and not f:IsShown() and f.sample then PaintSample(f.stray, f.sample) end
         f:SetShown(show)
+        if f.petFrame then f.petFrame:SetShown(show and PetsWanted()) end
     end
     -- Der Anker hält den sicheren Header: nur außerhalb des Kampfes ein-/ausblenden
     if not InCombatLockdown() then
@@ -1050,6 +1300,8 @@ local EVENTS = {
     "GROUP_ROSTER_UPDATE", "PLAYER_TARGET_CHANGED", "PLAYER_ENTERING_WORLD", "PLAYER_REGEN_ENABLED",
     -- Heilvorhersage und Schilde (per pcall registriert, falls der Client sie nicht kennt)
     "UNIT_HEAL_PREDICTION", "UNIT_ABSORB_AMOUNT_CHANGED", "UNIT_HEAL_ABSORB_AMOUNT_CHANGED",
+    -- Begleiter gerufen/entlassen (meldet die Besitzer-Einheit)
+    "UNIT_PET",
 }
 
 -- Diese Ereignisse zeichnen nur Heilvorhersage/Schild neu
@@ -1073,6 +1325,17 @@ events:SetScript("OnEvent", function(_, event, unit)
             local u = button:IsShown() and ButtonUnit(button)
             if u and button.stray then pcall(PaintTarget, button.stray, u) end
         end
+        for _, button in ipairs(petButtons) do
+            local u = button:IsShown() and ButtonUnit(button)
+            if u and button.stray then pcall(PaintTarget, button.stray, u) end
+        end
+        return
+    end
+    if event == "UNIT_PET" then
+        -- Neuer Begleiter: Name/Leben nach dem Zustandstreiber-Durchlauf neu zeichnen
+        local petUnit = type(unit) == "string" and OWNER_PET[unit]
+        local b = petUnit and petByUnit[petUnit]
+        if b then C_Timer.After(0.3, function() UpdatePet(b) end) end
         return
     end
     if event == "GROUP_ROSTER_UPDATE" or event == "PLAYER_ENTERING_WORLD" or event == "PLAYER_REGEN_ENABLED" then
@@ -1102,10 +1365,23 @@ events:SetScript("OnEvent", function(_, event, unit)
             end
         end
     end
+    -- Begleiter (pet, partypet1–4): nur Leben, Name und Flags sind für sie wichtig
+    local pb = petByUnit[unit]
+    if pb and pb:IsShown() and pb.stray and ButtonUnit(pb) then
+        if HEALTH_EVENTS[event] then
+            pcall(PaintPetHealth, pb.stray, unit)
+        elseif event == "UNIT_NAME_UPDATE" or event == "UNIT_FLAGS" then
+            UpdatePet(pb)
+        end
+    end
 end)
 
 local function UpdateRangeAll()
     for _, button in ipairs(buttons) do
+        local u = button:IsShown() and ButtonUnit(button)
+        if u and button.stray then pcall(PaintRange, button.stray, u) end
+    end
+    for _, button in ipairs(petButtons) do
         local u = button:IsShown() and ButtonUnit(button)
         if u and button.stray then pcall(PaintRange, button.stray, u) end
     end
@@ -1146,6 +1422,7 @@ function ns.PartyApplyLayout()
         button:SetSize(w, h)
         if button.stray then ResizeTile(button.stray, h, w) end
     end
+    LayoutPetButtons()
     -- Zuletzt: löst die Neuanordnung durch den Header aus
     header:SetAttribute("yOffset", -sp)
 end
@@ -1183,6 +1460,7 @@ function Refresh()
         header:Hide()
         anchor:Hide()
     end
+    pcall(ApplyPets)
     for button in pairs(needSetup) do SetupInteraction(button) end
     SetEventsRegistered(on)
     UpdatePreview()
@@ -1280,4 +1558,48 @@ ns.AddOption(3, "Gruppenrahmen", {
         RepaintSamples()
         pcall(RequestAll)
     end,
+})
+
+local PET_KEYWORDS = { "pet", "pets", "begleiter", "tier", "wichtel", "dämon", "daemon", "demon", "jäger", "hunter", "hexenmeister", "warlock", "partypet" }
+
+local function PetsOptionOn()
+    return ns.db and ns.db.partyFrames and ns.db.partyPets and true or false
+end
+
+ns.AddOption(3, "Gruppenrahmen", {
+    key = "partyPets",
+    label = "Begleiter anzeigen",
+    tooltip = "Zeigt das Tier oder den Dämon eines Gruppenmitglieds (Jäger, Hexenmeister …) als kleines Fenster links neben seinem Rahmen: Name, Lebensbalken und Leben in Prozent. Auch dein eigener Begleiter erscheint neben deinem Rahmen.\n\nLinksklick wählt den Begleiter als Ziel, Rechtsklick öffnet sein Menü; mit „Mouseover-Zauber“ (Kampf → Zaubern) heilst du ihn direkt unter der Maus. Die Testgruppe zeigt einen Begleiter bei der Jägerin. Ein- und Ausschalten wirkt nur außerhalb des Kampfes.",
+    keywords = PET_KEYWORDS,
+    isEnabled = function() return ns.db and ns.db.partyFrames and true or false end,
+    disabledHint = "Erst „Gruppenrahmen anzeigen“ einschalten (oben auf dieser Seite).",
+    set = function(value)
+        ns.db.partyPets = value
+        CombatNote()
+        Refresh()
+    end,
+})
+
+ns.AddOption(3, "Gruppenrahmen", {
+    key = "partyPetWidth",
+    type = "slider",
+    label = "Begleiter: Breite",
+    min = 40, max = 160, step = 1,
+    tooltip = "Breite des Begleiter-Fensters in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    keywords = PET_KEYWORDS,
+    isEnabled = PetsOptionOn,
+    disabledHint = "Erst „Begleiter anzeigen“ einschalten.",
+    set = function(v) ns.db.partyPetWidth = v; ns.PartyApplyLayout() end,
+})
+
+ns.AddOption(3, "Gruppenrahmen", {
+    key = "partyPetHeight",
+    type = "slider",
+    label = "Begleiter: Höhe",
+    min = 14, max = 60, step = 1,
+    tooltip = "Höhe des Begleiter-Fensters in Pixeln; es sitzt mittig neben dem Rahmen des Besitzers. Im Kampf wird die Änderung erst danach übernommen.",
+    keywords = PET_KEYWORDS,
+    isEnabled = PetsOptionOn,
+    disabledHint = "Erst „Begleiter anzeigen“ einschalten.",
+    set = function(v) ns.db.partyPetHeight = v; ns.PartyApplyLayout() end,
 })

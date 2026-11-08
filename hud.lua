@@ -1,13 +1,15 @@
--- stray – Oberfläche: Minimap-Knopfspalte (Freunde, stray, Addon-Tasche), Menü auf der Minimap
--- (mittlere Maustaste und Kartenmenü-Knopf), Uhrzeit und FPS unter der Minimap, Erfahrungsleiste
--- oben, Taschen- und Menüleiste unten rechts (gehört zu „Eigene Aktionsleisten“).
+-- stray – Oberfläche: Hauptoption „stray-Oberfläche“ mit Unterschaltern, Minimap-Knopfspalte
+-- (Freunde, stray, Addon-Tasche), Menü auf der Minimap (mittlere Maustaste ohne Ping und
+-- Kartenmenü-Knopf), Uhrzeit und FPS unter der Minimap, Erfahrungsleiste oben, Taschen- und
+-- Menüleiste unten rechts.
 -- Alles defensiv: Blizzard-Rahmen können im Client anders heißen oder fehlen.
 -- Sichere/geschützte Rahmen nur außerhalb des Kampfes anfassen, sonst nach Kampfende nachholen.
 -- Keine Felder auf Blizzard-Frames: Merker stehen in lokalen Tabellen mit dem Frame als Schlüssel.
 
 local _, ns = ...
 
-local SECTION = "Leisten & Minimap"
+local SECTION = "stray-Oberfläche"
+local SECTION_XP = "Erfahrung"
 
 local FONT = STANDARD_TEXT_FONT or "Fonts\\FRIZQT__.TTF"
 local FONT_BODY = "Fonts\\ARIALN.TTF"
@@ -28,6 +30,40 @@ ns.defaults.questXPBar = false
 ns.defaults.minimapMiddleMenu = false
 ns.defaults.bottomMicroButtons = false
 ns.defaults.bottomBarSize = 28
+-- Neu ab 0.22.0-alpha: Hauptoption, eigener Schalter für die Taschenleiste, EP-Leiste einstellbar
+ns.defaults.strayUI = false
+ns.defaults.bottomBar = false
+ns.defaults.xpBarWidth = 560
+ns.defaults.xpBarHeight = 20
+ns.defaults.xpBarFontSize = 13
+
+-- Teile der stray-Oberfläche (Unterschalter). Ein Teil wirkt nur, wenn auch die Hauptoption an ist.
+-- „Menüknöpfe unten“ (bottomMicroButtons) gehört zur Taschenleiste und zählt hier nicht mit.
+local UI_PARTS = { "abEnabled", "bottomBar", "squareMinimap", "minimapMiddleMenu", "hudMinimapColumn", "hudClock", "hudXPBar" }
+
+-- Teil der stray-Oberfläche wirksam? (Hauptschalter und Unterschalter an)
+local function UIOn(key)
+    return ns.db and ns.db.strayUI and ns.db[key] and true or false
+end
+ns.StrayUIPart = UIOn
+
+-- Einmalig beim Laden von 0.22: Wer schon Teile an hat, bekommt die Hauptoption an, die Teile
+-- bleiben wie sie sind. Die Taschenleiste hing bisher an „Eigene Aktionsleisten“.
+local function MigrateStrayUI()
+    if not ns.db or ns.db.strayUIMigrated then return end
+    ns.db.strayUIMigrated = true
+    ns.db.bottomBar = ns.db.abEnabled and true or false
+    for _, key in ipairs(UI_PARTS) do
+        if ns.db[key] then
+            ns.db.strayUI = true
+            break
+        end
+    end
+end
+
+ns.On("ADDON_LOADED", function(name)
+    if name == ns.name then MigrateStrayUI() end
+end)
 
 local CELL = 24
 local CELL_GAP = 4
@@ -347,7 +383,7 @@ end)
 
 local friendTimer = false
 local function ScheduleFriends()
-    if friendTimer or not (ns.db and ns.db.hudMinimapColumn) then return end
+    if friendTimer or not (UIOn("hudMinimapColumn")) then return end
     friendTimer = true
     C_Timer.After(0.3, function()
         friendTimer = false
@@ -455,14 +491,14 @@ local function Collect(child)
     child:SetFrameLevel(addonBag:GetFrameLevel() + 2)
     -- Manche Addons (z. B. LibDBIcon) setzen ihren Knopf später wieder an den Minimap-Rand
     hooksecurefunc(child, "SetPoint", function()
-        if not placing and collected[child] and ns.db and ns.db.hudMinimapColumn then ScheduleBagLayout() end
+        if not placing and collected[child] and UIOn("hudMinimapColumn") then ScheduleBagLayout() end
     end)
     child:HookScript("OnShow", ScheduleBagLayout)
     child:HookScript("OnHide", ScheduleBagLayout)
 end
 
 local function CollectButtons()
-    if not (ns.db and ns.db.hudMinimapColumn) then return end
+    if not (UIOn("hudMinimapColumn")) then return end
     local found = false
     for _, holder in ipairs({ Minimap, MinimapBackdrop }) do
         if holder and holder.GetChildren then
@@ -941,10 +977,12 @@ end
 ns.OpenStrayMinimapMenu = function() OpenMenu(Minimap) end
 
 -- Klick daneben schließt (Knopf und Karte selbst regeln ihr Auf/Zu im Klick)
-SafeOn("GLOBAL_MOUSE_DOWN", function()
+SafeOn("GLOBAL_MOUSE_DOWN", function(mouseButton)
     if not menu:IsShown() or InCombat() then return end
     if menu:IsMouseOver() then return end
     if menuOwner == mapButton and mapButton:IsMouseOver() then return end
+    -- Zweiter Mittelklick auf die Karte schließt im eigenen Handler (sonst ginge es gleich wieder auf)
+    if menuOwner == Minimap and mouseButton == "MiddleButton" and Minimap:IsMouseOver() then return end
     menu:Hide()
 end)
 
@@ -975,21 +1013,71 @@ mapButton:SetScript("OnLeave", function(self)
     GameTooltip:Hide()
 end)
 
+-- Mittlere Maustaste auf der Minimap ohne Ping -------------------------------------
+-- Blizzard pingt bei jeder Maustaste im Innenkreis der Karte (Minimap OnClick). Ein unsichtbarer
+-- eigener Rahmen über der Karte fängt deshalb nur die mittlere Taste: Links, Rechts und die
+-- Seitentasten reicht er per SetPassThroughButtons an die Karte (und Kartenpunkte) durch, das
+-- Mausrad nimmt er gar nicht an, Mausbewegung möglichst auch nicht (Tooltips der Kartenpunkte).
+-- Blizzards Kartenskript bleibt unberührt. Klappt das im Client nicht, bleibt nur der Kartenmenü-Knopf.
+
+local middleCatcher = CreateFrame("Frame", "strayMinimapMiddleClick", Minimap)
+middleCatcher:SetAllPoints(Minimap)
+middleCatcher:Hide()
+
+local catcherReady = nil -- nil = noch nicht eingerichtet, true/false = Ergebnis
+
+local function SetupCatcher()
+    if catcherReady ~= nil then return catcherReady end
+    if InCombat() then return false end -- SetPassThroughButtons ist eine geschützte Funktion
+    local ok = pcall(middleCatcher.SetPassThroughButtons, middleCatcher, "LeftButton", "RightButton", "Button4", "Button5")
+    if ok then
+        middleCatcher:EnableMouse(true)
+        pcall(middleCatcher.EnableMouseWheel, middleCatcher, false)
+        -- Bewegung nicht abfangen, sonst fehlen die Tooltips der Kartenpunkte
+        if not pcall(middleCatcher.SetMouseMotionEnabled, middleCatcher, false) then
+            pcall(middleCatcher.SetPropagateMouseMotion, middleCatcher, true)
+        end
+    else
+        middleCatcher:EnableMouse(false)
+    end
+    catcherReady = ok and true or false
+    return catcherReady
+end
+
+middleCatcher:SetScript("OnMouseUp", function(_, mouseButton)
+    if mouseButton ~= "MiddleButton" or not UIOn("minimapMiddleMenu") then return end
+    if menu:IsShown() and menuOwner == Minimap then
+        CloseMenu()
+    else
+        OpenMenu(Minimap)
+    end
+end)
+
+local UpdateMapButton -- unten
+
+local function UpdateMiddleClick()
+    local want = UIOn("minimapMiddleMenu")
+    if want and SetupCatcher() then
+        -- Über der Karte, aber unter eigenen Knöpfen und den Kartenpunkten anderer Addons
+        middleCatcher:SetFrameStrata(Minimap:GetFrameStrata())
+        middleCatcher:SetFrameLevel(Minimap:GetFrameLevel() + 1)
+        middleCatcher:Show()
+    else
+        middleCatcher:Hide()
+        if want and catcherReady == nil then Defer("middleCatcher", UpdateMiddleClick) end
+    end
+    if UpdateMapButton then pcall(UpdateMapButton) end
+end
+
 -- Kartenmenü-Knopf mit der Knopfspalte, bei eckiger Karte immer (dort fehlen Blizzards
--- Verfolgungs- und Kalenderknopf)
-local function UpdateMapButton()
-    local want = ns.db and (ns.db.hudMinimapColumn or (ns.IsSquareMinimap and ns.IsSquareMinimap())) and true or false
+-- Verfolgungs- und Kalenderknopf) und als Ersatz, wenn die mittlere Maustaste nicht abfangbar ist
+function UpdateMapButton()
+    local square = ns.IsSquareMinimap and ns.IsSquareMinimap() or false
+    local middleFallback = UIOn("minimapMiddleMenu") and catcherReady == false
+    local want = (UIOn("hudMinimapColumn") or square or middleFallback) and true or false
     mapButton:SetShown(want)
     if not want and menuOwner == mapButton then CloseMenu() end
 end
-
--- Mittlere Maustaste auf der Minimap. Blizzard pingt bei jeder Maustaste im Innenkreis der Karte,
--- also auch hier; Mausrad: camera.lua
-Minimap:HookScript("OnMouseUp", function(self, mouseButton)
-    if mouseButton == "MiddleButton" and ns.db and ns.db.minimapMiddleMenu then
-        OpenMenu(self)
-    end
-end)
 
 -- Aufbau der Spalte ----------------------------------------------------------
 
@@ -1005,7 +1093,7 @@ local function ScreenSide()
 end
 
 local function LayoutColumn()
-    if not (ns.db and ns.db.hudMinimapColumn) then return end
+    if not (UIOn("hudMinimapColumn")) then return end
     -- Eckige Minimap (minimap.lua): Spalte links bündig am Block aus Gebietsname und Karte
     local top = ns.SquareMinimapTop and ns.SquareMinimapTop()
     local gap = CELL_GAP
@@ -1051,11 +1139,11 @@ local function LayoutColumn()
 end
 
 ns.OnMinimapButtonOption = function()
-    if ns.db and ns.db.hudMinimapColumn then LayoutColumn() end
+    if UIOn("hudMinimapColumn") then LayoutColumn() end
 end
 
 local function ApplyColumn(toggled)
-    if ns.db.hudMinimapColumn then
+    if UIOn("hudMinimapColumn") then
         LayoutColumn()
         column:Show()
         UpdateMapButton()
@@ -1075,10 +1163,10 @@ end
 
 -- Minimap verschoben oder neu skaliert: Seite neu prüfen
 Minimap:HookScript("OnSizeChanged", function()
-    if ns.db and ns.db.hudMinimapColumn then C_Timer.After(0, function() pcall(LayoutColumn) end) end
+    if UIOn("hudMinimapColumn") then C_Timer.After(0, function() pcall(LayoutColumn) end) end
 end)
 SafeOn("EDIT_MODE_LAYOUTS_UPDATED", function()
-    if ns.db and ns.db.hudMinimapColumn then C_Timer.After(0.5, function() pcall(LayoutColumn) end) end
+    if UIOn("hudMinimapColumn") then C_Timer.After(0.5, function() pcall(LayoutColumn) end) end
 end)
 
 ---------------------------------------------------------------------------
@@ -1106,7 +1194,7 @@ local clockLayoutKey = nil
 
 local function LayoutClock(force)
     local square = ns.IsSquareMinimap and ns.IsSquareMinimap() or false
-    local clockOn = ns.db and ns.db.hudClock and true or false
+    local clockOn = UIOn("hudClock") and true or false
     local coordsOn = (not square) and BlizzardCoordsOn()
     local key = (square and "s" or "r") .. (coordsOn and "c" or "") .. (clockOn and "u" or "")
     if not force and key == clockLayoutKey then return end
@@ -1177,14 +1265,14 @@ local function HideBlizzardClock()
     if not hookedClock[b] then
         hookedClock[b] = true
         pcall(b.HookScript, b, "OnShow", function(self)
-            if ns.db and ns.db.hudClock then pcall(self.Hide, self) end
+            if UIOn("hudClock") then pcall(self.Hide, self) end
         end)
     end
 end
 
 local function ApplyClock(toggled)
     LayoutClock(true)
-    if ns.db.hudClock then
+    if UIOn("hudClock") then
         UpdateClock()
         clock:Show()
         if not clockTicker then
@@ -1200,8 +1288,9 @@ end
 
 -- minimap.lua meldet, wenn die Karte eckig/rund wird oder die Größe wechselt
 ns.HudLayoutAroundMap = function()
+    pcall(UpdateMiddleClick)
     pcall(UpdateMapButton)
-    if ns.db and ns.db.hudMinimapColumn then pcall(LayoutColumn) end
+    if UIOn("hudMinimapColumn") then pcall(LayoutColumn) end
     pcall(LayoutClock, true)
 end
 
@@ -1242,8 +1331,57 @@ mainBar:SetStatusBarColor(C.xp[1], C.xp[2], C.xp[3], C.xp[4])
 mainBar:SetMinMaxValues(0, 1)
 mainBar:SetValue(0)
 
-local xpText = Text(mainBar, 11, FONT_BODY, "OUTLINE")
-xpText:SetPoint("CENTER", xpBar, "CENTER", 0, 0)
+-- Drei Texte: links Stufe und Prozent, Mitte Erholt (+ EP-Tracker), rechts Quest-EP.
+-- Schatten statt Kontur, damit die Schrift auf der Leiste ruhig und lesbar bleibt.
+local function XPText(justify)
+    local fs = mainBar:CreateFontString(nil, "OVERLAY")
+    fs:SetFontObject(GameFontHighlightSmall)
+    fs:SetTextColor(C.text[1], C.text[2], C.text[3])
+    fs:SetJustifyH(justify)
+    fs:SetWordWrap(false)
+    fs:SetShadowColor(0, 0, 0, 1)
+    fs:SetShadowOffset(1, -1)
+    return fs
+end
+
+local xpLeft = XPText("LEFT")
+local xpMid = XPText("CENTER")
+local xpRight = XPText("RIGHT")
+xpLeft:SetPoint("LEFT", xpBar, "LEFT", 6, 0)
+xpMid:SetPoint("CENTER", xpBar, "CENTER", 0, 0)
+xpRight:SetPoint("RIGHT", xpBar, "RIGHT", -6, 0)
+
+local function XPDim(key, lo, hi, default)
+    local v = tonumber(ns.db and ns.db[key]) or default
+    return math.max(lo, math.min(hi, math.floor(v + 0.5)))
+end
+
+local function XPWidth() return XPDim("xpBarWidth", 300, 1200, 560) end
+local function XPHeight() return XPDim("xpBarHeight", 10, 40, 20) end
+local function XPFontSize() return XPDim("xpBarFontSize", 8, 20, 13) end
+
+-- Größe und Schrift auf ganze Pixel
+local function LayoutXPBar()
+    xpBar:SetSize(XPWidth(), XPHeight())
+    local size = XPFontSize()
+    for _, fs in ipairs({ xpLeft, xpMid, xpRight }) do
+        pcall(fs.SetFont, fs, FONT_BODY, size, "")
+    end
+end
+
+local function SetXPTexts(left, mid, right)
+    xpLeft:SetText(left or "")
+    xpMid:SetText(mid or "")
+    xpRight:SetText(right or "")
+end
+
+-- Zeile des EP-Trackers (xptracker.lua), falls an und mit Daten
+local function TrackerLine()
+    if not (ns.XPTracker and ns.XPTracker.GetLine) then return nil end
+    local ok, line = pcall(ns.XPTracker.GetLine)
+    if ok and type(line) == "string" and line ~= "" then return line end
+    return nil
+end
 
 ns.MakeMovable(xpBar, "xpbar", { "TOP", "TOP", 0, -6 })
 
@@ -1320,7 +1458,7 @@ local function CompletedQuestXP()
 end
 
 local function UpdateXP()
-    if not ns.db or not ns.db.hudXPBar then xpBar:Hide() return end
+    if not UIOn("hudXPBar") then xpBar:Hide() return end
     if not AtMaxLevel() then
         local cur, max = Number(UnitXP("player")), Number(UnitXPMax("player"))
         local rested = GetXPExhaustion and Number(GetXPExhaustion()) or 0
@@ -1345,10 +1483,13 @@ local function UpdateXP()
             else
                 questBar:Hide()
             end
-            local text = Pct(cur / max * 100) .. " %"
-            if rested > 0 then text = text .. "  (Erholt: " .. Pct(rested / max * 100) .. " %)" end
-            if questXP > 0 then text = text .. "  Quests: +" .. Num(questXP) .. " EP" end
-            xpText:SetText(text)
+            local left = Pct(cur / max * 100) .. " %"
+            if xpData.level then left = "Stufe " .. xpData.level .. " · " .. left end
+            local mid = rested > 0 and ("Erholt " .. Pct(rested / max * 100) .. " %") or nil
+            local line = TrackerLine()
+            if line then mid = mid and (mid .. " · " .. line) or line end
+            local right = questXP > 0 and ("Quests +" .. Num(questXP) .. " EP") or nil
+            SetXPTexts(left, mid, right)
             xpBar:Show()
             return
         end
@@ -1370,7 +1511,8 @@ local function UpdateXP()
         mainBar:SetValue(full and 1 or value)
         restBar:Hide()
         local pct = full and "100,0" or Pct(value / span * 100)
-        xpText:SetText(name .. ": " .. pct .. " %" .. (label ~= "" and ("  (" .. label .. ")") or ""))
+        SetXPTexts(name .. " · " .. pct .. " %", label ~= "" and label or nil,
+            (not full) and (Num(value) .. " / " .. Num(span)) or nil)
         xpBar:Show()
         return
     end
@@ -1380,7 +1522,7 @@ local function UpdateXP()
         mainBar:SetMinMaxValues(0, 1)
         mainBar:SetValue(0.5)
         restBar:Hide()
-        xpText:SetText("Erfahrungsleiste (keine Fraktion beobachtet)")
+        SetXPTexts("Stufe ?", "Erfahrungsleiste (keine Fraktion beobachtet)", nil)
         xpBar:Show()
     else
         xpBar:Hide()
@@ -1390,7 +1532,7 @@ end
 xpBar:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
     if xpMode == "xp" and xpData.max then
-        GameTooltip:AddLine("Erfahrung" .. (xpData.level and (" – Level " .. xpData.level) or ""))
+        GameTooltip:AddLine("Erfahrung" .. (xpData.level and (" – Stufe " .. xpData.level) or ""))
         GameTooltip:AddDoubleLine("EP", Num(xpData.cur) .. " / " .. Num(xpData.max), 1, 1, 1, 1, 1, 1)
         local missing = xpData.max - xpData.cur
         GameTooltip:AddDoubleLine("Fehlend", Num(missing) .. " (" .. Pct(missing / xpData.max * 100) .. " %)", 1, 1, 1, 1, 1, 1)
@@ -1416,13 +1558,20 @@ xpBar:SetScript("OnEnter", function(self)
         GameTooltip:AddLine("Erfahrungsleiste")
         GameTooltip:AddLine("Auf Höchststufe zeigt sie den Ruf der beobachteten Fraktion.", 1, 1, 1, true)
     end
+    -- EP-Tracker (xptracker.lua): EP/h, Zeit bis Levelaufstieg, Spielzeit …
+    if xpMode ~= "rep" and ns.XPTracker and ns.XPTracker.AddTooltip then
+        if TrackerLine() then GameTooltip:AddLine(" ") end
+        pcall(ns.XPTracker.AddTooltip, GameTooltip)
+    end
     GameTooltip:AddLine(" ")
     GoldLine("Shift + Ziehen: verschieben")
     GameTooltip:Show()
 end)
 xpBar:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-ns.RegisterMovable(xpBar, "Erfahrungsleiste", function() pcall(UpdateXP) end)
+-- Breite und Höhe auch im Bearbeitungsmodus (opts wird von älteren Ständen ignoriert)
+ns.RegisterMovable(xpBar, "Erfahrungsleiste", function() pcall(UpdateXP) end,
+    { widthKey = "xpBarWidth", heightKey = "xpBarHeight" })
 
 -- Blizzards EP- und Rufleisten: nur verstecken, keine Edit-Mode-Systeme umhängen
 local BLIZZARD_XP = {
@@ -1433,7 +1582,7 @@ local BLIZZARD_XP = {
 local hookedXP = {} -- Blizzard-Rahmen, an denen schon ein OnShow-Hook hängt (keine Felder auf Blizzard-Frames)
 
 local function HideBlizzardXP()
-    if not ns.db.hudXPBar then return end
+    if not UIOn("hudXPBar") then return end
     for _, name in ipairs(BLIZZARD_XP) do
         local f = _G[name]
         if type(f) == "table" and f.Hide then
@@ -1444,7 +1593,7 @@ local function HideBlizzardXP()
                 if not hookedXP[f] and f.HookScript then
                     hookedXP[f] = true
                     pcall(f.HookScript, f, "OnShow", function(self)
-                        if not (ns.db and ns.db.hudXPBar) then return end
+                        if not (UIOn("hudXPBar")) then return end
                         if InCombat() and IsProtectedFrame(self) then
                             Defer("blizzardXP", HideBlizzardXP)
                         else
@@ -1458,7 +1607,8 @@ local function HideBlizzardXP()
 end
 
 local function ApplyXP(toggled)
-    if ns.db.hudXPBar then
+    if UIOn("hudXPBar") then
+        LayoutXPBar()
         ns.RestorePosition(xpBar)
         UpdateXP()
         HideBlizzardXP()
@@ -1470,7 +1620,7 @@ end
 
 local xpTimer = false
 local function ScheduleXP()
-    if xpTimer or not (ns.db and ns.db.hudXPBar) then return end
+    if xpTimer or not (UIOn("hudXPBar")) then return end
     xpTimer = true
     C_Timer.After(0.1, function()
         xpTimer = false
@@ -1486,7 +1636,7 @@ end
 -- QUEST_LOG_UPDATE kommt oft in Schüben: Quest-EP höchstens alle 0,5 s neu zählen
 local questXPTimer = false
 SafeOn("QUEST_LOG_UPDATE", function()
-    if questXPTimer or not (ns.db and ns.db.hudXPBar and ns.db.questXPBar) then return end
+    if questXPTimer or not (UIOn("hudXPBar") and ns.db.questXPBar) then return end
     questXPTimer = true
     C_Timer.After(0.5, function()
         questXPTimer = false
@@ -1496,9 +1646,10 @@ end)
 
 ---------------------------------------------------------------------------
 -- 4) Taschen- und Menüleiste unten rechts
--- Erscheint mit „Eigene Aktionsleisten“ (ns.db.abEnabled). Eigene, flache stray-Knöpfe;
--- Blizzards Taschen- und Menüknöpfe werden außerhalb des Kampfes in einen versteckten
--- eigenen Rahmen umgehängt (kein Umsetzen von Edit-Mode-Systemen, keine Felder auf Blizzard-Frames).
+-- Unterschalter „Taschenleiste unten rechts“ der stray-Oberfläche (ns.db.bottomBar). Eigene Knöpfe;
+-- Blizzards Taschenknöpfe werden außerhalb des Kampfes in einen versteckten
+-- eigenen Rahmen umgehängt, die Menüleiste nur ausgeblendet (Mikroknöpfe nie umhängen, keine
+-- Edit-Mode-Systeme umsetzen, keine Felder auf Blizzard-Frames).
 -- Die Menüknöpfe sind sichere Klick-Knöpfe auf Blizzards Mikroknöpfe. Sobald es sie gibt, ist
 -- die Leiste selbst geschützt: Aufbau, Größe, Position und Ein-/Ausblenden nur außerhalb des Kampfes.
 ---------------------------------------------------------------------------
@@ -1516,12 +1667,12 @@ local MICRO_FALLBACK = {
     "HelpMicroButton", "StoreMicroButton", "MainMenuMicroButton",
 }
 
-local BAR_PAD = 3
-local BAR_GAP = 2
-local GROUP_GAP = 6
+local BAR_PAD = 4
+local BAR_GAP = 3
+local GROUP_GAP = 10
 
 local function BottomActive()
-    return ns.db and ns.db.abEnabled and true or false
+    return UIOn("bottomBar")
 end
 
 local function BarButtonSize()
@@ -1685,11 +1836,21 @@ local function HookBlizzardMicro()
 end
 
 -- Eigene Leiste ------------------------------------------------------------------
+-- Entwurf 3: Blizzards Menüsymbole als freie Bildzeichen ohne Knopfrahmen auf einem leicht
+-- dunklen, halbdurchsichtigen Streifen; Charakter als rundes Live-Porträt; Rucksack und Taschen
+-- zusammen als ein Taschenknopf mit Füllbalken. Kein Schlüsselbund.
+
+local ICON_DIM = 0.82  -- Grundhelligkeit der Bildzeichen, beim Überfahren voll hell
+local FILL_H = 3       -- Höhe des Füllbalkens unter dem Taschenknopf
 
 local bottomBar = CreateFrame("Frame", "strayMicroBar", UIParent)
 bottomBar:SetSize(200, 34)
 bottomBar:SetFrameStrata("MEDIUM")
-Style(bottomBar, { C.bg[1], C.bg[2], C.bg[3], 0.6 })
+do
+    local strip = bottomBar:CreateTexture(nil, "BACKGROUND")
+    strip:SetAllPoints()
+    strip:SetColorTexture(0, 0, 0, 0.45)
+end
 bottomBar:Hide()
 
 -- Schlüssel „microbar“ wie bisher: eine schon verschobene Leiste bleibt, wo sie war
@@ -1700,7 +1861,31 @@ bottomBar:SetScript("OnDragStart", function(self)
     if IsShiftKeyDown() and not InCombat() then self:StartMoving() end
 end)
 
--- secureTarget: Blizzards Mikroknopf → sicherer Klick-Knopf, sonst normaler Knopf
+-- Seitenverhältnis eines Atlas (Breite/Höhe), nil wenn der Client ihn nicht kennt
+local function AtlasAspect(atlas)
+    if type(atlas) ~= "string" or not (C_Texture and C_Texture.GetAtlasInfo) then return nil end
+    local ok, info = pcall(C_Texture.GetAtlasInfo, atlas)
+    info = ok and ns.Public(info)
+    if type(info) ~= "table" then return nil end
+    local w, h = Number(info.width), Number(info.height)
+    if w and h and w > 0 and h > 0 then return w / h end
+    return 1
+end
+
+-- Bildzeichen von Blizzards Mikroknopf lesen (nur lesen, nichts am Blizzard-Knopf ändern)
+local function MicroAtlas(entry)
+    local target = MicroFor(entry)
+    if not target or type(target.GetNormalTexture) ~= "function" then return nil end
+    local ok, tex = pcall(target.GetNormalTexture, target)
+    if not ok or type(tex) ~= "table" or type(tex.GetAtlas) ~= "function" then return nil end
+    local okA, atlas = pcall(tex.GetAtlas, tex)
+    atlas = okA and ns.Public(atlas)
+    if type(atlas) == "string" and atlas ~= "" then return atlas end
+    return nil
+end
+
+-- secureTarget: Blizzards Mikroknopf → sicherer Klick-Knopf, sonst normaler Knopf.
+-- Nur Bildzeichen, kein Rahmen; HIGHLIGHT-Kopie hellt beim Überfahren auf.
 local function MakeBarButton(secureTarget, name)
     local b
     if secureTarget then
@@ -1709,29 +1894,57 @@ local function MakeBarButton(secureTarget, name)
         b = CreateFrame("Button", name, bottomBar)
         b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     end
-    Style(b)
+    if not b then return nil end
     b.icon = b:CreateTexture(nil, "ARTWORK")
-    b.icon:SetPoint("TOPLEFT", 1, -1)
-    b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
-    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    local hl = b:CreateTexture(nil, "HIGHLIGHT")
-    hl:SetPoint("TOPLEFT", 1, -1)
-    hl:SetPoint("BOTTOMRIGHT", -1, 1)
-    hl:SetColorTexture(1, 1, 1, 0.12)
-    b.count = Text(b, 10, FONT_BODY, "OUTLINE")
-    b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -2, 2)
-    b:HookScript("OnEnter", function(self) SetBorder(self, C.accent) end)
+    b.icon:SetPoint("CENTER")
+    b.icon:SetVertexColor(ICON_DIM, ICON_DIM, ICON_DIM)
+    b.glow = b:CreateTexture(nil, "HIGHLIGHT")
+    b.glow:SetAllPoints(b.icon)
+    b.glow:SetBlendMode("ADD")
+    b.glow:SetAlpha(0.3)
+    b.aspect = 1
+    b:HookScript("OnEnter", function(self)
+        if not self.off then self.icon:SetVertexColor(1, 1, 1) end
+    end)
     b:HookScript("OnLeave", function(self)
-        SetBorder(self, C.border)
+        local v = self.off and 1 or ICON_DIM
+        self.icon:SetVertexColor(v, v, v)
         GameTooltip:Hide()
     end)
     b:Hide()
     return b
 end
 
+-- Atlas (Blizzards Menüsymbol) bevorzugt, sonst Symbol-Datei mit beschnittenem Rand
+local function SetGlyph(b, atlas, files)
+    local aspect = AtlasAspect(atlas)
+    if aspect and pcall(b.icon.SetAtlas, b.icon, atlas, false) then
+        pcall(b.glow.SetAtlas, b.glow, atlas, false)
+        b.aspect = aspect
+        return true
+    end
+    b.aspect = 1
+    if files and SetFirstTexture(b.icon, files) then
+        b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        SetFirstTexture(b.glow, files)
+        b.glow:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        return true
+    end
+    b.icon:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.6)
+    return false
+end
+
 -- Menüknöpfe (dieselben Einträge wie das Minimap-Menü), erst bei Bedarf außerhalb des Kampfes gebaut
 local microButtons = {}
 local microBuilt = false
+local portraitButton = nil -- Charakter-Knopf mit Live-Porträt
+
+-- Rundes Porträt des eingeloggten Charakters (SetPortraitTexture maskiert selbst rund)
+local function UpdatePortrait()
+    if not portraitButton or not SetPortraitTexture then return end
+    pcall(SetPortraitTexture, portraitButton.icon, "player")
+    pcall(SetPortraitTexture, portraitButton.glow, "player")
+end
 
 local function BuildMicroButtons()
     if microBuilt then return true end
@@ -1743,8 +1956,12 @@ local function BuildMicroButtons()
             local ok, b = pcall(MakeBarButton, target, "strayBottomMenu_" .. entry.key)
             if ok and b then
                 b.entry = entry
-                if not SetFirstTexture(b.icon, entry.icons) then
-                    b.icon:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.6)
+                if entry.key == "char" and SetPortraitTexture then
+                    portraitButton = b
+                    b.aspect = 1
+                    UpdatePortrait()
+                else
+                    SetGlyph(b, MicroAtlas(entry), entry.icons)
                 end
                 if not entry.secure then
                     b:SetScript("OnClick", function(self) RunEntry(self.entry, self) end)
@@ -1777,8 +1994,11 @@ local function UpdateMicroState()
         else
             off = BlockedNow(b.entry)
         end
-        pcall(b.icon.SetDesaturated, b.icon, off)
-        b.icon:SetAlpha(off and 0.5 or 1)
+        b.off = off and true or false
+        pcall(b.icon.SetDesaturated, b.icon, b.off)
+        b.icon:SetAlpha(b.off and 0.45 or 1)
+        local v = b.off and 1 or ICON_DIM
+        b.icon:SetVertexColor(v, v, v)
     end
 end
 
@@ -1790,121 +2010,101 @@ local function ContainerCall(name, ...)
     return ok and Number(v) or nil
 end
 
-local function BagInvID(bag)
-    return ContainerCall("ContainerIDToInventoryID", bag)
-end
-
--- Freie Plätze in allen Taschen: Blizzards Summe, sonst selbst zählen
-local function TotalFreeSlots()
-    local total = ContainerCall("CalculateTotalNumberOfFreeBagSlots")
-    if total then return total end
-    local sum = 0
-    for i = 0, 4 do sum = sum + (ContainerCall("GetContainerNumFreeSlots", i) or 0) end
-    return sum
-end
-
-local function KeyringShown()
-    if type(KEYRING_CONTAINER) ~= "number" then return false end
-    if C_ActionBar and C_ActionBar.ShouldShowKeyring then
-        local ok, show = pcall(C_ActionBar.ShouldShowKeyring)
-        return ok and ns.Public(show) and true or false
+local function BagName(bag)
+    if C_Container and C_Container.GetBagName then
+        local ok, name = pcall(C_Container.GetBagName, bag)
+        name = ok and String(name)
+        if name then return name end
     end
-    return false
+    if bag == 0 then return "Rucksack" end
+    return "Tasche " .. bag
 end
 
-local function PutIntoBag(bag)
+-- Freie und gesamte Plätze über Rucksack und Taschen 1–4
+local function BagTotals()
+    local free, total = 0, 0
+    for bag = 0, 4 do
+        local slots = ContainerCall("GetContainerNumSlots", bag) or 0
+        if slots > 0 then
+            total = total + slots
+            free = free + (ContainerCall("GetContainerNumFreeSlots", bag) or 0)
+        end
+    end
+    return free, total
+end
+
+local bagButton = MakeBarButton(nil, "strayBagButton")
+bagButton.icon:ClearAllPoints()
+bagButton.icon:SetPoint("TOP", bagButton, "TOP", 0, 0)
+SetGlyph(bagButton, nil, { "Interface\\Buttons\\Button-Backpack-Up", "Interface\\Icons\\INV_Misc_Bag_08" })
+
+bagButton.fill = CreateFrame("StatusBar", nil, bagButton)
+bagButton.fill:SetPoint("BOTTOM", bagButton, "BOTTOM", 0, 0)
+bagButton.fill:SetSize(20, FILL_H)
+bagButton.fill:SetStatusBarTexture(WHITE)
+bagButton.fill:SetMinMaxValues(0, 1)
+bagButton.fill:SetValue(0)
+do
+    local bg = bagButton.fill:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetColorTexture(0, 0, 0, 0.6)
+end
+
+local function PutIntoBackpack()
     if not (CursorHasItem and CursorHasItem()) then return false end
-    if bag == 0 then
-        if PutItemInBackpack then pcall(PutItemInBackpack) end
-    elseif bag == KEYRING_CONTAINER then
-        if PutKeyInKeyRing then pcall(PutKeyInKeyRing) end
-    else
-        local inv = BagInvID(bag)
-        if inv and PutItemInBag then pcall(PutItemInBag, inv) end
-    end
+    if PutItemInBackpack then pcall(PutItemInBackpack) end
     return true
 end
 
-local bagButtons = {}
-
-local function MakeBagButton(bag, keyring)
-    local b = MakeBarButton(nil, nil)
-    b.bag = bag
-    b.keyring = keyring
-    b:RegisterForDrag("LeftButton")
-    b:SetScript("OnClick", function(self)
-        if PutIntoBag(self.bag) then return end
-        if self.bag == 0 then
-            if IsModifiedClick and IsModifiedClick("OPENALLBAGS") and ToggleAllBags then
-                pcall(ToggleAllBags)
-            elseif ToggleBackpack then
-                pcall(ToggleBackpack)
-            end
-        elseif ToggleBag then
-            pcall(ToggleBag, self.bag)
-        end
-    end)
-    b:SetScript("OnReceiveDrag", function(self) PutIntoBag(self.bag) end)
-    b:SetScript("OnDragStart", function(self)
-        if self.bag == 0 or self.keyring then return end
-        local inv = BagInvID(self.bag)
-        if inv and PickupBagFromSlot then pcall(PickupBagFromSlot, inv) end
-    end)
-    b:HookScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        if self.keyring then
-            GameTooltip:AddLine(KEYRING or "Schlüsselbund")
-        elseif self.bag == 0 then
-            GameTooltip:AddLine("Rucksack")
-        else
-            local inv = BagInvID(self.bag)
-            local hasItem = false
-            if inv then
-                local ok, has = pcall(GameTooltip.SetInventoryItem, GameTooltip, "player", inv)
-                hasItem = ok and ns.Public(has) and true or false
-            end
-            if not hasItem then GameTooltip:AddLine("Leerer Taschenplatz") end
-        end
-        if not self.keyring then
-            local free, total = ContainerCall("GetContainerNumFreeSlots", self.bag), ContainerCall("GetContainerNumSlots", self.bag)
-            if free and total and total > 0 then
-                GameTooltip:AddLine("Frei: " .. free .. " von " .. total, C.text[1], C.text[2], C.text[3])
-            end
-            if self.bag == 0 then
-                GameTooltip:AddLine("Frei in allen Taschen: " .. TotalFreeSlots(), C.text[1], C.text[2], C.text[3])
-            end
-        end
-        GoldLine("Linksklick: öffnen")
-        GameTooltip:Show()
-    end)
-    return b
-end
-
-for bag = 0, 4 do bagButtons[#bagButtons + 1] = MakeBagButton(bag, false) end
-local keyringButton = MakeBagButton(type(KEYRING_CONTAINER) == "number" and KEYRING_CONTAINER or -2, true)
-
-local BAG_EMPTY = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
-
-local function UpdateBags()
-    for _, b in ipairs(bagButtons) do
-        local tex
-        if b.bag == 0 then
-            tex = "Interface\\Buttons\\Button-Backpack-Up"
-        else
-            local inv = BagInvID(b.bag)
-            if inv and GetInventoryItemTexture then
-                local ok, t = pcall(GetInventoryItemTexture, "player", inv)
-                tex = ok and ns.Public(t) or nil
-            end
-        end
-        b.icon:SetTexture(tex or BAG_EMPTY)
-        local total = ContainerCall("GetContainerNumSlots", b.bag) or 0
-        local free = ContainerCall("GetContainerNumFreeSlots", b.bag)
-        b.count:SetText((total > 0 and free) and tostring(free) or "")
-        pcall(b.icon.SetDesaturated, b.icon, total == 0)
+bagButton:SetScript("OnClick", function()
+    if PutIntoBackpack() then return end
+    -- Öffnet Blizzards Taschen bzw. das stray-Taschenfenster (bagwindow.lua hängt sich daran)
+    if ToggleAllBags then
+        pcall(ToggleAllBags)
+    elseif ToggleBackpack then
+        pcall(ToggleBackpack)
     end
-    keyringButton.icon:SetTexture("Interface\\Icons\\INV_Misc_Key_14")
-    keyringButton.count:SetText("")
+end)
+bagButton:SetScript("OnReceiveDrag", function() PutIntoBackpack() end)
+
+bagButton:HookScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
+    GameTooltip:AddLine("Taschen")
+    for bag = 0, 4 do
+        local slots = ContainerCall("GetContainerNumSlots", bag) or 0
+        if slots > 0 then
+            local free = ContainerCall("GetContainerNumFreeSlots", bag) or 0
+            GameTooltip:AddDoubleLine(BagName(bag), free .. " frei von " .. slots,
+                1, 1, 1, C.text[1], C.text[2], C.text[3])
+        end
+    end
+    local free, total = BagTotals()
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddDoubleLine("Frei gesamt", free .. " von " .. total, 1, 1, 1, C.accent[1], C.accent[2], C.accent[3])
+    GoldLine("Linksklick: Taschen öffnen")
+    GameTooltip:Show()
+end)
+
+-- Füllbalken: grün, ab drei Vierteln gelb, ab 90 % rot
+local function UpdateBags()
+    local free, total = BagTotals()
+    local fill = bagButton.fill
+    if total > 0 then
+        local used = math.max(0, total - free)
+        fill:SetMinMaxValues(0, total)
+        fill:SetValue(used)
+        local share = used / total
+        if share >= 0.9 then
+            fill:SetStatusBarColor(0.95, 0.25, 0.2, 1)
+        elseif share >= 0.75 then
+            fill:SetStatusBarColor(1, 0.82, 0, 1)
+        else
+            fill:SetStatusBarColor(0.3, 0.8, 0.35, 1)
+        end
+    else
+        fill:SetMinMaxValues(0, 1)
+        fill:SetValue(0)
+    end
 end
 
 local function LayoutBottom()
@@ -1916,31 +2116,40 @@ local function LayoutBottom()
     end
     if ns.db.bottomMicroButtons then BuildMicroButtons() end
     local size = BarButtonSize()
-    local font = math.max(8, math.floor(size * 0.38))
     local x = BAR_PAD
-    local function place(b)
-        b:SetSize(size, size)
-        pcall(b.count.SetFont, b.count, FONT_BODY, font, "OUTLINE")
+    local function place(b, w)
+        b:SetSize(w, size)
         b:ClearAllPoints()
         b:SetPoint("BOTTOMLEFT", bottomBar, "BOTTOMLEFT", x, BAR_PAD)
         b:Show()
-        x = x + size + BAR_GAP
+        x = x + w + BAR_GAP
     end
     local anyMicro = false
     for _, b in ipairs(microButtons) do
         if ns.db.bottomMicroButtons and Has(b.entry) then
-            place(b)
+            local w
+            if b == portraitButton then
+                w = size
+                b.icon:SetSize(size - 2, size - 2)
+            else
+                -- Blizzard kann das Symbol tauschen (z. B. Gilde): bei jedem Aufbau neu lesen
+                SetGlyph(b, MicroAtlas(b.entry), b.entry.icons)
+                w = math.max(8, math.floor(size * (b.aspect or 1) + 0.5))
+                b.icon:SetSize(w, size)
+            end
+            place(b, w)
             anyMicro = true
         else
             b:Hide()
         end
     end
     if anyMicro then x = x + GROUP_GAP - BAR_GAP end
-    -- Rechts außen der Rucksack, links davon die Taschen 4 bis 1 (wie bei Blizzard)
-    if KeyringShown() then place(keyringButton) else keyringButton:Hide() end
-    for i = #bagButtons, 1, -1 do place(bagButtons[i]) end
+    bagButton.icon:SetSize(size - FILL_H - 2, size - FILL_H - 2)
+    bagButton.fill:SetSize(math.max(8, size - 6), FILL_H)
+    place(bagButton, size)
     bottomBar:SetSize(x - BAR_GAP + BAR_PAD, size + 2 * BAR_PAD)
     UpdateMicroState()
+    UpdatePortrait()
 end
 
 local bagTimer = false
@@ -1965,7 +2174,27 @@ if type(UpdateMicroButtons) == "function" then
     end)
 end
 
--- Von actionbars.lua beim Umschalten von „Eigene Aktionsleisten“ und nach dem Login aufgerufen
+-- Live-Porträt: bei Ausrüstungs- oder Modellwechsel neu zeichnen (gedrosselt)
+local portraitTimer = false
+local function SchedulePortrait(unit)
+    if ns.IsSecret(unit) then return end
+    if unit ~= nil and unit ~= "player" then return end
+    if portraitTimer or not portraitButton or not BottomActive() then return end
+    portraitTimer = true
+    C_Timer.After(0.3, function()
+        portraitTimer = false
+        pcall(UpdatePortrait)
+    end)
+end
+
+for _, event in ipairs({ "UNIT_PORTRAIT_UPDATE", "UNIT_MODEL_CHANGED", "PLAYER_EQUIPMENT_CHANGED", "PORTRAITS_UPDATED" }) do
+    SafeOn(event, function(unit)
+        if event == "PLAYER_EQUIPMENT_CHANGED" or event == "PORTRAITS_UPDATED" then unit = nil end
+        SchedulePortrait(unit)
+    end)
+end
+
+-- Beim Umschalten von „Taschenleiste unten rechts“ bzw. der Hauptoption und nach dem Login
 function ns.HudUpdateBottomBar()
     if not ns.db then return end
     MigrateOldMicroBar()
@@ -1993,69 +2222,101 @@ end
 -- Optionen
 ---------------------------------------------------------------------------
 
+-- Hauptoption „stray-Oberfläche“ und Unterschalter ------------------------------------
+-- Alle Schalter der stray-Oberfläche stehen hier (auch die Teile aus minimap.lua und
+-- actionbars.lua), damit die Reihenfolge stimmt: Hauptschalter ganz oben, darunter je Teil.
+
+local function Report(ok, err)
+    if not ok and err then geterrorhandler()(err) end
+end
+
+-- Was beim Wirksam-Werden bzw. Abschalten eines Teils passieren muss
+local PART_APPLY = {
+    abEnabled = function() if ns.ActionBarsToggled then ns.ActionBarsToggled() end end,
+    bottomBar = function() ns.HudUpdateBottomBar() end,
+    squareMinimap = function() if ns.ApplySquareMinimap then ns.ApplySquareMinimap() end end,
+    minimapMiddleMenu = function() UpdateMiddleClick() end,
+    hudMinimapColumn = function() ApplyColumn(true) end,
+    hudClock = function() ApplyClock(true) end,
+    hudXPBar = function() ApplyXP(true) end,
+}
+
+-- Wert setzen und nur die Teile neu anwenden, deren Wirkung sich dadurch ändert
+local function SetUIValue(key, value)
+    local before = {}
+    for _, k in ipairs(UI_PARTS) do before[k] = UIOn(k) end
+    ns.db[key] = value and true or false
+    for _, k in ipairs(UI_PARTS) do
+        if UIOn(k) ~= before[k] then Report(pcall(PART_APPLY[k])) end
+    end
+end
+
+local function MainOn()
+    return ns.db and ns.db.strayUI and true or false
+end
+
+local MAIN_HINT = "Erst „stray-Oberfläche“ einschalten (oben in diesem Bereich)."
+
 ns.AddOption(3, SECTION, {
-    key = "hudMinimapColumn",
-    label = "Minimap-Knopfspalte",
-    tooltip = "Senkrechte Knopfspalte neben der Minimap mit Freunden, stray-Knopf und Addon-Tasche.\n\n"
-        .. "Freunde: Zahl der Freunde online, Liste im Tooltip, Linksklick öffnet die Freundesliste.\n"
-        .. "Addon-Tasche: sammelt die Minimap-Knöpfe anderer Addons und klappt sie per Klick auf "
-        .. "(verträgt sich nicht mit Leatrix „Hide addon buttons“).\n"
-        .. "Oben links in der Minimap sitzt ein kleines Kartenmenü (Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte). Bei der eckigen Minimap ist es immer da, auch ohne diese Spalte.\n\n"
-        .. "Die Spalte steht rechts neben der Minimap, am rechten Bildschirmrand links davon. "
-        .. "Bei der eckigen Minimap sitzt sie links bündig daran.",
+    key = "strayUI",
+    label = "stray-Oberfläche",
+    keywords = { "oberfläche", "ui", "interface", "hud", "leisten", "bars", "minimap", "layout" },
+    tooltip = "Ein Schalter für die ganze stray-Oberfläche: eigene Aktionsleisten, Taschenleiste unten rechts, eckige Minimap, Menü per Mittelklick, Minimap-Knopfspalte, Uhrzeit und FPS sowie die Erfahrungsleiste oben.\n\n"
+        .. "Beim ersten Einschalten kommen alle Teile mit. Mit den Schaltern darunter schaltest du einzelne Teile wieder ab. "
+        .. "Aus heißt: alles wie bei Blizzard (Blizzards Aktionsleisten erst nach dem Neuladen).",
     set = function(value)
-        ns.db.hudMinimapColumn = value
-        ApplyColumn(true)
+        -- Nichts gewählt? Dann bringt der Hauptschalter alle Teile mit (Menüknöpfe unten bleiben aus)
+        if value and ns.db then
+            local any = false
+            for _, k in ipairs(UI_PARTS) do
+                if ns.db[k] then any = true break end
+            end
+            if not any then
+                for _, k in ipairs(UI_PARTS) do ns.db[k] = true end
+            end
+        end
+        SetUIValue("strayUI", value)
     end,
 })
 
 ns.AddOption(3, SECTION, {
-    key = "hudClock",
-    label = "Uhrzeit und FPS",
-    tooltip = "Kleine Zeile unter der Minimap mit Bildern pro Sekunde und Uhrzeit.\n\n"
-        .. "Im Tooltip stehen Latenz und Serverzeit. Blizzards Uhr wird solange ausgeblendet. "
-        .. "Sind Blizzards Spielerkoordinaten an, rückt die Zeile darunter.",
-    set = function(value)
-        ns.db.hudClock = value
-        ApplyClock(true)
-    end,
+    key = "abEnabled",
+    label = "Eigene Aktionsleisten",
+    keywords = { "aktionsleisten", "actionbars", "bars", "leisten", "knöpfe", "buttons" },
+    tooltip = "Ersetzt Blizzards Aktionsleisten durch bis zu 5 schlichte stray-Leisten à 12 Knöpfe. Deine Belegung und deine Tasten bleiben: Leiste 1 ist die Hauptleiste (mit Seitenwechsel bei Haltung, Gestalt, Verstohlenheit und Umschalt+Mausrad), Leiste 2 die untere linke, Leiste 3 die untere rechte, Leiste 4 die rechte und Leiste 5 die Leiste „Rechts 2“. Haltungs- und Begleiterleiste bleiben von Blizzard.\n\n"
+        .. "Die einzelnen Leisten stellst du auf der Seite Aktionsleisten ein (anzeigen, Knopfgröße, Knöpfe pro Reihe). Standard: Leisten 1–4 an, 5 aus.\n\n"
+        .. "Verschieben über den Bearbeitungsmodus; dort und bei offenem stray-Fenster siehst du auch die leeren Plätze. Änderungen wirken nur außerhalb des Kampfes.\n\n"
+        .. "Mit Blizzards Hauptleiste verschwindet auch die Blizzard-EP-Leiste: Schalte dafür „Erfahrungsleiste oben“ ein (weiter unten).\n\n"
+        .. "Ausschalten erfordert Neuladen für Blizzards Aktionsleisten.",
+    isEnabled = MainOn,
+    disabledHint = MAIN_HINT,
+    set = function(value) SetUIValue("abEnabled", value) end,
 })
 
 ns.AddOption(3, SECTION, {
-    key = "hudXPBar",
-    label = "Erfahrungsleiste oben",
-    tooltip = "Schmale Erfahrungsleiste oben in der Mitte mit erholten EP als hellem Bereich.\n\n"
-        .. "Auf Höchststufe zeigt sie den Ruf der beobachteten Fraktion. Shift + Ziehen verschiebt sie. "
-        .. "Blizzards Leiste kommt nach dem Ausschalten mit /reload zurück.",
-    set = function(value)
-        ns.db.hudXPBar = value
-        ApplyXP(true)
-    end,
+    key = "bottomBar",
+    label = "Taschenleiste unten rechts",
+    keywords = { "taschen", "bags", "inventar", "inventory", "rucksack", "backpack", "menü", "micro" },
+    tooltip = "Schlanke Leiste unten rechts statt Blizzards Taschenleiste: ein Taschenknopf für Rucksack und alle Taschen. "
+        .. "Der Balken darunter zeigt, wie voll die Taschen sind (grün, ab drei Vierteln gelb, ab 90 % rot); der Tooltip listet jede Tasche mit freien Plätzen. "
+        .. "Linksklick öffnet die Taschen bzw. das stray-Taschenfenster. Den Schlüsselbund zeigt stray nicht.\n\n"
+        .. "Shift + Ziehen verschiebt die Leiste (nicht im Kampf), ebenso der Bearbeitungsmodus.",
+    isEnabled = MainOn,
+    disabledHint = MAIN_HINT,
+    set = function(value) SetUIValue("bottomBar", value) end,
 })
 
-ns.AddOption(3, SECTION, {
-    key = "questXPBar",
-    label = "Quest-EP auf der EP-Leiste",
-    tooltip = "Zeigt auf der stray-Erfahrungsleiste einen goldenen Bereich: so viele EP bringen alle abgeschlossenen Quests, die du noch nicht abgegeben hast. Er beginnt am aktuellen EP-Stand, die Summe steht in der Leiste und im Tooltip.\n\nBraucht die Option „Erfahrungsleiste oben“ (direkt darüber).",
-    isEnabled = function() return ns.db and ns.db.hudXPBar and true or false end,
-    disabledHint = "Erst „Erfahrungsleiste oben“ einschalten (direkt darüber).",
-    set = function(value)
-        ns.db.questXPBar = value
-        if ns.db.hudXPBar then pcall(UpdateXP) end
-    end,
-})
-
-local BOTTOM_HINT = "Erst „Eigene Aktionsleisten“ einschalten (Aktionsleisten → Aktionsleisten)."
+local BOTTOM_HINT = "Erst „Taschenleiste unten rechts“ einschalten (direkt darüber)."
+local function BottomOptionOn() return BottomActive() end
 
 ns.AddOption(3, SECTION, {
     key = "bottomMicroButtons",
-    label = "Menüknöpfe unten anzeigen",
-    tooltip = "Die Taschenleiste unten rechts erscheint mit „Eigene Aktionsleisten“ und zeigt Rucksack und Taschen mit der Zahl freier Plätze.\n\n"
-        .. "Mit dieser Option kommen links davon die Menüknöpfe dazu: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde und Gruppensuche. "
+    label = "Menüknöpfe unten",
+    keywords = { "menü", "menu", "micro", "mikromenü", "charakter", "zauberbuch", "talente" },
+    tooltip = "Setzt links neben den Taschenknopf Blizzards Menüsymbole ohne Rahmen: Charakter (rundes Bild deines Charakters), Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde und Gruppensuche.\n\n"
         .. "Sie klicken Blizzards eigene Menüknöpfe an und gehen deshalb auch im Kampf. Grau heißt: Blizzard hat den Knopf gerade abgeschaltet (z. B. Talente unter Stufe 10). "
-        .. "Das Spielmenü öffnest du wie gewohnt mit Esc.\n\n"
-        .. "Shift + Ziehen am Rand verschiebt die Leiste (nicht im Kampf). Ein- und Umbau im Kampf geschieht erst danach.",
-    isEnabled = BottomActive,
+        .. "Das Spielmenü öffnest du wie gewohnt mit Esc. Ein- und Umbau im Kampf geschieht erst danach.",
+    isEnabled = BottomOptionOn,
     disabledHint = BOTTOM_HINT,
     set = function(value)
         ns.db.bottomMicroButtons = value
@@ -2068,8 +2329,8 @@ ns.AddOption(3, SECTION, {
     type = "slider",
     label = "Größe Taschenleiste",
     min = 20, max = 40, step = 1,
-    tooltip = "Kantenlänge der Knöpfe in der Taschen- und Menüleiste in Pixeln.",
-    isEnabled = BottomActive,
+    tooltip = "Höhe der Symbole in der Taschen- und Menüleiste in Pixeln.",
+    isEnabled = BottomOptionOn,
     disabledHint = BOTTOM_HINT,
     set = function(v)
         ns.db.bottomBarSize = math.max(20, math.min(40, math.floor((tonumber(v) or 28) + 0.5)))
@@ -2077,16 +2338,150 @@ ns.AddOption(3, SECTION, {
     end,
 })
 
-ns.AddOption(3, "Kamera & Karte", {
+ns.AddOption(3, SECTION, {
+    key = "squareMinimap",
+    label = "Eckige Minimap oben rechts",
+    keywords = { "minimap", "karte", "map", "eckig", "square" },
+    tooltip = "Macht die Minimap viereckig mit schmalem stray-Rand und setzt sie bündig in die obere rechte Bildschirmecke. Darüber steht der Gebietsname (Klick: Weltkarte), links im Kopf ein Briefsymbol bei neuer Post, darunter die Koordinaten, wenn Blizzards Einstellung „Spielerkoordinaten“ an ist.\n\n"
+        .. "Blizzards runder Rahmen, Zoomknöpfe, Zonenleiste, Verfolgungs- und Kalenderknopf werden ausgeblendet. Verfolgung und Kalender erreichst du über den kleinen Kartenmenü-Knopf oben links in der Karte oder, falls eingeschaltet, per Mittelklick auf die Karte.\n\n"
+        .. "Blizzards Bearbeitungsmodus kann die Minimap dann nicht mehr anwählen; die Größe stellst du mit dem Regler darunter ein.\n\n"
+        .. "Ausschalten stellt die runde Karte wieder her. Sitzt danach etwas schief, hilft /reload. Im Kampf wird erst danach umgebaut.",
+    isEnabled = MainOn,
+    disabledHint = MAIN_HINT,
+    set = function(value) SetUIValue("squareMinimap", value) end,
+})
+
+ns.AddOption(3, SECTION, {
+    key = "squareMinimapSize",
+    type = "slider",
+    label = "Größe eckige Minimap",
+    min = 140, max = 260, step = 10,
+    tooltip = "Kantenlänge der eckigen Minimap in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    isEnabled = function() return UIOn("squareMinimap") end,
+    disabledHint = "Erst „Eckige Minimap oben rechts“ einschalten (direkt darüber).",
+    set = function(v)
+        ns.db.squareMinimapSize = math.max(140, math.min(260, math.floor((tonumber(v) or 200) + 0.5)))
+        if UIOn("squareMinimap") and ns.ApplySquareMinimap then pcall(ns.ApplySquareMinimap) end
+    end,
+})
+
+ns.AddOption(3, SECTION, {
     key = "minimapMiddleMenu",
-    label = "Menü auf der mittleren Maustaste",
+    label = "Menü per Mittelklick auf die Minimap",
+    keywords = { "minimap", "menü", "menu", "mittelklick", "middle click", "maustaste" },
     tooltip = "Mittlere Maustaste auf der Minimap öffnet an der Maus ein kleines stray-Menü: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche sowie Kalender, Verfolgung, Weltkarte und, falls eingeschaltet, Twinks. "
         .. "Dasselbe Menü öffnet der Kartenmenü-Knopf oben links in der Karte.\n\n"
-        .. "Im Kampf geht es nicht auf, dann kommt ein Hinweis im Chat. Schließen per Klick daneben oder Esc.\n\n"
-        .. "Hinweis: Blizzard pingt bei jeder Maustaste innerhalb des runden Innenbereichs der Karte, also auch bei der mittleren. "
-        .. "Ohne Ping geht es nah am Rand (bei eckiger Karte in einer Ecke). Mausrad bleibt wie gewohnt.",
+        .. "Der Mittelklick pingt nicht: stray fängt nur die mittlere Taste ab, Links- und Rechtsklick sowie Mausrad gehen wie gewohnt an die Karte. "
+        .. "Im Kampf geht das Menü nicht auf, dann kommt ein Hinweis im Chat. Schließen per Klick daneben, zweitem Mittelklick oder Esc.",
+    isEnabled = MainOn,
+    disabledHint = MAIN_HINT,
+    set = function(value) SetUIValue("minimapMiddleMenu", value) end,
+})
+
+ns.AddOption(3, SECTION, {
+    key = "hudMinimapColumn",
+    label = "Minimap-Knopfspalte",
+    keywords = { "minimap", "freunde", "friends", "addon-knöpfe", "buttons" },
+    tooltip = "Senkrechte Knopfspalte neben der Minimap mit Freunden, stray-Knopf und Addon-Tasche.\n\n"
+        .. "Freunde: Zahl der Freunde online, Liste im Tooltip, Linksklick öffnet die Freundesliste.\n"
+        .. "Addon-Tasche: sammelt die Minimap-Knöpfe anderer Addons und klappt sie per Klick auf "
+        .. "(verträgt sich nicht mit Leatrix „Hide addon buttons“).\n"
+        .. "Oben links in der Minimap sitzt ein kleines Kartenmenü (Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte). Bei der eckigen Minimap ist es immer da, auch ohne diese Spalte.\n\n"
+        .. "Die Spalte steht rechts neben der Minimap, am rechten Bildschirmrand links davon. "
+        .. "Bei der eckigen Minimap sitzt sie links bündig daran.",
+    isEnabled = MainOn,
+    disabledHint = MAIN_HINT,
+    set = function(value) SetUIValue("hudMinimapColumn", value) end,
+})
+
+ns.AddOption(3, SECTION, {
+    key = "hudClock",
+    label = "Uhrzeit und FPS",
+    keywords = { "uhr", "clock", "zeit", "time", "fps", "latenz", "latency", "ping" },
+    tooltip = "Kleine Zeile unter der Minimap mit Bildern pro Sekunde und Uhrzeit.\n\n"
+        .. "Im Tooltip stehen Latenz und Serverzeit. Blizzards Uhr wird solange ausgeblendet. "
+        .. "Sind Blizzards Spielerkoordinaten an, rückt die Zeile darunter.",
+    isEnabled = MainOn,
+    disabledHint = MAIN_HINT,
+    set = function(value) SetUIValue("hudClock", value) end,
+})
+
+ns.AddOption(3, SECTION, {
+    key = "hudXPBar",
+    label = "Erfahrungsleiste oben",
+    keywords = { "ep", "xp", "erfahrung", "experience", "ruf", "reputation", "leiste" },
+    tooltip = "Erfahrungsleiste oben in der Mitte: links Stufe und Fortschritt, in der Mitte erholte EP (heller Bereich) und, falls eingeschaltet, der EP-Tracker, rechts die EP fertiger Quests.\n\n"
+        .. "Auf Höchststufe zeigt sie den Ruf der beobachteten Fraktion. Breite, Höhe und Schrift stellst du im Bereich Erfahrung ein. Shift + Ziehen verschiebt sie. "
+        .. "Blizzards Leiste kommt nach dem Ausschalten mit /reload zurück.",
+    isEnabled = MainOn,
+    disabledHint = MAIN_HINT,
+    set = function(value) SetUIValue("hudXPBar", value) end,
+})
+
+-- Bereich „Erfahrung“: Feinheiten der EP-Leiste ------------------------------------------
+
+local XP_HINT = "Erst „Erfahrungsleiste oben“ einschalten (Oberfläche → stray-Oberfläche)."
+local function XPOptionOn() return UIOn("hudXPBar") end
+
+local function RefreshXPBar()
+    if UIOn("hudXPBar") then
+        LayoutXPBar()
+        pcall(UpdateXP)
+    end
+end
+
+ns.AddOption(3, SECTION_XP, {
+    key = "questXPBar",
+    label = "Quest-EP auf der EP-Leiste",
+    keywords = { "quest", "ep", "xp", "abgeben", "turn in" },
+    tooltip = "Zeigt auf der stray-Erfahrungsleiste einen goldenen Bereich: so viele EP bringen alle abgeschlossenen Quests, die du noch nicht abgegeben hast. Er beginnt am aktuellen EP-Stand, die Summe steht rechts in der Leiste und im Tooltip.",
+    isEnabled = XPOptionOn,
+    disabledHint = XP_HINT,
     set = function(value)
-        ns.db.minimapMiddleMenu = value
+        ns.db.questXPBar = value
+        if UIOn("hudXPBar") then pcall(UpdateXP) end
+    end,
+})
+
+ns.AddOption(3, SECTION_XP, {
+    key = "xpBarWidth",
+    type = "slider",
+    label = "Breite EP-Leiste",
+    min = 300, max = 1200, step = 10,
+    tooltip = "Breite der stray-Erfahrungsleiste in Pixeln.",
+    isEnabled = XPOptionOn,
+    disabledHint = XP_HINT,
+    set = function(v)
+        ns.db.xpBarWidth = math.max(300, math.min(1200, math.floor((tonumber(v) or 560) + 0.5)))
+        RefreshXPBar()
+    end,
+})
+
+ns.AddOption(3, SECTION_XP, {
+    key = "xpBarHeight",
+    type = "slider",
+    label = "Höhe EP-Leiste",
+    min = 10, max = 40, step = 1,
+    tooltip = "Höhe der stray-Erfahrungsleiste in Pixeln.",
+    isEnabled = XPOptionOn,
+    disabledHint = XP_HINT,
+    set = function(v)
+        ns.db.xpBarHeight = math.max(10, math.min(40, math.floor((tonumber(v) or 20) + 0.5)))
+        RefreshXPBar()
+    end,
+})
+
+ns.AddOption(3, SECTION_XP, {
+    key = "xpBarFontSize",
+    type = "slider",
+    label = "Schriftgröße EP-Leiste",
+    min = 8, max = 20, step = 1,
+    tooltip = "Schriftgröße der Texte auf der stray-Erfahrungsleiste in Pixeln.",
+    isEnabled = XPOptionOn,
+    disabledHint = XP_HINT,
+    set = function(v)
+        ns.db.xpBarFontSize = math.max(8, math.min(20, math.floor((tonumber(v) or 13) + 0.5)))
+        RefreshXPBar()
     end,
 })
 
@@ -2095,27 +2490,33 @@ ns.AddOption(3, "Kamera & Karte", {
 ---------------------------------------------------------------------------
 
 ns.OnConfig(function()
-    if ns.db and ns.db.hudXPBar then pcall(UpdateXP) end
+    if UIOn("hudXPBar") then pcall(UpdateXP) end
 end)
 
 SafeOn("ADDON_LOADED", function(name)
-    if name == "Blizzard_TimeManager" and ns.db and ns.db.hudClock then HideBlizzardClock() end
+    if name == "Blizzard_TimeManager" and UIOn("hudClock") then HideBlizzardClock() end
 end)
 
 SafeOn("PLAYER_LOGIN", function()
     if not ns.db then return end
+    MigrateStrayUI() -- greift nur, falls ADDON_LOADED es nicht schon erledigt hat
     MigrateOldMicroBar()
     pcall(ApplyClock, false)
     pcall(ApplyXP, false)
     pcall(ns.HudUpdateBottomBar)
+    pcall(UpdateMiddleClick)
+    -- EP-Tracker (xptracker.lua) meldet neue Zeilen für die EP-Leiste
+    if ns.XPTracker and ns.XPTracker.OnChange then
+        pcall(ns.XPTracker.OnChange, function() ScheduleXP() end)
+    end
     -- Minimap-Form und andere Addon-Knöpfe stehen oft erst kurz nach dem Login fest
     C_Timer.After(1, function()
         pcall(UpdateMapButton)
-        if ns.db.hudMinimapColumn then pcall(ApplyColumn, false) end
+        if UIOn("hudMinimapColumn") then pcall(ApplyColumn, false) end
         pcall(LayoutClock, true)
     end)
     C_Timer.After(5, function()
-        if ns.db.hudMinimapColumn then
+        if UIOn("hudMinimapColumn") then
             pcall(CollectButtons)
             pcall(LayoutColumn)
         end
@@ -2125,7 +2526,7 @@ end)
 
 SafeOn("PLAYER_ENTERING_WORLD", function()
     if not ns.db then return end
-    if ns.db.hudXPBar then ScheduleXP() HideBlizzardXP() end
+    if UIOn("hudXPBar") then ScheduleXP() HideBlizzardXP() end
     if BottomActive() then
         SchedulePark()
         ScheduleBags()

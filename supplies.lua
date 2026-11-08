@@ -13,6 +13,8 @@
 --               im Kampf versiegelt, darum nur außerhalb des Kampfes prüfen und den Stand vor
 --               dem Kampf behalten.
 --
+-- Auf Wunsch laufen gelbe Striche um die Symbole (ns.Glow aus glow.lua).
+--
 -- Aktualisiert bei BAG_UPDATE_DELAYED, UNIT_AURA (player, gedrosselt, nicht im Kampf),
 -- PLAYER_REGEN_ENABLED, SPELLS_CHANGED und beim Wechsel der Ausrüstung.
 
@@ -26,6 +28,7 @@ ns.defaults.supAmmo = true
 ns.defaults.supFood = true
 ns.defaults.supBuffs = true
 ns.defaults.supThreshold = 10
+ns.defaults.supGlow = false -- laufender Rand um die Symbole (glow.lua)
 
 local AMMO_FACTOR = 20 -- Munition: Warnschwelle × 20 (bei 10 also 200 Schuss = ein Stapel)
 local MANA_CLASSES = { MAGE = true, PRIEST = true, WARLOCK = true, DRUID = true, SHAMAN = true, PALADIN = true, HUNTER = true }
@@ -485,17 +488,24 @@ local function Collect()
     return out
 end
 
+local function SetGlow(b, on)
+    if ns.Glow then pcall(ns.Glow, b, on and true or false) end
+end
+
 local function Show(entries)
+    local glow = ns.db and ns.db.supGlow
     for i, e in ipairs(entries) do
         local b = icons[i] or CreateIcon(i)
         b.entry = e
         b.tex:SetTexture(e.icon)
         b.count:SetText(e.count and tostring(e.count) or "")
         b:Show()
+        SetGlow(b, glow)
     end
     for i = #entries + 1, #icons do
         icons[i].entry = nil
         icons[i]:Hide()
+        SetGlow(icons[i], false)
     end
     if #entries == 0 then
         holder:Hide()
@@ -636,4 +646,13 @@ ns.AddOption(1, SECTION, {
     min = 1, max = 40, step = 1,
     isEnabled = IsOn,
     set = function(value) ns.db.supThreshold = value; Request() end,
+})
+
+ns.AddOption(1, SECTION, {
+    key = "supGlow",
+    label = "Laufender Rand",
+    tooltip = "Gelbe Striche laufen im Kreis um die Symbole der Vorrats-Erinnerung, damit dir fehlende Sachen sofort auffallen.",
+    keywords = { "rand", "leuchten", "glow", "pixel glow", "border", "highlight", "animation", "supplies" },
+    isEnabled = IsOn,
+    set = function(value) ns.db.supGlow = value; Request() end,
 })
