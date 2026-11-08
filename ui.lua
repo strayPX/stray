@@ -128,7 +128,7 @@ local PAGES = {
         { name = "Profile", sections = { "Profile" } },
     } },
     { group = "SYSTEM", name = "Sprache & System", icon = "settings", tabs = {
-        { name = "Allgemein", keys = { "language", "updateNotice", "strayUI" }, sections = { "stray-Oberfläche" } },
+        { name = "Allgemein", keys = { "language", "uiStyle", "updateNotice", "strayUI" }, sections = { "stray-Oberfläche" } },
         { name = "Bearbeiten", sections = { "Bearbeiten" } },
         { name = "Interface", sections = { "Interface" } },
         { name = "Kamera", sections = { "Kamera & Karte" } },
@@ -191,6 +191,7 @@ local UNITS = {
 ---------------------------------------------------------------------------
 
 local KEYWORDS = {
+    uiStyle = { "stil", "style", "forever", "bronze", "gold", "design", "theme", "aussehen", "look", "oberfläche" },
     fastLoot = { "loot", "beute", "plündern", "schnell", "fast" },
     autoLoot = { "loot", "autoloot", "beute", "plündern" },
     autoSell = { "verkaufen", "sell", "junk", "müll", "grau", "vendor", "händler" },

@@ -11,6 +11,7 @@ local L = ns.L
 
 ns.defaults = {
     language = "auto", -- Sprache von stray: "auto" (Client), "deDE" oder "enUS"
+    uiStyle = "stray", -- Oberflächen-Stil: "stray" (lila, flach) oder "forever" (Bronze & Gold), siehe style.lua
     fastLoot = false,
     autoSell = false,
     autoRepair = false,
@@ -97,6 +98,15 @@ ns.Colors = {
     text       = { 0.902, 0.902, 0.925, 1 },    -- #e6e6ec
     textDim    = { 0.545, 0.545, 0.600, 1 },    -- #8b8b99
     textFaint  = { 0.369, 0.369, 0.420, 1 },    -- #5e5e6b
+    -- Entsprechungen für den Stil „Forever UI“ (style.lua überschreibt sie dort mit Gold/Bronze/Rot);
+    -- im Stil „stray“ im lila Ton, damit Module nicht verzweigen müssen
+    gold        = { 0.702, 0.659, 0.980, 1 },    -- wie accentText
+    goldDim     = { 0.545, 0.486, 0.965, 1 },    -- wie accent
+    bronze      = { 0.298, 0.298, 0.369, 1 },
+    bronzeLight = { 0.545, 0.545, 0.600, 1 },
+    bronzeDark  = { 0.149, 0.149, 0.184, 1 },
+    red         = { 0.890, 0.360, 0.360, 1 },
+    redDim      = { 0.550, 0.220, 0.220, 1 },
 }
 
 ---------------------------------------------------------------------------
@@ -134,6 +144,8 @@ ns.On("ADDON_LOADED", function(name)
         strayDB[key] = nil
     end
     ns.db = strayDB
+    -- Stil-Palette zuerst, damit alle folgenden Handler und Module die gewählten Farben sehen
+    if ns.Style then ns.Style.Apply() end
     -- Sprache zuerst, damit alle folgenden Handler und ns.L die gewählte Sprache sehen
     if ns.SetLanguage then ns.SetLanguage(strayDB.language) end
     if ns.OnLoaded then ns.OnLoaded() end

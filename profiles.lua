@@ -117,6 +117,7 @@ local NONE = "none"
 local ENUMS = {
     dmMode = { damage = true, healing = true },
     language = { auto = true, deDE = true, enUS = true },
+    uiStyle = { stray = true, forever = true },
 }
 
 -- Altes zweites DMG-Meter-Fenster (bis 0.22.x): aus alten Profilen übernehmen, damagemeter.lua
@@ -183,7 +184,7 @@ local function DecodeDMWindows(text)
 end
 
 -- Auswahlfelder (choice), die trotzdem als einfacher Wert mitgehen
-local ALLOW_CHOICE = { language = true }
+local ALLOW_CHOICE = { language = true, uiStyle = true }
 
 local function IsHistoryKey(key)
     for _, pattern in ipairs(HISTORY_PATTERNS) do
