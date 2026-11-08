@@ -1,9 +1,9 @@
 -- stray – Hilfe bei vollen Taschen
 -- Ab höchstens einem freien Platz sucht stray den billigsten Gegenstand in den Taschen
--- (Verkaufspreis × Anzahl) und markiert ihn als Löschkandidat: im stray-Taschenfenster,
--- an Blizzards Taschenknöpfen (eigene Texturen, keine Felder auf Blizzard-Frames) und im Tooltip.
+-- (Verkaufspreis × Anzahl) und markiert ihn als Löschkandidat: an Blizzards Taschenknöpfen
+-- (eigene Texturen, keine Felder auf Blizzard-Frames) und im Tooltip.
 -- Beim Plündern bekommt Beute, die mehr wert ist als der Löschkandidat, eine kleine Goldmünze.
--- stray löscht nie etwas selbst: „Aufnehmen“ legt den Gegenstand nur auf den Mauszeiger.
+-- stray löscht nie etwas selbst.
 
 local _, ns = ...
 local L = ns.L
@@ -101,7 +101,6 @@ local function Scan()
     local free, bags = NormalBags()
     if not free or free > MAX_FREE then return nil end
 
-    local pinned = (ns.db and type(ns.db.bagPinned) == "table") and ns.db.bagPinned or {}
     local best
     for _, bag in ipairs(bags) do
         for slot = 1, NumSlots(bag) do
@@ -114,7 +113,7 @@ local function Scan()
                 local noValue = Public(info.hasNoValue)
                 local locked = Public(info.isLocked)
                 if type(itemID) ~= "number" then itemID = ItemIDFromLink(link) end
-                if type(itemID) == "number" and not noValue and not locked and not pinned[itemID]
+                if type(itemID) == "number" and not noValue and not locked
                     and not (type(quality) == "number" and quality >= MIN_KEEP_QUALITY)
                     and not IsQuestThing(bag, slot, itemID, link) then
                     local price = SellPrice(link or itemID)
@@ -264,9 +263,6 @@ end
 local function Apply()
     local ok, result = pcall(Scan)
     candidate = ok and result or nil
-    if ns.BagWindowSetTriage then
-        pcall(ns.BagWindowSetTriage, candidate and candidate.bag, candidate and candidate.slot)
-    end
     pcall(PaintBlizzard)
     if LootFrame and LootFrame:IsShown() then SafePaintLoot() end
 end
@@ -280,31 +276,6 @@ local function RequestScan(delay)
         pending = false
         Apply()
     end)
-end
-
--- Für andere Module (z. B. Anheften im Taschenfenster)
-function ns.TriageRefresh()
-    if Enabled() or candidate then RequestScan(0.05) end
-end
-
--- Legt den Löschkandidat auf den Mauszeiger. Gelöscht wird nur über Blizzards Bestätigung.
-function ns.TriagePickup()
-    if not candidate then
-        ns.Print(L["Kein Löschkandidat."])
-        return
-    end
-    if CursorHasItem and CursorHasItem() then
-        ns.Print(L["Auf dem Mauszeiger liegt schon etwas."])
-        return
-    end
-    local ok, info = pcall(Container.GetContainerItemInfo, candidate.bag, candidate.slot)
-    if not ok or type(info) ~= "table" or Public(info.itemID) ~= candidate.itemID then
-        RequestScan(0)
-        return
-    end
-    if not Container.PickupContainerItem then return end
-    Container.PickupContainerItem(candidate.bag, candidate.slot)
-    ns.Print(L("%s liegt auf dem Mauszeiger. Zum Zerstören neben die Fenster klicken – WoW fragt dann nach. Rechtsklick legt ihn zurück.", candidate.link or L["Gegenstand"]))
 end
 
 -- Tooltipzeile am Löschkandidaten
@@ -366,7 +337,7 @@ end)
 ns.AddOption(1, "Taschen", {
     key = "bagTriage",
     label = L["Hilfe bei vollen Taschen"],
-    tooltip = L["Ist höchstens noch ein Platz frei, markiert stray den billigsten Gegenstand (Verkaufspreis × Anzahl) rot als Löschkandidat – in Blizzards Taschen, im stray-Taschenfenster und im Tooltip. Beute, die mehr wert ist, bekommt beim Plündern eine Goldmünze.\n\nNie vorgeschlagen werden Questgegenstände, angeheftete Gegenstände, Gegenstände ohne Verkaufswert und alles ab „selten“ (blau).\n\nstray löscht nichts selbst. Im stray-Taschenfenster legt „Löschkandidat aufnehmen“ den Gegenstand nur auf den Mauszeiger."],
+    tooltip = L["Ist höchstens noch ein Platz frei, markiert stray den billigsten Gegenstand (Verkaufspreis × Anzahl) rot als Löschkandidat – in Blizzards Taschen und im Tooltip. Beute, die mehr wert ist, bekommt beim Plündern eine Goldmünze.\n\nNie vorgeschlagen werden Questgegenstände, Gegenstände ohne Verkaufswert und alles ab „selten“ (blau).\n\nstray löscht nichts selbst."],
     set = function(value)
         ns.db.bagTriage = value
         Apply()

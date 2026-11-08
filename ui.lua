@@ -1,9 +1,10 @@
 -- stray – Einstellungsfenster (seit 0.23.0-alpha nach Leons Vorlage)
 -- Kopf über die ganze Breite: Logo + „stray“ links, breites Suchfeld, Knopf „Bearbeitungsmodus“ und
--- Schließen rechts. Links die Navigation nach dem Ort im Spiel: Übersicht (Bildschirmkarte, zuletzt
--- geändert, Module), Leisten & Menü, Karte & Gruppe, Taschen & Handel, Kampf, Welt & Quests, stray
--- (System) und Alle Anzeigen, mit schlichten Liniensymbolen (gewählt = lila Strich links + helle
--- Fläche), unten die Profil-Auswahl. Frühere Seitennamen (V.LEGACY_PAGES) führen auf die neuen Seiten.
+-- Schließen rechts. Links die Navigation: Übersicht (Funktionsliste nach Seiten mit An/Aus, zuletzt
+-- geändert), Automation, Sozial & Chat, Interface, Kampf, Welt, stray (System) und Alle Anzeigen, mit
+-- schlichten Liniensymbolen (gewählt = lila Strich links + helle Fläche), unten die Profil-Auswahl.
+-- Reiter ohne Optionen und Seiten ohne Reiter werden nicht angezeigt. Frühere Seitennamen
+-- (V.LEGACY_PAGES) führen auf die neuen Seiten.
 -- Rechts je Seite ein großer Titel mit Häkchen „Aktiv“ (Hauptschalter des Moduls bzw. Reiters),
 -- darunter Reiter (die Bereiche der Seite). Inhalt einspaltig: Abschnitts-Überschriften in
 -- Großbuchstaben mit feiner Linie (ALLGEMEIN, ANORDNUNG, POSITION), Zeilen mit Name und Bedienelement
@@ -19,10 +20,10 @@
 -- Verträge für andere Module:
 --   ns.RegisterInstances(name, { {id=, label=, strayKey=?}, … } oder function, getSelected, setSelected)
 --     Auswahlliste über dem Inhalt eines Reiters oder einer Seite (name = Reiter- oder Seitenname),
---     z. B. „Aktionsleiste 1“. Frühestens ab ADDON_LOADED aufrufen (ui.lua lädt zuletzt).
+--     z. B. „DMG-Meter 2“. Frühestens ab ADDON_LOADED aufrufen (ui.lua lädt zuletzt).
 --   ns.ConfirmOption / ns.ConflictHint (conflicts.lua): Nachfrage beim Einschalten, Hinweis-Kasten.
 --   ns.EditSelected / ns.OnEditSelect (editmode.lua): „Im Spiel ausgewählt“, Sprung zur Seite.
---   ns.slashCommands[befehl] = fn: eigene Unterbefehle für /stray (z. B. „keys“).
+--   ns.slashCommands[befehl] = fn: eigene Unterbefehle für /stray.
 -- Stil „forever“ (style.lua): Rahmen, Schiefer, Gold, Reiter, Knöpfe, Eingabefelder. Das Fenster baut sich erst
 -- in ns.OnLoaded auf (Build-Teile), weil der Stil aus ns.db kommt; im Stil „stray“ bleibt alles wie bisher.
 -- Symbole in media/icons: Tabler Icons (MIT-Lizenz, tabler.io); „meditation“ ist eigenes stray-Symbol
@@ -153,52 +154,44 @@ end
 -- „Alle Anzeigen“ (displays) sind eigene Seiten ohne Reiter.
 local PAGES = {
     { name = "Übersicht", icon = "home", home = true },
-    { name = "Leisten & Menü", icon = "layout-grid", tabs = {
-        { name = "Aktionsleisten", keys = { "abEnabled" }, sections = { "Aktionsleisten" }, master = "abEnabled" },
-        { name = "Tastenbelegung", sections = { "Tastenbelegung" }, master = "abEnabled" },
-        { name = "Abklingzeiten", sections = { "Abklingzeiten" }, master = "cdManager" },
-        { name = "Taschen- & Menüleiste", keys = { "bottomBar", "bottomMicroButtons", "bottomBarSize" }, master = "bottomBar" },
-        { name = "EP-Leiste", keys = { "hudXPBar", "questXPBar", "xpBarWidth", "xpBarHeight", "xpBarFontSize" },
-            master = "hudXPBar" },
+    { name = "Automation", icon = "backpack", tabs = {
+        { name = "Quests", sections = { "Quests" } },
+        { name = "NPCs", sections = { "NPCs" } },
+        { name = "Filmsequenzen", sections = { "Filmsequenzen" } },
+        { name = "Händler", sections = { "Händler" } },
+        { name = "Beute", sections = { "Beute" } },
+        { name = "Taschen", sections = { "Taschen" } },
+        { name = "Automatisch", sections = { "Automatisch" } },
     } },
-    { name = "Karte & Gruppe", icon = "map-2", tabs = {
-        { name = "Minimap", keys = { "squareMinimap", "squareMinimapSize", "minimapMiddleMenu", "hudMinimapColumn",
-            "hudClock", "hudTrackingButton", "minimapWheel", "minimapButton" }, sections = { "Leisten & Minimap" }, master = "squareMinimap" },
-        { name = "Gruppenrahmen", sections = { "Gruppenrahmen" }, master = "partyFrames" },
-        { name = "Begleiter", prefix = "^partyPet", master = "partyPets" },
-        { name = "Chat", sections = { "Chat" } },
+    { name = "Sozial & Chat", icon = "map-2", tabs = {
         { name = "Sozial", sections = { "Sozial" } },
         { name = "Charaktere", sections = { "Charaktere" } },
+        { name = "Chat", sections = { "Chat" } },
     } },
-    { name = "Taschen & Handel", icon = "backpack", tabs = {
-        { name = "Taschen", sections = { "Taschen" } },
-        { name = "Taschenfenster", keys = { "bagWindow", "bagColumns" }, prefix = "^bag",
-            exclude = { bagTriage = true }, master = "bagWindow" },
-        { name = "Vorrat", sections = { "Vorrat" }, master = "supplies" },
-        { name = "Beute", sections = { "Beute" } },
-        { name = "Händler", sections = { "Händler" } },
+    { name = "Interface", icon = "layout-grid", tabs = {
+        { name = "Ausblenden", sections = { "Ausblenden" } },
+        { name = "Text", sections = { "Text" } },
+        { name = "Tooltip", sections = { "Tooltip" } },
+        { name = "Charakter", sections = { "Charakter" } },
+        { name = "Interface", sections = { "Interface" } },
+        { name = "Kamera", sections = { "Kamera & Karte" } },
     } },
     { name = "Kampf", icon = "swords", tabs = {
         { name = "Bedrohung", sections = { "Bedrohung" } },
         { name = "DMG-Meter", sections = { "DMG-Meter" }, master = "dmShow" },
         { name = "Kampfhilfen", sections = { "Kampfhilfen" } },
         { name = "Zaubern", sections = { "Zaubern" } },
-        { name = "Swing", prefix = "^swing", master = "swingTimer" },
         { name = "Würfelfenster", keys = { "rollsMove" }, master = "rollsMove" },
     } },
-    { name = "Welt & Quests", icon = "exclamation-circle", tabs = {
-        { name = "Quests", sections = { "Quests" } },
-        { name = "NPCs", sections = { "NPCs" } },
-        { name = "Filmsequenzen", sections = { "Filmsequenzen" } },
+    { name = "Welt", icon = "exclamation-circle", tabs = {
         { name = "Flugzeit", prefix = "^flight", master = "flightBar" },
         { name = "EP-Tracker", prefix = "^xpTracker", sections = { "Erfahrung" }, master = "xpTracker" },
-        { name = "Kamera", sections = { "Kamera & Karte" } },
+        { name = "Grafik & Ton", sections = { "Grafik & Ton" } },
     } },
     { name = "stray", icon = "settings", tabs = {
         { name = "Profile", sections = { "Profile" } },
-        { name = "Allgemein", keys = { "language", "uiStyle", "updateNotice", "strayUI" }, sections = { "stray-Oberfläche" } },
+        { name = "Allgemein", keys = { "language", "uiStyle", "updateNotice" }, sections = { "stray-Oberfläche" } },
         { name = "Bearbeiten", sections = { "Bearbeiten" } },
-        { name = "Interface", sections = { "Interface" } },
     } },
     { name = "Alle Anzeigen", icon = "stack-2", displays = true },
 }
@@ -206,88 +199,56 @@ local PAGES = {
 -- Verschiebbare Anzeigen (Label aus ns.RegisterMovable, Anfang genügt) → Seite, Reiter, optional Schlüssel
 -- des Schalters, der die Anzeige ein- und ausschaltet (sonst gilt der Hauptschalter des Reiters)
 local MOVABLE_TABS = {
-    { "Aktionsleiste", "Leisten & Menü", "Aktionsleisten" },
-    { "Abklingzeiten", "Leisten & Menü", "Abklingzeiten" },
-    { "Taschen und Menü", "Leisten & Menü", "Taschen- & Menüleiste" },
-    { "Erfahrungsleiste", "Leisten & Menü", "EP-Leiste" },
-    { "Gruppenrahmen", "Karte & Gruppe", "Gruppenrahmen" },
-    { "Begleiter", "Karte & Gruppe", "Begleiter" },
-    { "Minimap", "Karte & Gruppe", "Minimap" },
-    { "Taschenfenster", "Taschen & Handel", "Taschenfenster" },
-    { "Vorrat", "Taschen & Handel", "Vorrat" },
     { "Bedrohungsliste", "Kampf", "Bedrohung", "threatList" },
     { "Tank-Warnung", "Kampf", "Bedrohung", "threatTankWarn" },
     { "Aggro-Warnung", "Kampf", "Bedrohung", "threatAggroWarn" },
     { "DMG-Meter", "Kampf", "DMG-Meter" },
     { "Gefahr-Hinweis", "Kampf", "Kampfhilfen", "dangerWarn" },
-    { "Swing", "Kampf", "Swing" },
     { "Würfelfenster", "Kampf", "Würfelfenster" },
-    { "EP-Tracker", "Welt & Quests", "EP-Tracker" },
-    { "Flugzeit", "Welt & Quests", "Flugzeit" },
-    { "Haltbarkeit", "stray", "Interface", "durability" },
+    { "EP-Tracker", "Welt", "EP-Tracker" },
+    { "Flugzeit", "Welt", "Flugzeit" },
+    { "Haltbarkeit", "Interface", "Interface", "durability" },
 }
 
--- Übersicht: Module mit An/Aus, nach Ort gruppiert (Überschrift = Seitenname)
+-- Übersicht: Funktionen mit An/Aus, nach Seiten gruppiert (Überschrift = Seitenname)
 local HOME = {
-    { label = "Leisten & Menü", keys = { "abEnabled", "bottomBar", "cdManager", "hudXPBar" } },
-    { label = "Karte & Gruppe", keys = { "squareMinimap", "partyFrames", "playerNotes", "alts" } },
-    { label = "Taschen & Handel", keys = { "bagWindow", "supplies", "autoSell" } },
-    { label = "Kampf", keys = { "threatList", "dmShow", "swingTimer", "dangerWarn" } },
-    { label = "Welt & Quests", keys = { "questAccept", "xpTracker", "flightBar" } },
-    { label = "stray", keys = { "strayUI" } },
+    { label = "Automation", keys = { "questAccept", "gossipSkip", "autoLoot", "autoSell", "autoRepair", "bagTriage" } },
+    { label = "Sozial & Chat", keys = { "playerNotes", "inviteAcceptFriends", "chatLinks" } },
+    { label = "Interface", keys = { "durability", "hideErrors", "cameraMax" } },
+    { label = "Kampf", keys = { "threatList", "dmShow", "dangerWarn", "mouseoverCast" } },
+    { label = "Welt", keys = { "xpTracker", "flightBar" } },
 }
 
--- Weitere Bausteine der Seiten (gebündelt, um lokale Namen zu sparen): V.MAP = Bildschirmkarte der
--- Übersicht mit Fläche (x, y, w, h als Anteil des Spielfensters), Beschriftung, Name, Schlüsseln der
--- Schalter (aktiv, wenn einer an ist) und Ziel (Seite, Reiter)
+-- Weitere Bausteine der Seiten (gebündelt, um lokale Namen zu sparen)
 local V = {}
-V.MAP = {
-    { label = "Minimap", name = "Minimap", x = 0.835, y = 0.04, w = 0.145, h = 0.26, keys = { "squareMinimap" },
-        page = "Karte & Gruppe", tab = "Minimap" },
-    { label = "EP-Leiste", name = "EP-Leiste", x = 0.30, y = 0.03, w = 0.40, h = 0.07, keys = { "hudXPBar" },
-        page = "Leisten & Menü", tab = "EP-Leiste" },
-    { label = "Gruppe", name = "Gruppenrahmen", x = 0.03, y = 0.17, w = 0.12, h = 0.30, keys = { "partyFrames" },
-        page = "Karte & Gruppe", tab = "Gruppenrahmen" },
-    { label = "Bedrohung", name = "Bedrohungsliste", x = 0.03, y = 0.50, w = 0.12, h = 0.17, keys = { "threatList" },
-        page = "Kampf", tab = "Bedrohung" },
-    { label = "Chat", name = "Chat", x = 0.03, y = 0.71, w = 0.26, h = 0.25, keys = { "chatLinks", "chatCoords" },
-        page = "Karte & Gruppe", tab = "Chat" },
-    { label = "Aktionsleisten", name = "Aktionsleisten", x = 0.33, y = 0.84, w = 0.34, h = 0.12, keys = { "abEnabled" },
-        page = "Leisten & Menü", tab = "Aktionsleisten" },
-    { label = "Taschen & Menü", name = "Taschen- & Menüleiste", x = 0.72, y = 0.90, w = 0.25, h = 0.07,
-        keys = { "bottomBar" }, page = "Leisten & Menü", tab = "Taschen- & Menüleiste" },
-    { label = "Taschenfenster", name = "Taschenfenster", x = 0.74, y = 0.58, w = 0.23, h = 0.29, keys = { "bagWindow" },
-        page = "Taschen & Handel", tab = "Taschenfenster" },
-    { label = "DMG-Meter", name = "DMG-Meter", x = 0.80, y = 0.34, w = 0.17, h = 0.20, keys = { "dmShow" },
-        page = "Kampf", tab = "DMG-Meter" },
-}
 
 -- Frühere Seiten- und Reiternamen (für ns.OpenConfig anderer Module)
 V.LEGACY_PAGES = {
-    ["Zentrale"] = "Übersicht", ["Aktionsleisten"] = "Leisten & Menü", ["Einheiten"] = "Karte & Gruppe",
-    ["Taschen & Minimap"] = "Taschen & Handel", ["Kampf & Anzeigen"] = "Kampf", ["Komfort"] = "Welt & Quests",
+    ["Zentrale"] = "Übersicht", ["Aktionsleisten"] = "Interface", ["Einheiten"] = "Sozial & Chat",
+    ["Taschen & Minimap"] = "Automation", ["Kampf & Anzeigen"] = "Kampf", ["Komfort"] = "Automation",
     ["Profile"] = "stray", ["Sprache & System"] = "stray",
+    ["Leisten & Menü"] = "Interface", ["Karte & Gruppe"] = "Sozial & Chat", ["Taschen & Handel"] = "Automation",
+    ["Welt & Quests"] = "Automation",
 }
-V.LEGACY_TABS = { ["Taschenleiste"] = "Taschen- & Menüleiste", ["Leisten"] = "Aktionsleisten" }
+V.LEGACY_TABS = {
+    ["Taschenfenster"] = "Taschen", ["Taschenleiste"] = "Taschen", ["Taschen- & Menüleiste"] = "Taschen",
+    ["Minimap"] = "Kamera", ["Swing"] = "Kampfhilfen", ["EP-Leiste"] = "EP-Tracker",
+    ["Vorrat"] = "Taschen", ["Gruppenrahmen"] = "Sozial", ["Begleiter"] = "Sozial",
+    ["Aktionsleisten"] = "Interface", ["Leisten"] = "Interface", ["Tastenbelegung"] = "Interface",
+    ["Abklingzeiten"] = "Kampfhilfen",
+}
 
--- Beim Einschalten zuerst auch diesen Schalter einschalten (eigene Leisten gehören zur stray-Oberfläche)
-local MASTER_REQUIRES = { abEnabled = "strayUI" }
+-- Beim Einschalten zuerst auch einen anderen Schalter einschalten (Schlüssel → Schlüssel)
+local MASTER_REQUIRES = {}
 
 -- Geänderte Schlüssel, nach denen „Übernehmen“ neu lädt (zusätzlich option.reload = true)
 local RELOAD_KEYS = {
-    language = true, strayUI = true, abEnabled = true, bottomBar = true, bottomMicroButtons = true,
-    squareMinimap = true, hudMinimapColumn = true, hudXPBar = true, partyFrames = true,
-    partyHideBlizzard = true, bagWindow = true, accountCVars = true,
-    cdManager = true, rollsMove = true, -- Ausschalten: Blizzards Optik/Position erst nach /reload
+    language = true, accountCVars = true,
+    rollsMove = true, -- Ausschalten: Blizzards Optik/Position erst nach /reload
 }
 
 -- Einheit hinter dem Zahlenfeld (zusätzlich option.unit)
-local UNITS = {
-    abSpacing = "px", abSizeSel = "px", cdSize = "px", bottomBarSize = "px", squareMinimapSize = "px",
-    xpBarWidth = "px", xpBarHeight = "px", xpBarFontSize = "px", partyWidth = "px", partyHeight = "px",
-    partySpacing = "px", partyPetWidth = "px", partyPetHeight = "px", swingWidth = "px",
-    abEmptyAlpha = "%", partyBrightness = "%",
-}
+local UNITS = {}
 
 ---------------------------------------------------------------------------
 -- Stichwörter für die Suche (deutsch + englisch), zusätzlich zu option.keywords
@@ -313,14 +274,6 @@ local KEYWORDS = {
     questItemMarks = { "quest", "items", "gegenstände", "marker", "markieren" },
     freeSlots = { "bags", "slots", "plätze", "frei", "free", "inventar", "inventory" },
     bagTriage = { "bags", "voll", "full", "inventar", "inventory", "aufräumen" },
-    bagWindow = { "bags", "bag", "inventar", "inventory", "rucksack", "sortieren", "sort" },
-    bagColumns = { "bags", "spalten", "columns", "inventar", "breite" },
-    supplies = { "supplies", "vorrat", "erinnerung", "reminder", "reagenzien" },
-    supReagents = { "reagenzien", "reagents", "vorrat" },
-    supAmmo = { "ammo", "munition", "pfeile", "arrows", "kugeln", "bullets", "jäger", "hunter" },
-    supFood = { "food", "drink", "essen", "trinken", "wasser", "water" },
-    supBuffs = { "buff", "buffs", "stärkung" },
-    supThreshold = { "schwelle", "threshold", "anzahl", "stück" },
     gossipSkip = { "gossip", "dialog", "npc", "gespräch", "skip" },
     questAccept = { "quest", "accept", "annehmen", "auto" },
     questTurnIn = { "quest", "turn in", "abgeben", "auto", "complete" },
@@ -335,49 +288,13 @@ local KEYWORDS = {
     dmAutoReset = { "damage", "meter", "reset", "zurücksetzen", "instanz", "dungeon" },
     dangerWarn = { "danger", "gefahr", "elite", "level", "warnung", "warning" },
     dangerLevels = { "danger", "gefahr", "level", "stufen" },
-    swingTimer = { "swing", "timer", "nahkampf", "melee", "auto attack", "autoangriff" },
-    swingWidth = { "swing", "breite", "width" },
-    swingRanged = { "swing", "ranged", "fernkampf", "bogen", "bow", "auto shot", "jäger" },
     mouseoverCast = { "mouseover", "heal", "heilen", "cast", "zaubern", "spell" },
     abRankCheck = { "rank", "rang", "zauber", "spell", "veraltet" },
-    abEnabled = { "actionbar", "actionbars", "bars", "leisten", "buttons", "knöpfe" },
-    abKeybinds = { "keybind", "keybinds", "hotkey", "tasten", "binding", "kürzel" },
-    abSpacing = { "abstand", "spacing", "actionbar" },
-    abShowEmpty = { "empty", "leer", "grid", "raster", "plätze" },
-    abEmptyAlpha = { "empty", "leer", "alpha", "deckkraft", "transparenz" },
-    abEdit = { "actionbar", "leiste" },
-    abShowSel = { "actionbar", "leiste", "anzeigen", "show" },
-    abSizeSel = { "actionbar", "größe", "size", "scale" },
-    abColsSel = { "actionbar", "reihe", "row", "columns", "spalten" },
-    cdManager = { "cooldown", "cooldowns", "cd", "abklingzeit", "timer" },
-    cdSize = { "cooldown", "cd", "größe", "size", "symbol" },
-    partyFrames = { "party", "group", "gruppe", "raid", "heal", "heilen", "heiler", "healer", "frames", "rahmen" },
-    partyHideBlizzard = { "party", "blizzard", "hide", "ausblenden" },
-    partyWidth = { "party", "breite", "width", "size" },
-    partyHeight = { "party", "höhe", "height", "size" },
-    partySpacing = { "party", "abstand", "spacing" },
-    partyBrightness = { "party", "helligkeit", "brightness", "farbe" },
-    strayUI = { "ui", "oberfläche", "interface", "hud", "blizzard" },
     cameraMax = { "camera", "kamera", "zoom", "distance", "entfernung" },
     minimapWheel = { "minimap", "zoom", "mausrad", "mousewheel", "scroll" },
-    minimapButton = { "minimap", "button", "icon", "knopf" },
-    squareMinimap = { "minimap", "square", "eckig", "karte" },
-    squareMinimapSize = { "minimap", "größe", "size" },
-    minimapMiddleMenu = { "minimap", "menü", "menu", "mittelklick", "middle click" },
     flightBar = { "flight", "flug", "taxi", "greif", "timer", "flugmeister" },
-    hudMinimapColumn = { "minimap", "buttons", "knöpfe", "addons" },
-    hudClock = { "clock", "uhr", "uhrzeit", "fps", "zeit", "time", "latenz", "latency", "ping" },
-    hudTrackingButton = { "verfolgung", "tracking", "fernglas", "lupe", "suche", "kräuter", "erze", "minimap" },
-    hudXPBar = { "xp", "exp", "ep", "erfahrung", "experience", "level", "stufe" },
-    questXPBar = { "xp", "exp", "ep", "quest", "erfahrung", "experience" },
     xpTracker = { "xp", "exp", "ep", "erfahrung", "tracker", "ep/h", "xp/h", "level", "stufe", "spielzeit", "played" },
     xpTrackerTable = { "xp", "exp", "ep", "tabelle", "table", "tracker", "verlauf", "history" },
-    bottomBar = { "bags", "taschen", "taschenleiste", "bag bar", "menü", "menu", "unten" },
-    xpBarWidth = { "xp", "ep", "erfahrung", "breite", "width" },
-    xpBarHeight = { "xp", "ep", "erfahrung", "höhe", "height" },
-    xpBarFontSize = { "xp", "ep", "erfahrung", "schrift", "font", "größe" },
-    bottomMicroButtons = { "menu", "menü", "micro", "mikromenü", "knöpfe" },
-    bottomBarSize = { "bags", "taschen", "taschenleiste", "größe", "size" },
     hideErrors = { "error", "errors", "fehler", "meldungen", "spam", "rote schrift" },
     durability = { "durability", "haltbarkeit", "repair", "reparieren", "rüstung" },
     rollsMove = { "roll", "rolls", "loot", "würfeln", "need", "greed", "bedarf", "gier" },
@@ -402,19 +319,12 @@ local SECTION_KEYWORDS = {
     ["NPCs"] = { "npc" },
     ["Chat"] = { "chat" },
     ["Taschen"] = { "bags", "bag", "inventar", "inventory" },
-    ["Vorrat"] = { "supplies", "reagents", "reagenzien" },
     ["Quests"] = { "quest", "quests" },
     ["Bedrohung"] = { "aggro", "threat" },
     ["DMG-Meter"] = { "dps", "damage", "meter", "schaden", "heal", "heilung" },
     ["Kampfhilfen"] = { "combat", "kampf" },
     ["Zaubern"] = { "cast", "spell", "zauber" },
-    ["Aktionsleisten"] = { "actionbar", "actionbars", "bars", "leisten" },
-    ["Tastenbelegung"] = { "keybind", "keybinds", "hotkey", "tasten", "binding", "belegen" },
-    ["Abklingzeiten"] = { "cooldown", "cd" },
-    ["Gruppenrahmen"] = { "party", "group", "heal", "heilen", "rahmen", "frames", "pet", "begleiter" },
-    ["stray-Oberfläche"] = { "ui", "hud", "oberfläche", "interface" },
     ["Kamera & Karte"] = { "camera", "kamera", "minimap", "map", "karte" },
-    ["Leisten & Minimap"] = { "minimap", "hud" },
     ["Erfahrung"] = { "xp", "exp", "ep", "experience", "erfahrung", "level" },
     ["Interface"] = { "ui", "interface" },
     ["Sozial"] = { "social", "sozial" },
@@ -1522,11 +1432,9 @@ end
 -- Tabellen, deren Einträge einzeln zählen (je Anzeige)
 local PER_ENTRY = { positions = true, scales = true }
 
--- Bereiche mit Leisten/Rahmen: im Kampf erst nach dem Kampf zurücksetzen
+-- Bereiche mit Anzeigen/Rahmen: im Kampf erst nach dem Kampf zurücksetzen
 local DEFER_SECTIONS = {
-    ["Aktionsleisten"] = true, ["Abklingzeiten"] = true, ["Gruppenrahmen"] = true, ["Tastenbelegung"] = true,
-    ["stray-Oberfläche"] = true, ["Leisten & Minimap"] = true, ["Erfahrung"] = true,
-    ["Kamera & Karte"] = true, ["Zaubern"] = true, ["Taschen"] = true,
+    ["Erfahrung"] = true, ["Kamera & Karte"] = true, ["Zaubern"] = true, ["Taschen"] = true,
 }
 
 local function DeepCopy(value)
@@ -2255,23 +2163,6 @@ end
 local function InstanceFor(page, tab)
     local inst = (tab and S.instances[tab.name]) or (page and S.instances[page.name])
     if inst then return inst end
-    -- Aktionsleisten ohne eigene Anmeldung: die Auswahl „Leiste bearbeiten“ (abEdit) als Liste oben
-    local option = tab and tab.name == "Aktionsleisten" and R.byKey.abEdit and R.byKey.abEdit[1]
-    if option then
-        S.abInst = S.abInst or {
-            option = option,
-            list = function()
-                local list = {}
-                for i, v in ipairs(option.values or {}) do
-                    list[i] = { id = v, label = "Aktionsleiste " .. tostring(v), strayKey = "ab" .. tostring(v) }
-                end
-                return list
-            end,
-            get = option.get,
-            set = option.set,
-        }
-        return S.abInst
-    end
 end
 
 local function InstanceCurrent(inst)
@@ -2318,116 +2209,8 @@ local function MovablesFor(page, tab)
 end
 
 ---------------------------------------------------------------------------
--- Übersicht: Bildschirmkarte; Alle Anzeigen: Zeilen
+-- Alle Anzeigen: Zeilen
 ---------------------------------------------------------------------------
-
--- Kleines 16:9-Abbild des Spielfensters mit klickbaren Flächen (V.MAP). Farben aus ns.Colors/ns.Style;
--- ausgeschaltete Module sind gedimmt, Hover = lila Akzent und Tooltip, Klick = Seite und Reiter öffnen.
-local function CreateMapRow()
-    local row = CreateFrame("Frame", nil, scrollChild)
-    local box = CreateFrame("Frame", nil, row)
-    row.box = box
-    local fx1 = FX("Fill", box, "inset")
-    local fx2 = FX("Border", box, { size = 6, corners = false })
-    if not (fx1 and fx2) then
-        local r, g, b, a = 0.055, 0.055, 0.070, 1
-        if ns.Style and ns.Style.FillColor then
-            local ok, r2, g2, b2, a2 = pcall(ns.Style.FillColor, "inset")
-            if ok and r2 then r, g, b, a = r2, g2, b2, a2 or 1 end
-        end
-        Panel(box, 6, { r, g, b, a }, C.line, "BACKGROUND")
-    end
-    row.caption = Text(row, 11, C.grey)
-    row.caption:SetPoint("BOTTOM", row, "BOTTOM", 0, 2)
-    row.areas = {}
-    local edgeColor = FOREVER and ns.Colors.bronze or C.line
-    for _, def in ipairs(V.MAP) do
-        local a = CreateFrame("Button", nil, box)
-        a:RegisterForClicks("LeftButtonUp")
-        a.def = def
-        a.fill = a:CreateTexture(nil, "BACKGROUND")
-        a.fill:SetAllPoints()
-        a.edges = {}
-        local function Edge(p1, x1, y1, p2, x2, y2, horizontal)
-            local t = Line(a, edgeColor, "BORDER")
-            t:SetPoint(p1, a, p1, x1, y1)
-            t:SetPoint(p2, a, p2, x2, y2)
-            if horizontal then t:SetHeight(1) else t:SetWidth(1) end
-            table.insert(a.edges, t)
-        end
-        Edge("TOPLEFT", 0, 0, "TOPRIGHT", 0, 0, true)
-        Edge("BOTTOMLEFT", 0, 0, "BOTTOMRIGHT", 0, 0, true)
-        Edge("TOPLEFT", 0, 0, "BOTTOMLEFT", 0, 0, false)
-        Edge("TOPRIGHT", 0, 0, "BOTTOMRIGHT", 0, 0, false)
-        a.text = Text(a, 10, C.text)
-        a.text:SetPoint("CENTER", 0, 0)
-        a.text:SetJustifyH("CENTER")
-        a.text:SetWordWrap(false)
-        function a:Paint()
-            local hov = self.hover
-            local c = hov and { C.accent[1], C.accent[2], C.accent[3], 0.32 } or C.card
-            self.fill:SetColorTexture(c[1], c[2], c[3], c[4] or 1)
-            local e = hov and C.accent or edgeColor
-            for _, t in ipairs(self.edges) do t:SetColorTexture(e[1], e[2], e[3], e[4] or 1) end
-            SetTextColor(self.text, hov and C.hi or (self.active and C.text or C.faint))
-            self:SetAlpha(self.active and 1 or 0.55)
-        end
-        a:SetScript("OnEnter", function(self)
-            self.hover = true
-            self:Paint()
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:SetText(L[self.def.name], 1, 1, 1)
-            local tc = self.active and C.accentT or C.grey
-            GameTooltip:AddLine(self.active and L["aktiv"] or L["aus"], tc[1], tc[2], tc[3])
-            GameTooltip:AddLine(L["Klick: Einstellungen"], C.grey[1], C.grey[2], C.grey[3])
-            GameTooltip:Show()
-        end)
-        a:SetScript("OnLeave", function(self)
-            self.hover = false
-            self:Paint()
-            GameTooltip:Hide()
-        end)
-        a:SetScript("OnClick", function(self)
-            S.Navigate(self.def.page, self.def.tab)
-        end)
-        table.insert(row.areas, a)
-    end
-    -- Größe und Zustand der Flächen aktualisieren; gibt die Zeilenhöhe zurück
-    function row:Update(width)
-        local w = math.floor(math.min(480, width - 8))
-        local h = math.floor(w * 9 / 16)
-        self.box:ClearAllPoints()
-        self.box:SetPoint("TOP", self, "TOP", 0, -2)
-        self.box:SetSize(w, h)
-        local pad = FOREVER and 8 or 4
-        for _, a in ipairs(self.areas) do
-            local d = a.def
-            if FindTab(d.page, d.tab) then
-                local on = false
-                for _, key in ipairs(d.keys) do
-                    local option = SwitchOption(key)
-                    if option and SafeGet(option) then on = true break end
-                end
-                a.active = on
-                local aw, ah = math.max(10, math.floor(d.w * w)), math.max(10, math.floor(d.h * h))
-                a:ClearAllPoints()
-                a:SetPoint("TOPLEFT", self.box, "TOPLEFT", math.max(pad, math.floor(d.x * w)),
-                    -math.max(pad, math.floor(d.y * h)))
-                a:SetSize(aw, ah)
-                a.text:SetText(L[d.label])
-                a.text:SetWidth(aw - 4)
-                a.hover = a:IsMouseOver() and true or false
-                a:Paint()
-                a:Show()
-            else
-                a:Hide()
-            end
-        end
-        self.caption:SetText(L["Klick auf eine Fläche öffnet ihre Einstellungen."])
-        return h + 26
-    end
-    return row
-end
 
 -- Zeile der Seite „Alle Anzeigen“: Name · Ort · Sichtbar/Aus; Klick springt zur Einstellung
 local function CreateDisplayRow()
@@ -2580,9 +2363,6 @@ local function Layout(items)
             end
             for bi = #item.buttons + 1, #el.buttons do el.buttons[bi]:Hide() end
             h = 44
-        elseif item.kind == "map" then
-            el = Take("map", CreateMapRow)
-            h = el:Update(width)
         elseif item.kind == "display" then
             el = Take("display", CreateDisplayRow)
             el:Fill(item, width)
@@ -3015,27 +2795,12 @@ local function AddOptionItems(items, options, skip, skip2)
     end
 end
 
--- Knopf „Tasten belegen“ (keybinds.lua), falls vorhanden
-local function KeybindStarter()
-    if type(ns.slashCommands) == "table" and type(ns.slashCommands.keys) == "function" then return ns.slashCommands.keys end
-    if type(ns.StartKeybindMode) == "function" then return ns.StartKeybindMode end
-    if type(ns.Keybinds) == "table" and type(ns.Keybinds.Start) == "function" then return ns.Keybinds.Start end
-end
-
 local function HomeItems(items)
-    table.insert(items, { kind = "heading", text = L["BILDSCHIRM"] })
-    table.insert(items, { kind = "map" })
     local quick = {
         { label = L["Bearbeitungsmodus"], enabled = not InCombat(),
             tip = L["Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein."],
             onClick = function() if not InCombat() and ns.EnterEditMode then ns.EnterEditMode() end end },
     }
-    local keys = KeybindStarter()
-    if keys then
-        table.insert(quick, { label = L["Tasten belegen"], enabled = not InCombat(),
-            tip = L["Über einen Knopf der stray-Aktionsleisten fahren und eine Taste drücken. Auch per /stray keys."],
-            onClick = function() if not InCombat() then pcall(keys) end end })
-    end
     table.insert(quick, { label = L["Profile"], tip = L["Profile exportieren und importieren."],
         onClick = function() S.Navigate("stray", "Profile") end })
     table.insert(items, { kind = "heading", text = L["SCHNELLZUGRIFF"] })
@@ -3543,16 +3308,6 @@ SlashCmdList["STRAY"] = function(msg)
     end
     if (msg == "edit" or msg == "bearbeiten") and ns.EnterEditMode then
         ns.EnterEditMode()
-        return
-    end
-    if msg == "keys" or msg == "tasten" then
-        local start = KeybindStarter()
-        if start then
-            local ok, err = pcall(start)
-            if not ok then geterrorhandler()(err) end
-        else
-            ns.Print(L["Tastenbelegung ist noch nicht verfügbar."])
-        end
         return
     end
     if frame:IsShown() then

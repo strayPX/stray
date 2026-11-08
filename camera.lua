@@ -84,8 +84,8 @@ local function ApplyMinimap(toggled)
     elseif not nativeWheel then
         Minimap:EnableMouseWheel(false)
     end
-    -- Aus: nicht selbst einblenden. Blizzard zeigt die Knöpfe beim Überfahren der Karte von allein
-    -- (bei eckiger stray-Karte bleiben sie aus); nur den Zoom-Zustand der Knöpfe angleichen.
+    -- Aus: nicht selbst einblenden. Blizzard zeigt die Knöpfe beim Überfahren der Karte von allein;
+    -- nur den Zoom-Zustand der Knöpfe angleichen.
     if on then
         for _, button in pairs(zoomButtons) do pcall(button.Hide, button) end
     else

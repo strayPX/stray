@@ -3,7 +3,7 @@
 -- Typen: b (1/0), n (Zahl), s (Text, Sonderzeichen als %XX maskiert).
 -- Inhalt: alle Optionen aus dem Register, alle weiteren einfachen Werte aus ns.db, die ein
 -- Modul in ns.defaults anmeldet (außer Charakter-/Verlaufsdaten), Positionen (pos.*),
--- Größen je Anzeige (scale.*), Minimap-Winkel und Werkzeugleisten-Punkt.
+-- Größen je Anzeige (scale.*) und Werkzeugleisten-Punkt.
 
 local _, ns = ...
 local L = ns.L
@@ -102,7 +102,7 @@ end
 local NO_EXPORT_DB = {
     point = true, uiSize = true,
     altData = true, playerNoteData = true, mailAltList = true, flightRouteTimes = true,
-    accountCVarData = true, bagPinned = true, cdCVarByStray = true,
+    accountCVarData = true,
     flightTimer = true, flightTimes = true,
 }
 
@@ -203,7 +203,7 @@ local function IsGenericKey(key, byKey, blocked)
     if type(key) ~= "string" or not key:match("^%a[%w_]*$") then return false end
     if blocked[key] and not ALLOW_CHOICE[key] then return false end
     if byKey[key] or SKIP_KEYS[key] or NO_EXPORT_DB[key] then return false end
-    if POSITION_KEYS[key] or key == "positions" or key == "scales" or key == "minimapAngle" then return false end
+    if POSITION_KEYS[key] or key == "positions" or key == "scales" then return false end
     if ENUMS[key] then return true end
     if IsHistoryKey(key) then return false end
     local default = ns.defaults[key]
@@ -274,9 +274,6 @@ local function BuildExport()
         end
     end
 
-    if IsFinite(db.minimapAngle) then
-        table.insert(parts, "minimapAngle=n:" .. FormatNumber(Round1(db.minimapAngle)))
-    end
     for _, key in ipairs({ "editBarPoint" }) do
         local pos = EncodePosition(db[key])
         if pos then table.insert(parts, key .. "=s:" .. pos) end
@@ -440,16 +437,6 @@ local function ParseImport(text)
                     result.invalid = result.invalid + 1
                 elseif value ~= current then
                     table.insert(result.changes, { option = option, value = value })
-                end
-            elseif key == "minimapAngle" then
-                seen[key] = true
-                if type(value) ~= "number" then
-                    result.invalid = result.invalid + 1
-                else
-                    value = value % 360
-                    if not IsFinite(db.minimapAngle) or Round1(db.minimapAngle) ~= Round1(value) then
-                        table.insert(result.changes, { dbKey = "minimapAngle", value = value })
-                    end
                 end
             elseif POSITION_KEYS[key] or posKey then
                 seen[key] = true

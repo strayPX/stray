@@ -6,7 +6,7 @@ ns.name = ADDON_NAME
 -- Version der Lua-Dateien. Beim Release zusammen mit „## Version:“ in stray.toc anheben:
 -- WoW liest die toc nur beim Spielstart, der Vergleich beider Werte zeigt, ob nach einem Update
 -- ein kompletter Neustart nötig ist (siehe PLAYER_LOGIN unten).
-ns.VERSION = "1.1.0"
+ns.VERSION = "2.0.0"
 local L = ns.L
 
 ns.defaults = {
@@ -39,37 +39,8 @@ ns.defaults = {
     dmMode = "damage", -- "damage" oder "healing"
     dmWidth = 230,
     dmHeight = 190,
-    -- Gruppenrahmen
-    partyFrames = false,
-    partyHideBlizzard = false,
-    partyWidth = 96,
-    partyHeight = 42,
-    partySpacing = 4,
-    partyBrightness = 60,
-    -- Oberfläche (hud.lua)
-    hudMinimapColumn = false,
-    hudClock = false,
-    hudXPBar = false,
-    -- Aktionsleisten (actionbars.lua)
-    abEnabled = false,
-    abSize = 36,
-    abSpacing = 2,
-    abKeybinds = true,
-    -- je Leiste 1–5: anzeigen, Knopfgröße, Knöpfe pro Reihe (Standard: Leisten 1–4 an, 12 pro Reihe)
-    abShow1 = true, abShow2 = true, abShow3 = true, abShow4 = true, abShow5 = false,
-    abSize1 = 36, abSize2 = 36, abSize3 = 36, abSize4 = 36, abSize5 = 36,
-    abCols1 = 12, abCols2 = 12, abCols3 = 12, abCols4 = 12, abCols5 = 12,
-    -- Abklingzeiten (cooldowns.lua)
-    cdManager = false,
-    cdSize = 36,
-    -- Taschenfenster (bagwindow.lua)
-    bagWindow = false,
-    bagColumns = 10,
-    bagPinned = {},
     updateNotice = true, -- Chat-Hinweis nach einem Update (Reload oder Neustart)
     -- lastVersion: zuletzt gesehene Version, wird beim ersten Login gesetzt (kein Standardwert)
-    minimapButton = true, -- Ausnahme: anfangs an, weil der Knopf der Zugang zum Fenster ist
-    minimapAngle = 225,
     threatList = false,
     threatPlates = false,
     threatPercent = false,
@@ -79,10 +50,36 @@ ns.defaults = {
     scales = {},    -- Größe je Anzeige aus dem Bearbeitungsmodus: [Schlüssel] = Faktor (0.5–2), fehlt = 1
 }
 
--- Einstellungen, die es nicht mehr gibt (Flugzeit 0.4.0-alpha, Questtracker nach 1.0.0)
+-- Einstellungen, die es nicht mehr gibt (Flugzeit 0.4.0-alpha, Questtracker nach 1.0.0,
+-- eigene Oberfläche mit 2.0.0: Aktionsleisten, Abklingzeiten, Taschenfenster, Gruppenrahmen, Minimap,
+-- Taschen-/Menü-/Erfahrungsleiste, Swing-Timer, Vorrat, stray-Minimap-Knopf, EP-Tracker-Zeile)
 local REMOVED_KEYS = { "flightTimer", "flightTimes", "questTracker", "questTrackerAlpha", "questTrackerCollapsed", "questTrackerGroup",
     "questTrackerHeight", "questTrackerHideBlizzard", "questTrackerRecipes", "questTrackerRecipesCollapsed", "questTrackerShowAll",
-    "questTrackerSort", "questTrackerTop", "questTrackerWidth", "questTrackerZones" }
+    "questTrackerSort", "questTrackerTop", "questTrackerWidth", "questTrackerZones",
+    -- Aktionsleisten, Tastenbelegung (actionbars.lua, keybinds.lua)
+    "abEnabled", "abSize", "abSpacing", "abKeybinds", "abEmptyAlpha", "abRankCheck", "abShowEmpty",
+    "abShow1", "abShow2", "abShow3", "abShow4", "abShow5", "abSize1", "abSize2", "abSize3", "abSize4", "abSize5",
+    "abCols1", "abCols2", "abCols3", "abCols4", "abCols5",
+    -- Abklingzeiten (cooldowns.lua)
+    "cdManager", "cdSize", "cdCVarByStray",
+    -- Oberfläche (hud.lua): Taschen-/Menüleiste, Erfahrungsleiste, Minimap-Spalte, Uhr
+    "strayUI", "strayUIMigrated", "bottomBar", "bottomBarSize", "bottomMicroButtons", "hudMicroBar", "hudClock",
+    "hudMinimapColumn", "hudTrackingButton", "hudXPBar", "questXPBar", "xpBarWidth", "xpBarHeight", "xpBarFontSize",
+    "minimapMiddleMenu", "minimapShowPlayerCoords", "squareMinimap", "squareMinimapSize",
+    -- Taschenfenster (bagwindow.lua)
+    "bagWindow", "bagColumns", "bagHeight", "bagPinned", "bagSlotsBar", "bagSlotsBarAuto",
+    -- Gruppenrahmen (party.lua)
+    "partyFrames", "partyHideBlizzard", "partyWidth", "partyHeight", "partySpacing", "partyBrightness",
+    "partyPets", "partyPetAnchor", "partyPetWidth", "partyPetHeight",
+    -- stray-Minimap-Knopf (minimap.lua)
+    "minimapButton", "minimapAngle",
+    -- Swing-Timer (swing.lua), Vorrat (supplies.lua)
+    "swingTimer", "swingRanged", "swingWidth", "supplies", "supAmmo", "supBuffs", "supFood", "supReagents", "supThreshold",
+    -- EP-Tracker: Zeile an der Erfahrungsleiste entfällt, die Tabelle ist jetzt der EP-Tracker selbst
+    "xpTrackerTable" }
+
+-- Positionen und Größen der entfernten Anzeigen (ns.db.positions / ns.db.scales)
+local REMOVED_POSITIONS = { "ab1", "ab2", "ab3", "ab4", "ab5", "bagwindow", "cooldowns", "xpbar", "microbar", "party", "supplies", "swing" }
 
 ns.GOLD = { 1, 0.82, 0 }
 ns.GOLD_DARK = { 0.79, 0.64, 0.29 }
@@ -144,6 +141,10 @@ ns.On("ADDON_LOADED", function(name)
     end
     for _, key in ipairs(REMOVED_KEYS) do
         strayDB[key] = nil
+    end
+    for _, key in ipairs(REMOVED_POSITIONS) do
+        if type(strayDB.positions) == "table" then strayDB.positions[key] = nil end
+        if type(strayDB.scales) == "table" then strayDB.scales[key] = nil end
     end
     ns.db = strayDB
     -- Stil-Palette zuerst, damit alle folgenden Handler und Module die gewählten Farben sehen
@@ -243,7 +244,7 @@ end
 
 -- Größe je Anzeige (ns.db.scales[strayKey]) anwenden. Ohne Eintrag bleibt der Maßstab unberührt,
 -- außer stray hat die Anzeige vorher vergrößert/verkleinert: dann zurück auf 1.
--- Geschützte Rahmen (z. B. Aktionsleisten) nur außerhalb des Kampfes.
+-- Geschützte Rahmen nur außerhalb des Kampfes.
 local scaled = {} -- [frame] = true, solange stray einen Maßstab ungleich 1 gesetzt hat
 
 function ns.ApplyScale(frame)

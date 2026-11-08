@@ -3,11 +3,11 @@
 -- verschiebbar: lila Fläche mit Namen darüber, ziehen zum Verschieben, Shift + Rechtsklick setzt eine
 -- Anzeige ganz auf Standard zurück (einfacher Rechtsklick tut nichts, kein Versehen). Oben mittig eine
 -- schlanke, verschiebbare Werkzeugleiste (seit 0.23): „Bearbeiten · Zurück · ☐ Raster · ☑ Einrasten ·
--- Alles zurücksetzen · Tasten belegen · Fertig“, darunter eine kompakte Hinweiszeile.
+-- Alles zurücksetzen · Fertig“, darunter eine kompakte Hinweiszeile.
 -- Die gewählte Anzeige trägt einen lila Umriss mit Eck-Griffen; ns.EditSelected / ns.OnEditSelect melden
 -- die Auswahl an ui.lua. Anzeigen dürfen jederzeit dazukommen oder verschwinden (Flächen je Eintrag).
 -- Esc beendet den Modus (Leiste steht in UISpecialFrames).
--- Nur außerhalb des Kampfes (die Gruppenrahmen hängen an Blizzards geschützten Rahmen).
+-- Nur außerhalb des Kampfes.
 --
 -- Rückgängig (seit Nachtrag 0.22.0-alpha): Jede Änderung (Ziehen, Pfeiltasten, X/Y, Größe %,
 -- Breite/Höhe, Zurücksetzen, Alles zurücksetzen) legt vorher einen Schnappschuss der betroffenen
@@ -1280,7 +1280,7 @@ end
 local function CreateBar()
     -- Benannt, damit die Leiste in UISpecialFrames stehen kann (Esc versteckt sie → Modus endet).
     -- Ist eine Anzeige gewählt, fängt das Fenster je Anzeige das Esc vorher ab (hebt nur die Auswahl auf).
-    -- Schlank nach Leons Vorlage: Bearbeiten · Zurück · ☐ Raster · ☑ Einrasten · ⟳ · Tasten belegen · Fertig
+    -- Schlank nach Leons Vorlage: Bearbeiten · Zurück · ☐ Raster · ☑ Einrasten · ⟳ · Fertig
     ForeverBorderColor()
     bar = CreateFrame("Frame", "strayEditBar", UIParent)
     bar:SetFrameStrata("FULLSCREEN_DIALOG")
@@ -1410,34 +1410,7 @@ local function CreateBar()
     end)
     x = x + reset:GetWidth() + 6
 
-    -- Tasten belegen (keybinds.lua): Modus beenden, dann Belegen starten
-    if ns.StartKeybindMode then
-        local keys = BaseButton(10, nil, BAR_BTN_H)
-        keys.text = Text(keys, BAR_FONT, C.textSide, FONT_BODY)
-        keys.text:SetPoint("CENTER")
-        keys.text:SetText(L["Tasten belegen"])
-        keys:SetWidth(math.floor(TextWidth(keys.text, L["Tasten belegen"], 7) + 20 + 0.5))
-        keys:SetScript("OnClick", function()
-            if InCombatLockdown() then return end
-            ExitEditMode()
-            if ns.StartKeybindMode then
-                local ok, err = pcall(ns.StartKeybindMode)
-                if not ok then geterrorhandler()(err) end
-            end
-        end)
-        keys:SetScript("OnEnter", function(self)
-            self.text:SetTextColor(1, 1, 1)
-            ShowTip(self, L["Tasten belegen"], L["Beendet den Bearbeitungsmodus und startet das Belegen: über einen Knopf der stray-Aktionsleisten fahren und eine Taste drücken. Auch per /stray keys."])
-        end)
-        keys:SetScript("OnLeave", function(self)
-            self.text:SetTextColor(C.textSide[1], C.textSide[2], C.textSide[3])
-            GameTooltip:Hide()
-        end)
-        Place(keys, x)
-        x = x + keys:GetWidth() + 10
-    else
-        x = x + 4
-    end
+    x = x + 4
     x = Dot(x)
 
     -- Fertig: dunkler Knopf mit lila Rand
@@ -1507,11 +1480,6 @@ function ns.EnterEditMode()
         ns.Print(L["Der Bearbeitungsmodus geht nur außerhalb des Kampfes."])
         return
     end
-    -- Nicht gleichzeitig mit der Tastenbelegung (beide nehmen die Tastatur)
-    if ns.KeybindModeActive and ns.KeybindModeActive() then
-        ns.Print(L["Erst die Tastenbelegung beenden (Speichern, Abbrechen oder Esc)."])
-        return
-    end
     if not bar then CreateBar() end
     if not grid then CreateGrid() end
     if strayFrame and strayFrame:IsShown() then strayFrame:Hide() end
@@ -1572,6 +1540,6 @@ ns.AddOption(3, "Bearbeiten", {
     label = L["Bearbeitungsmodus"],
     buttonText = L["Bearbeiten"],
     keywords = { "bearbeiten", "verschieben", "position", "größe", "skalierung", "edit mode", "move", "layout", "scale", "unlock" },
-    tooltip = L["Blendet alle eingeschalteten stray-Anzeigen ein und macht sie frei verschiebbar – ohne Shift. Klick wählt eine Anzeige aus: Daneben öffnet sich ein kleines Fenster mit X/Y (ab Bildschirmmitte), Größe in Prozent und – wo vorhanden – Breite und Höhe; Pfeiltasten schieben sie um 1 px, mit Shift um 10 px. Shift + Rechtsklick setzt eine Anzeige ganz auf Standard zurück. „Zurück“ oder Strg + Z macht den letzten Schritt rückgängig. Esc hebt die Auswahl auf, ein weiteres Esc oder „Fertig“ beendet den Modus. Die Leiste oben schaltet Raster und Einrasten an anderen Anzeigen und der Bildschirmmitte.\n\nBetrifft alle eingeschalteten stray-Anzeigen: Gruppenrahmen, Aktionsleisten, Abklingzeiten, Bedrohungsliste, DMG-Meter, Haltbarkeit, Erfahrungsleiste, Taschen- und Menüleiste, Taschenfenster, Swing-Timer, Vorrat, Flugzeit, Würfelfenster, Gefahr-Hinweis und die Warntexte. Geht nur außerhalb des Kampfes. Auch per /stray edit."],
+    tooltip = L["Blendet alle eingeschalteten stray-Anzeigen ein und macht sie frei verschiebbar – ohne Shift. Klick wählt eine Anzeige aus: Daneben öffnet sich ein kleines Fenster mit X/Y (ab Bildschirmmitte), Größe in Prozent und – wo vorhanden – Breite und Höhe; Pfeiltasten schieben sie um 1 px, mit Shift um 10 px. Shift + Rechtsklick setzt eine Anzeige ganz auf Standard zurück. „Zurück“ oder Strg + Z macht den letzten Schritt rückgängig. Esc hebt die Auswahl auf, ein weiteres Esc oder „Fertig“ beendet den Modus. Die Leiste oben schaltet Raster und Einrasten an anderen Anzeigen und der Bildschirmmitte.\n\nBetrifft alle eingeschalteten stray-Anzeigen: Bedrohungsliste, DMG-Meter, Haltbarkeit, EP-Tracker, Flugzeit, Würfelfenster, Gefahr-Hinweis und die Warntexte. Geht nur außerhalb des Kampfes. Auch per /stray edit."],
     onClick = function() ns.EnterEditMode() end,
 })

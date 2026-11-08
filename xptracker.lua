@@ -1,11 +1,8 @@
 -- stray – EP-Tracker: EP pro Stunde (Sitzung und letzte 10 Minuten), Zeit bis zum Levelaufstieg,
 -- Zeit auf der aktuellen Stufe, Gesamtspielzeit und Verlauf je Stufe (je Charakter gespeichert).
 --
--- Die Anzeige an der Erfahrungsleiste baut hud.lua; dieses Modul liefert nur die Daten:
---   ns.XPTracker.GetLine()        → kurzer Text („bis Level 1h 42m · EP/h 92k“) oder nil
---   ns.XPTracker.AddTooltip(tt)   → hängt die Einzelwerte an einen GameTooltip an
---   ns.XPTracker.OnChange(fn)     → fn() läuft, wenn sich die Zeile ändert (höchstens alle 5 s)
--- Dazu gibt es optional eine kleine verschiebbare Tabelle.
+-- Die Anzeige ist eine kleine verschiebbare Tabelle (Bearbeitungsmodus oder Shift + Ziehen);
+-- ns.XPTracker.AddTooltip(tt) hängt die Einzelwerte an deren Tooltip an.
 --
 -- Spielzeit: Quelle ist TIME_PLAYED_MSG (Gesamt + aktuelle Stufe). stray fragt sie einmal je
 -- Anmeldung ab (RequestTimePlayed). Damit die Antwort nicht als Chatzeile erscheint, wird das
@@ -18,7 +15,6 @@ local _, ns = ...
 local L = ns.L
 
 ns.defaults.xpTracker = false
-ns.defaults.xpTrackerTable = false
 -- ["Name-Realm"] = { level, played, playedAt, levelStart, levels = { [Stufe] = { played, duration, at } }, session = { start, xp, samples } }
 ns.defaults.xpHistory = {}
 
@@ -340,46 +336,10 @@ local function OnTimePlayed(total, thisLevel)
 end
 
 ---------------------------------------------------------------------------
--- Zeile und Benachrichtigung
----------------------------------------------------------------------------
-
-local callbacks = {}
-local lastLine = nil
-
-local function BuildLine()
-    if not Enabled() or AtMaxLevel() then return nil end
-    local entry = Entry()
-    if not entry then return nil end
-    local seconds, rate = TimeToLevel(entry)
-    if not rate or rate <= 0 then return nil end
-    return L("bis Level %s · EP/h %s", Duration(seconds), ShortNumber(rate))
-end
-
-local function Notify(force)
-    local ok, line = pcall(BuildLine)
-    if not ok then line = nil end
-    if not force and line == lastLine then return end
-    lastLine = line
-    for _, fn in ipairs(callbacks) do
-        local okCall, err = pcall(fn, line)
-        if not okCall then geterrorhandler()(err) end
-    end
-end
-
----------------------------------------------------------------------------
 -- Öffentliche Schnittstelle
 ---------------------------------------------------------------------------
 
 ns.XPTracker = {}
-
-function ns.XPTracker.GetLine()
-    local ok, line = pcall(BuildLine)
-    return ok and line or nil
-end
-
-function ns.XPTracker.OnChange(fn)
-    if type(fn) == "function" then callbacks[#callbacks + 1] = fn end
-end
 
 local function SortedLevels(entry)
     local list = {}
@@ -511,7 +471,7 @@ panel:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end
 local SAMPLE = { session = "84k", recent = "92k", toLevel = "1h 42m", onLevel = "38m", played = "2T 7h" }
 
 local function UpdatePanel()
-    if not Enabled() or not ns.db.xpTrackerTable then panel:Hide() return end
+    if not Enabled() then panel:Hide() return end
     title:SetText(L["EP-Tracker"]) -- zur Anzeigezeit, damit die gewählte Sprache greift
     local entry = Entry()
     local values = {}
@@ -568,7 +528,6 @@ local sessionFresh = false -- Sitzung gehört zu dieser Anmeldung (oder lief üb
 
 local function Tick()
     pcall(UpdatePanel)
-    Notify(false)
 end
 
 local function Apply()
@@ -585,7 +544,6 @@ local function Apply()
         ticker = nil
     end
     pcall(UpdatePanel)
-    Notify(true)
 end
 
 local loggedIn = false
@@ -629,29 +587,14 @@ end)
 ns.AddOption(3, SECTION, {
     key = "xpTracker",
     label = L["EP-Tracker"],
-    tooltip = L["Zeigt an der Erfahrungsleiste, wie lange es noch bis zum Levelaufstieg dauert und "
-        .. "wie viele EP pro Stunde du bekommst.\n\n"
-        .. "Im Tooltip der Leiste: EP/h der Sitzung und der letzten 10 Minuten, Zeit auf der Stufe, "
-        .. "Gesamtspielzeit und die letzten Stufen mit ihrer Dauer. Der Verlauf wird je Charakter gespeichert.\n\n"
-        .. "Beim Einloggen fragt stray einmal die Spielzeit ab (wie /played), ohne Chatzeile. "
-        .. "Auf Höchststufe bleibt die Zeile an der Leiste leer."],
+    tooltip = L["Kleine Tabelle mit EP/h (Sitzung und letzte 10 Minuten), Zeit bis zum Levelaufstieg, Zeit auf der Stufe und Spielzeit.\n\n"
+        .. "Shift + Ziehen verschiebt sie, ebenso der Bearbeitungsmodus. Im Tooltip der Tabelle stehen zusätzlich "
+        .. "gesamte Spielzeit und die letzten Stufen mit ihrer Dauer. Der Verlauf wird je Charakter gespeichert.\n\n"
+        .. "Beim Einloggen fragt stray einmal die Spielzeit ab (wie /played), ohne Chatzeile."],
     keywords = { "xp", "ep", "exp", "experience", "erfahrung", "level", "stufe", "levelup",
-        "xp/h", "ep/h", "tracker", "playtime", "played", "spielzeit" },
+        "xp/h", "ep/h", "tracker", "playtime", "played", "spielzeit", "tabelle", "table" },
     set = function(value)
         ns.db.xpTracker = value
         Apply()
-    end,
-})
-
-ns.AddOption(3, SECTION, {
-    key = "xpTrackerTable",
-    label = L["EP-Tracker als Tabelle"],
-    tooltip = L["Kleine Tabelle mit EP/h, Zeit bis zum Levelaufstieg, Zeit auf der Stufe und Spielzeit.\n\n"
-        .. "Shift + Ziehen verschiebt sie, ebenso der Bearbeitungsmodus. Braucht den EP-Tracker."],
-    keywords = { "xp", "ep", "exp", "level", "stufe", "playtime", "spielzeit", "tabelle", "table", "tracker" },
-    isEnabled = function() return ns.db and ns.db.xpTracker and true or false end,
-    set = function(value)
-        ns.db.xpTrackerTable = value
-        pcall(UpdatePanel)
     end,
 })

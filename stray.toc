@@ -4,7 +4,7 @@
 ## Notes: All-in-one quality-of-life addon for WoW Forever – type /stray.
 ## Notes-deDE: Komfort-Optionen per /stray – Beute, Händler, Taschen, Chat, Quests, Filmsequenzen, Bedrohung, Kamera, Interface, Sozial.
 ## Author: stray
-## Version: 1.1.0
+## Version: 2.0.0
 ## SavedVariables: strayDB
 ## X-Curse-Project-ID: 1790666
 
@@ -32,6 +32,7 @@ locale\enUS_20.lua
 locale\enUS_21.lua
 locale\enUS_22.lua
 locale\enUS_25.lua
+locale\enUS_26.lua
 stray.lua
 style.lua
 glow.lua
@@ -48,30 +49,21 @@ cinematics.lua
 threat.lua
 casting.lua
 damagemeter.lua
-party.lua
 editmode.lua
 profiles.lua
 camera.lua
-minimap.lua
-hud.lua
 xptracker.lua
-actionbars.lua
-keybinds.lua
-cooldowns.lua
-bagwindow.lua
 interface.lua
 social.lua
 vendor.lua
 triage.lua
 questmobs.lua
 danger.lua
-swing.lua
 notes.lua
 alts.lua
 accountui.lua
 mail.lua
 trainer.lua
-supplies.lua
 rolls.lua
 flight.lua
 ui.lua

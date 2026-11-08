@@ -54,7 +54,7 @@ local function ApiAvailable() return HAS_API end
 -- Maße, Farben, Schrift (wie das stray-Fenster)
 ---------------------------------------------------------------------------
 
--- Design „Variante 1 – flach wie die Gruppenrahmen“ (Leon 07.11.2026)
+-- Design „Variante 1 – flach“ (Leon 07.11.2026)
 local DEFAULT_W, DEFAULT_H = 230, 190
 local MIN_W, MIN_H, MAX_W, MAX_H = 160, 80, 600, 500
 local MAX_ROWS = 20 -- höchstens so viele Balken, egal wie hoch das Fenster ist
@@ -184,7 +184,7 @@ local function Text(parent, size, c, font, flags)
     return fs
 end
 
--- Schrift mit Schatten (wie die Namen der Gruppenrahmen)
+-- Schrift mit Schatten
 local function ShadowText(parent, size, c, font)
     local fs = Text(parent, size, c, font or FONT_BODY)
     fs:SetShadowColor(0, 0, 0, 1)
@@ -225,10 +225,10 @@ local function IconButton(parent, file)
     return b
 end
 
--- Klassenfarbe, abgedunkelt wie die Gruppenrahmen („Helligkeit der Balken“, Standard 60 %)
+-- Klassenfarbe, auf 60 % abgedunkelt (flach, nicht grell)
+local BAR_BRIGHTNESS = 0.6
 local function BarColor(class)
-    local f = tonumber(ns.db and ns.db.partyBrightness) or 60
-    f = math.max(0, math.min(100, f)) / 100
+    local f = BAR_BRIGHTNESS
     local color = class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[class]
     if color then return color.r * f, color.g * f, color.b * f end
     return 0.5 * f, 0.5 * f, 0.5 * f
@@ -510,7 +510,7 @@ end
 local function FillRow(bar, entry, max)
     SetName(bar.name, entry.name)
 
-    -- Flach in Klassenfarbe, abgedunkelt wie die Gruppenrahmen (Klasse ist nie versiegelt)
+    -- Flach in Klassenfarbe, abgedunkelt (Klasse ist nie versiegelt)
     bar:SetStatusBarColor(BarColor(entry.class))
 
     if not pcall(bar.SetMinMaxValues, bar, 0, max) then bar:SetMinMaxValues(0, 1) end
@@ -2008,7 +2008,7 @@ end
 ns.AddOption(2, "DMG-Meter", {
     key = "dmShow",
     label = L["DMG-Meter anzeigen"],
-    tooltip = L["Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (so hell wie die Gruppenrahmen), dein eigener Balken hat links einen lila Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit den Symbolen Schwerter und Herz zwischen Schaden und Heilung um, das Zahnrad öffnet diese Einstellungen; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben."],
+    tooltip = L["Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (abgedunkelt), dein eigener Balken hat links einen lila Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit den Symbolen Schwerter und Herz zwischen Schaden und Heilung um, das Zahnrad öffnet diese Einstellungen; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("dmShow"),

@@ -1,7 +1,7 @@
 -- stray – Warnung bei Konflikten mit anderen Addons
 --
--- Manche stray-Optionen machen dasselbe wie ein anderes beliebtes Addon (Taschen, Aktionsleisten,
--- Minimap, Gruppenrahmen …). Ist so ein Addon geladen, fragt stray vor dem Einschalten nach und
+-- Manche stray-Optionen machen dasselbe wie ein anderes beliebtes Addon (Beute, Quests,
+-- Händler, Schadensmesser …). Ist so ein Addon geladen, fragt stray vor dem Einschalten nach und
 -- zeigt an der Option dauerhaft einen Hinweis. stray ändert nie Einstellungen anderer Addons;
 -- ob die Funktion dort an ist, wird nur gelesen, wo das sicher geht (sonst „falls …“-Hinweis).
 --
@@ -69,41 +69,11 @@ local function Leatrix(setting)
     end
 end
 
--- ElvUI: Module lassen sich in den privaten Einstellungen abschalten (ElvUI[1] = Engine)
-local function ElvUI(...)
-    local path = { ... }
-    return function()
-        local E = Read(_G.ElvUI, 1)
-        if type(E) ~= "table" then return nil end
-        return Bool(Read(E, unpack(path)))
-    end
-end
-
-local function ElvUIParty()
-    local E = Read(_G.ElvUI, 1)
-    if type(E) ~= "table" then return nil end
-    local module = Bool(Read(E, "private", "unitframe", "enable"))
-    if module == false then return false end
-    local party = Bool(Read(E, "db", "unitframe", "units", "party", "enable"))
-    if party ~= nil then return party end
-    return module
-end
-
 ---------------------------------------------------------------------------
 -- Hinweistexte (deutscher Text = Übersetzungsschlüssel, zur Anzeigezeit mit L[...] geholt)
 ---------------------------------------------------------------------------
 
-local HINT_BAGS = "Zwei Taschenfenster öffnen sich dann gleichzeitig oder überdecken sich. Nutze nur eins: entweder das stray-Taschenfenster oder das andere Addon."
-local HINT_BAGS_ELVUI = "Falls in ElvUI das Taschen-Modul an ist, öffnen sich zwei Taschenfenster. Schalte es in ElvUI unter Taschen aus oder lass das stray-Taschenfenster aus."
 local HINT_METER = "Beide zeigen Werte aus Blizzards Schadensmesser. Das schadet nicht, kostet aber Platz – meist reicht eins."
-local HINT_BARS = "Beide verstecken Blizzards Leisten und legen eigene Knöpfe auf dieselben Aktionsplätze. Das gibt doppelte Leisten und Ärger mit den Tasten. Nutze nur eins."
-local HINT_BARS_ELVUI = "Falls in ElvUI das Aktionsleisten-Modul an ist, gibt es doppelte Leisten. Schalte es in ElvUI unter Aktionsleisten aus oder lass die stray-Leisten aus."
-local HINT_BAGBAR = "Falls dort die Taschen- oder Menüleiste an ist, siehst du beide Leisten. Blende sie dort aus oder lass die stray-Leiste aus."
-local HINT_MINIMAP = "Form, Rahmen und Position der Minimap setzen dann zwei Addons – sie kann springen oder schief sitzen. Nutze nur eins."
-local HINT_MINIMAP_ELVUI = "Falls in ElvUI das Minimap-Modul an ist, kämpfen beide um die Minimap. Schalte es in ElvUI unter Karten aus oder lass die eckige stray-Minimap aus."
-local HINT_MINIMAP_LEATRIX = "Schalte in Leatrix Plus unter Interface „Enhance minimap“ aus, sonst kämpfen beide um Form und Position der Minimap."
-local HINT_PARTY = "Falls du dort Gruppenrahmen nutzt, erscheint deine Gruppe doppelt. Blende die Gruppe dort aus oder lass die stray-Gruppenrahmen aus."
-local HINT_PARTY_ELVUI = "Falls in ElvUI die Gruppenrahmen an sind, erscheint deine Gruppe doppelt. Schalte sie in ElvUI unter Einheitenfenster → Gruppe aus oder lass die stray-Gruppenrahmen aus."
 local HINT_LOOT = "Zwei Addons greifen dann gleichzeitig nach der Beute – das kann Fehlermeldungen oder hängende Beutefenster geben. Nutze nur eins."
 local HINT_LOOT_LEATRIX = "Schalte in Leatrix Plus unter Interface „Faster auto loot“ aus, sonst greifen beide gleichzeitig nach der Beute."
 local HINT_QUEST_QUESTIE = "Falls das in Questie (Optionen → Automatik) an ist, nehmen zwei Addons gleichzeitig an bzw. geben ab. Schalte es dort aus oder lass diese Option aus."
@@ -120,49 +90,12 @@ local function Add(key, entry)
     table.insert(Conflicts[key], entry)
 end
 
--- Taschenfenster
-for _, a in ipairs({ "Bagnon", "Baganator", "ArkInventory", "AdiBags", "BetterBags", "Sorted" }) do
-    Add("bagWindow", { addon = a, feature = "ersetzt ebenfalls Blizzards Taschen", hint = HINT_BAGS })
-end
-Add("bagWindow", { addon = "EllesmereUIBags", name = "EllesmereUI", feature = "Taschen-Modul", hint = HINT_BAGS })
-Add("bagWindow", { addon = "ElvUI", feature = "Taschen-Modul", hint = HINT_BAGS_ELVUI,
-    check = ElvUI("private", "bags", "enable") })
-
 -- DMG-Meter
 Add("dmShow", { addon = "Details", name = "Details!", feature = "eigener Schadensmesser", hint = HINT_METER })
 for _, a in ipairs({ "Skada", "Recount" }) do
     Add("dmShow", { addon = a, feature = "eigener Schadensmesser", hint = HINT_METER })
 end
 Add("dmShow", { addon = "EllesmereUIDamageMeters", name = "EllesmereUI", feature = "eigener Schadensmesser", hint = HINT_METER })
-
--- Eigene Aktionsleisten
-for _, a in ipairs({ "Bartender4", "Dominos" }) do
-    Add("abEnabled", { addon = a, feature = "ersetzt ebenfalls die Aktionsleisten", hint = HINT_BARS })
-end
-Add("abEnabled", { addon = "EllesmereUIActionBars", name = "EllesmereUI", feature = "Aktionsleisten-Modul", hint = HINT_BARS })
-Add("abEnabled", { addon = "ElvUI", feature = "Aktionsleisten-Modul", hint = HINT_BARS_ELVUI,
-    check = ElvUI("private", "actionbar", "enable") })
-
--- Taschenleiste unten rechts (Bartender4/Dominos bringen eigene Taschen- und Menüleisten mit)
-for _, a in ipairs({ "Bartender4", "Dominos" }) do
-    Add("bottomBar", { addon = a, feature = "eigene Taschen- und Menüleiste", hint = HINT_BAGBAR })
-end
-
--- Eckige Minimap
-for _, a in ipairs({ "SexyMap", "BasicMinimap" }) do
-    Add("squareMinimap", { addon = a, feature = "verändert ebenfalls die Minimap", hint = HINT_MINIMAP })
-end
-Add("squareMinimap", { addon = "EllesmereUIMinimap", name = "EllesmereUI", feature = "Minimap-Modul", hint = HINT_MINIMAP })
-Add("squareMinimap", { addon = "ElvUI", feature = "Minimap-Modul", hint = HINT_MINIMAP_ELVUI,
-    check = ElvUI("private", "general", "minimap", "enable") })
-Add("squareMinimap", { addon = "Leatrix_Plus", name = "Leatrix Plus", feature = "„Enhance minimap“", hint = HINT_MINIMAP_LEATRIX,
-    check = Leatrix("MinimapModder") })
-
--- Gruppenrahmen
-for _, a in ipairs({ "Grid2", "VuhDo", "Cell", "HealBot" }) do
-    Add("partyFrames", { addon = a, feature = "eigene Gruppen- und Heilrahmen", hint = HINT_PARTY })
-end
-Add("partyFrames", { addon = "ElvUI", feature = "Gruppenrahmen", hint = HINT_PARTY_ELVUI, check = ElvUIParty })
 
 -- Beute
 Add("fastLoot", { addon = "Leatrix_Plus", name = "Leatrix Plus", feature = "„Faster auto loot“", hint = HINT_LOOT_LEATRIX,
