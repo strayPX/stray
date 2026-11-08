@@ -1,4 +1,4 @@
-# Nach 1.0.0 (nächste Version)
+# stray 1.1.0
 
 **Neu**
 - **DMG-Meter durchsichtig mit Symbol-Kopfzeile:** neue Option „Hintergrund-Deckkraft“ (0–100 %, Standard je Stil: „stray“ wie bisher, „Forever UI“ 0 % ohne Rahmen). Kopfzeile ohne Hintergrund: Titel weiß mit schwarzem Rand, rechts kleine graue Symbole statt Textknöpfen (Plus, Zurücksetzen, Schwerter/Herz für Schaden/Heilung, Zahnrad öffnet die DMG-Meter-Einstellungen, × bei Zusatzfenstern). Im Bearbeitungsmodus und beim Verschieben liegt eine halbdurchsichtige schwarze Fläche hinter dem Fenster.
@@ -8,6 +8,7 @@
 - Der laufende Rand um fehlende Vorrats-Symbole braucht weniger Leistung.
 - **Einstellungsfenster neu geordnet:** 6 Seiten nach dem Ort im Spiel (Leisten & Menü, Karte & Gruppe, Taschen & Handel, Kampf, Welt & Quests, stray) plus **Übersicht** mit **Bildschirmkarte** (Klick auf einen Bereich öffnet dessen Einstellungen), „Zuletzt geändert“ und die Seite **Alle Anzeigen**. Alle Optionen sind noch da.
 - **Taschenfenster und Taschen-/Menüleiste** im Stil „Forever UI“.
+- **Taschenplätze im Taschenfenster** (Rucksack und ausgerüstete Taschen) sind jetzt standardmäßig an.
 
 **Entfernt**
 - **stray-Questtracker** samt Berufsreagenzien-Abschnitt und Questgegenstand-Knöpfen. Blizzards Questverfolgung (oder Questie) zeigt wieder die Quests. Die Konfliktwarnung für Questie (Auto-Annehmen/Abgeben) bleibt.

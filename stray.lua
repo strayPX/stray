@@ -6,7 +6,7 @@ ns.name = ADDON_NAME
 -- Version der Lua-Dateien. Beim Release zusammen mit „## Version:“ in stray.toc anheben:
 -- WoW liest die toc nur beim Spielstart, der Vergleich beider Werte zeigt, ob nach einem Update
 -- ein kompletter Neustart nötig ist (siehe PLAYER_LOGIN unten).
-ns.VERSION = "1.0.0"
+ns.VERSION = "1.1.0"
 local L = ns.L
 
 ns.defaults = {
