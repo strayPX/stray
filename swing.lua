@@ -12,6 +12,7 @@
 -- ebenfalls nur während ein Schlag läuft. Alles ist aus, solange die Option aus ist.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.swingTimer = false
 ns.defaults.swingWidth = 200
@@ -22,7 +23,7 @@ local IsSecret = ns.IsSecret
 local SWING = Enum and Enum.PlayerSwingType
 local HAS_API = (type(C_SwingTimer) == "table" and type(SWING) == "table" and SWING.MainHand ~= nil
     and SWING.OffHand ~= nil and SWING.Ranged ~= nil) and true or false
-local NO_API = "Diese Spielversion meldet keine automatischen Schläge."
+local NO_API = L["Diese Spielversion meldet keine automatischen Schläge."]
 
 -- Füllung über Dauerobjekte (Midnight-Engine)
 local DIR = Enum and Enum.StatusBarTimerDirection
@@ -66,7 +67,9 @@ end
 
 -- 1.45 → „1,4“
 local function Seconds(s)
-    return (("%.1f"):format(s):gsub("%.", ","))
+    local text = ("%.1f"):format(s)
+    if not ns.isGerman then return text end
+    return (text:gsub("%.", ","))
 end
 
 ---------------------------------------------------------------------------
@@ -94,9 +97,9 @@ end
 local ROW_DEFS = {}
 if HAS_API then
     ROW_DEFS = {
-        { type = SWING.MainHand, tag = "Haupthand", fill = C.fill },
-        { type = SWING.OffHand, tag = "Nebenhand", fill = C.fillOH },
-        { type = SWING.Ranged, tag = "Fernkampf", fill = C.fillR },
+        { type = SWING.MainHand, tag = L["Haupthand"], fill = C.fill },
+        { type = SWING.OffHand, tag = L["Nebenhand"], fill = C.fillOH },
+        { type = SWING.Ranged, tag = L["Fernkampf"], fill = C.fillR },
     }
 end
 
@@ -256,7 +259,7 @@ local function ApplyPreview()
             if preview then
                 local share = (row.def.type == SWING.MainHand) and 0.6 or 0.3
                 row.bar:SetValue(share)
-                row.time:SetText(row.def.type == SWING.MainHand and "1,4" or "0,9")
+                row.time:SetText(Seconds(row.def.type == SWING.MainHand and 1.4 or 0.9))
             else
                 IdleRow(row)
             end
@@ -523,8 +526,8 @@ local function IsOn() return Enabled() end
 
 ns.AddOption(2, "Kampfhilfen", {
     key = "swingTimer",
-    label = "Swing-Timer",
-    tooltip = "Zeigt unter der Bildschirmmitte eine schmale Leiste je Waffe, die bis zu deinem nächsten automatischen Schlag von links nach rechts läuft, mit der Restzeit rechts. Haupthand immer, Nebenhand nur, wenn du mit zwei Waffen kämpfst.\n\nIst dein Ziel außer Reichweite, wird die Leiste rot und dunkler. Außerhalb des Kampfes und ohne laufenden Schlag ist sie unsichtbar.\n\nDie Zeiten meldet das Spiel selbst. Verschieben über den „Bearbeitungsmodus“ oder bei offenem stray-Fenster mit Shift + linker Maustaste.",
+    label = L["Swing-Timer"],
+    tooltip = L["Zeigt unter der Bildschirmmitte eine schmale Leiste je Waffe, die bis zu deinem nächsten automatischen Schlag von links nach rechts läuft, mit der Restzeit rechts. Haupthand immer, Nebenhand nur, wenn du mit zwei Waffen kämpfst.\n\nIst dein Ziel außer Reichweite, wird die Leiste rot und dunkler. Außerhalb des Kampfes und ohne laufenden Schlag ist sie unsichtbar.\n\nDie Zeiten meldet das Spiel selbst. Verschieben über den „Bearbeitungsmodus“ oder bei offenem stray-Fenster mit Shift + linker Maustaste."],
     isEnabled = function() return HAS_API end,
     disabledHint = NO_API,
     set = function(value)
@@ -536,11 +539,11 @@ ns.AddOption(2, "Kampfhilfen", {
 ns.AddOption(2, "Kampfhilfen", {
     key = "swingWidth",
     type = "slider",
-    label = "Breite Swing-Timer",
+    label = L["Breite Swing-Timer"],
     min = MIN_W, max = MAX_W, step = 10,
-    tooltip = "Breite der Swing-Timer-Leisten in Pixeln.",
+    tooltip = L["Breite der Swing-Timer-Leisten in Pixeln."],
     isEnabled = IsOn,
-    disabledHint = HAS_API and "Erst „Swing-Timer“ einschalten (weiter oben)." or NO_API,
+    disabledHint = HAS_API and L["Erst „Swing-Timer“ einschalten (weiter oben)."] or NO_API,
     set = function(v)
         ns.db.swingWidth = Clamp(v, MIN_W, MAX_W, 200)
         if Enabled() then Layout() end
@@ -549,10 +552,10 @@ ns.AddOption(2, "Kampfhilfen", {
 
 ns.AddOption(2, "Kampfhilfen", {
     key = "swingRanged",
-    label = "Fernkampf-Leiste",
-    tooltip = "Zeigt zusätzlich eine Leiste für Fernkampfschüsse (Automatischer Schuss der Jäger, Zauberstab), sobald eine Fernkampfwaffe angelegt ist.",
+    label = L["Fernkampf-Leiste"],
+    tooltip = L["Zeigt zusätzlich eine Leiste für Fernkampfschüsse (Automatischer Schuss der Jäger, Zauberstab), sobald eine Fernkampfwaffe angelegt ist."],
     isEnabled = IsOn,
-    disabledHint = HAS_API and "Erst „Swing-Timer“ einschalten (weiter oben)." or NO_API,
+    disabledHint = HAS_API and L["Erst „Swing-Timer“ einschalten (weiter oben)."] or NO_API,
     set = function(value)
         ns.db.swingRanged = value
         if Enabled() then WeaponsChanged() end

@@ -17,6 +17,7 @@
 -- oder verrechnet, sondern höchstens in pcall an Anzeige-Funktionen weitergereicht.
 
 local _, ns = ...
+local L = ns.L
 
 -- Veralteter Zauberrang (Option im Bereich „Zaubern“), neu ab 0.19.0-alpha
 ns.defaults.abRankCheck = false
@@ -138,7 +139,7 @@ local KEY_SHORT = {
     { "NUMPADPLUS", "N+" }, { "NUMPADMINUS", "N-" }, { "NUMPADMULTIPLY", "N*" },
     { "NUMPADDIVIDE", "N/" }, { "NUMPADDECIMAL", "N," }, { "NUMPAD", "N" },
     { "PAGEUP", "PU" }, { "PAGEDOWN", "PD" }, { "BACKSPACE", "Bks" }, { "SPACE", "Spc" },
-    { "INSERT", "Ins" }, { "DELETE", "Del" }, { "HOME", "Pos1" }, { "CAPSLOCK", "Caps" },
+    { "INSERT", "Ins" }, { "DELETE", "Del" }, { "HOME", L["Pos1"] }, { "CAPSLOCK", "Caps" },
 }
 
 local function ShortKey(key)
@@ -586,9 +587,9 @@ local function OnEnter(self)
         local higher = self.rankUp
         if higher and RankCheckOn() then
             if type(higher) == "number" then
-                GameTooltip:AddLine(("stray: höherer Rang bekannt (Rang %d)"):format(higher), 0.4, 1, 0.4)
+                GameTooltip:AddLine(L("stray: höherer Rang bekannt (Rang %d)", higher), 0.4, 1, 0.4)
             else
-                GameTooltip:AddLine("stray: höherer Rang bekannt", 0.4, 1, 0.4)
+                GameTooltip:AddLine(L["stray: höherer Rang bekannt"], 0.4, 1, 0.4)
             end
         end
         GameTooltip:Show()
@@ -1198,9 +1199,9 @@ ns.OnConfig(function() if Enabled() then RequestAll() end end)
 ---------------------------------------------------------------------------
 
 StaticPopupDialogs["STRAY_AB_RELOAD"] = {
-    text = "stray: Blizzards Aktionsleisten kommen erst nach dem Neuladen zurück.\nJetzt neu laden?",
-    button1 = "Neu laden",
-    button2 = "Später",
+    text = L["stray: Blizzards Aktionsleisten kommen erst nach dem Neuladen zurück.\nJetzt neu laden?"],
+    button1 = L["Neu laden"],
+    button2 = L["Später"],
     OnAccept = function() ReloadUI() end,
     timeout = 0,
     whileDead = true,
@@ -1209,20 +1210,20 @@ StaticPopupDialogs["STRAY_AB_RELOAD"] = {
 }
 
 local function CombatNote()
-    if InCombatLockdown() then ns.Print("Aktionsleisten: Die Änderung gilt nach dem Kampf.") end
+    if InCombatLockdown() then ns.Print(L["Aktionsleisten: Die Änderung gilt nach dem Kampf."]) end
 end
 
 local function IsOn() return Enabled() end
 
-local DISABLED_HINT = "Erst „stray-Oberfläche“ und darunter „Eigene Aktionsleisten“ einschalten (Oberfläche → stray-Oberfläche)."
+local DISABLED_HINT = L["Erst „stray-Oberfläche“ und darunter „Eigene Aktionsleisten“ einschalten (Oberfläche → stray-Oberfläche)."]
 
 -- Veralteter Zauberrang: Option im Bereich „Zaubern“ (der Bereich „Aktionsleisten“ ist voll)
 ns.AddOption(2, "Zaubern", {
     key = "abRankCheck",
-    label = "Veralteten Zauberrang zeigen",
-    tooltip = "Markiert auf den stray-Aktionsleisten Zauber, von denen du schon einen höheren Rang kennst: kleiner grüner Pfeil oben links und im Tooltip die Zeile „stray: höherer Rang bekannt“ mit der Rangnummer.\n\nstray tauscht nichts aus – zieh den neuen Rang selbst aus dem Zauberbuch auf den Platz. Wer absichtlich einen niedrigen Rang nutzt (z. B. zum Manasparen), kann die Markierung einfach ignorieren.",
+    label = L["Veralteten Zauberrang zeigen"],
+    tooltip = L["Markiert auf den stray-Aktionsleisten Zauber, von denen du schon einen höheren Rang kennst: kleiner grüner Pfeil oben links und im Tooltip die Zeile „stray: höherer Rang bekannt“ mit der Rangnummer.\n\nstray tauscht nichts aus – zieh den neuen Rang selbst aus dem Zauberbuch auf den Platz. Wer absichtlich einen niedrigen Rang nutzt (z. B. zum Manasparen), kann die Markierung einfach ignorieren."],
     isEnabled = function() return RANK_API and Enabled() end,
-    disabledHint = RANK_API and DISABLED_HINT or "Diese Spielversion liefert die nötigen Zauberbuch-Daten nicht.",
+    disabledHint = RANK_API and DISABLED_HINT or L["Diese Spielversion liefert die nötigen Zauberbuch-Daten nicht."],
     set = function(value)
         ns.db.abRankCheck = value
         QueueRankScan()
@@ -1244,15 +1245,15 @@ function ns.ActionBarsToggled()
         pcall(ns.ShowBlizzardBarArt)
     end
     if blizzardHidden then
-        ns.Print("Blizzards Aktionsleisten kommen nach /reload zurück.")
+        ns.Print(L["Blizzards Aktionsleisten kommen nach /reload zurück."])
         StaticPopup_Show("STRAY_AB_RELOAD")
     end
 end
 
 ns.AddOption(2, "Aktionsleisten", {
     key = "abKeybinds",
-    label = "Tastenkürzel anzeigen",
-    tooltip = "Zeigt die Taste jedes Knopfs klein oben rechts (z. B. „S1“ für Umschalt+1).",
+    label = L["Tastenkürzel anzeigen"],
+    tooltip = L["Zeigt die Taste jedes Knopfs klein oben rechts (z. B. „S1“ für Umschalt+1)."],
     isEnabled = IsOn,
     disabledHint = DISABLED_HINT,
     set = function(value)
@@ -1264,9 +1265,9 @@ ns.AddOption(2, "Aktionsleisten", {
 ns.AddOption(2, "Aktionsleisten", {
     key = "abSpacing",
     type = "slider",
-    label = "Abstand",
+    label = L["Abstand"],
     min = 0, max = 10, step = 1,
-    tooltip = "Abstand zwischen den Knöpfen und zwischen den gestapelten Leisten in Pixeln (gilt für alle Leisten). Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Abstand zwischen den Knöpfen und zwischen den gestapelten Leisten in Pixeln (gilt für alle Leisten). Im Kampf wird die Änderung erst danach übernommen."],
     isEnabled = IsOn,
     disabledHint = DISABLED_HINT,
     set = function(v)
@@ -1278,8 +1279,8 @@ ns.AddOption(2, "Aktionsleisten", {
 
 ns.AddOption(2, "Aktionsleisten", {
     key = "abShowEmpty",
-    label = "Leere Plätze immer zeigen",
-    tooltip = "Zeigt leere Aktionsplätze dauerhaft als schwarze Fläche mit dünnem Rand, nicht nur bei offenem stray-Fenster. Die Deckkraft stellst du darunter ein.\n\nLeere Plätze fangen trotzdem keine Klicks ab. Ziehst du einen Zauber oder Gegenstand auf die Leiste, nehmen sie ihn wie gewohnt an (nicht im Kampf).",
+    label = L["Leere Plätze immer zeigen"],
+    tooltip = L["Zeigt leere Aktionsplätze dauerhaft als schwarze Fläche mit dünnem Rand, nicht nur bei offenem stray-Fenster. Die Deckkraft stellst du darunter ein.\n\nLeere Plätze fangen trotzdem keine Klicks ab. Ziehst du einen Zauber oder Gegenstand auf die Leiste, nehmen sie ihn wie gewohnt an (nicht im Kampf)."],
     isEnabled = IsOn,
     disabledHint = DISABLED_HINT,
     set = function(value)
@@ -1291,11 +1292,11 @@ ns.AddOption(2, "Aktionsleisten", {
 ns.AddOption(2, "Aktionsleisten", {
     key = "abEmptyAlpha",
     type = "slider",
-    label = "Deckkraft leerer Plätze",
+    label = L["Deckkraft leerer Plätze"],
     min = 0, max = 100, step = 5,
-    tooltip = "Wie deckend die schwarze Fläche leerer Plätze ist, in Prozent (0 = unsichtbar). Der Rand wird mit abgestuft.",
+    tooltip = L["Wie deckend die schwarze Fläche leerer Plätze ist, in Prozent (0 = unsichtbar). Der Rand wird mit abgestuft."],
     isEnabled = function() return Enabled() and ShowEmptyOn() end,
-    disabledHint = "Erst ‚Leere Plätze immer zeigen‘ einschalten (direkt darüber).",
+    disabledHint = L["Erst ‚Leere Plätze immer zeigen‘ einschalten (direkt darüber)."],
     set = function(v)
         ns.db.abEmptyAlpha = Clamp(v, 0, 100, 40)
         ForEach(UpdateVisibility)
@@ -1305,11 +1306,11 @@ ns.AddOption(2, "Aktionsleisten", {
 ns.AddOption(2, "Aktionsleisten", {
     key = "abEdit",
     type = "choice",
-    label = "Leiste bearbeiten",
+    label = L["Leiste bearbeiten"],
     values = { 1, 2, 3, 4, 5 },
     labels = { "1", "2", "3", "4", "5" },
     noExport = true,
-    tooltip = "Wählt die Leiste, die die drei Zeilen darunter einstellen. 1 Hauptleiste, 2 unten links, 3 unten rechts, 4 rechts, 5 rechts 2.",
+    tooltip = L["Wählt die Leiste, die die drei Zeilen darunter einstellen. 1 Hauptleiste, 2 unten links, 3 unten rechts, 4 rechts, 5 rechts 2."],
     isEnabled = IsOn,
     disabledHint = DISABLED_HINT,
     get = function() return selectedBar end,
@@ -1321,9 +1322,9 @@ ns.AddOption(2, "Aktionsleisten", {
 
 ns.AddOption(2, "Aktionsleisten", {
     key = "abShowSel",
-    label = "Leiste anzeigen",
+    label = L["Leiste anzeigen"],
     noExport = true,
-    tooltip = "Zeigt die gewählte Leiste an. Leiste 1 ersetzt die Hauptleiste, 2 die untere linke, 3 die untere rechte, 4 die rechte und 5 die Leiste „Rechts 2“.\n\nEine ausgeschaltete Leiste ist versteckt; ihre Tasten laufen dann über Blizzards unsichtbare Leiste weiter. Im Kampf gilt die Änderung erst danach.",
+    tooltip = L["Zeigt die gewählte Leiste an. Leiste 1 ersetzt die Hauptleiste, 2 die untere linke, 3 die untere rechte, 4 die rechte und 5 die Leiste „Rechts 2“.\n\nEine ausgeschaltete Leiste ist versteckt; ihre Tasten laufen dann über Blizzards unsichtbare Leiste weiter. Im Kampf gilt die Änderung erst danach."],
     isEnabled = IsOn,
     disabledHint = DISABLED_HINT,
     get = function() return ShowWanted(selectedBar) end,
@@ -1337,10 +1338,10 @@ ns.AddOption(2, "Aktionsleisten", {
 ns.AddOption(2, "Aktionsleisten", {
     key = "abSizeSel",
     type = "slider",
-    label = "Knopfgröße",
+    label = L["Knopfgröße"],
     min = 24, max = 56, step = 1,
     noExport = true,
-    tooltip = "Größe der Knöpfe der gewählten Leiste in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Größe der Knöpfe der gewählten Leiste in Pixeln. Im Kampf wird die Änderung erst danach übernommen."],
     isEnabled = IsOn,
     disabledHint = DISABLED_HINT,
     get = function() return BarSize(selectedBar) end,
@@ -1354,10 +1355,10 @@ ns.AddOption(2, "Aktionsleisten", {
 ns.AddOption(2, "Aktionsleisten", {
     key = "abColsSel",
     type = "slider",
-    label = "Knöpfe pro Reihe",
+    label = L["Knöpfe pro Reihe"],
     min = 1, max = NUM_BUTTONS, step = 1,
     noExport = true,
-    tooltip = "Wie viele Knöpfe der gewählten Leiste nebeneinander stehen; die übrigen bilden weitere Reihen (z. B. 6 → 2 Reihen, 4 → 3 Reihen). Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Wie viele Knöpfe der gewählten Leiste nebeneinander stehen; die übrigen bilden weitere Reihen (z. B. 6 → 2 Reihen, 4 → 3 Reihen). Im Kampf wird die Änderung erst danach übernommen."],
     isEnabled = IsOn,
     disabledHint = DISABLED_HINT,
     get = function() return BarCols(selectedBar) end,

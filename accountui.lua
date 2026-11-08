@@ -6,6 +6,7 @@
 -- schreibgeschützten oder gesperrten CVars. Im Kampf wird nichts gesetzt, sondern nachgeholt.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.accountCVars = false
 ns.defaults.accountCVarData = {} -- { source = "Name-Realm", time = Zeitpunkt, values = { [cvar] = Wert } }
@@ -201,7 +202,8 @@ local function Apply()
         applying = false
         if count > 0 then
             local source = data.source:match("^([^%-]+)") or data.source
-            ns.Print(("%d %s von %s übernommen."):format(count, count == 1 and "Einstellung" or "Einstellungen", source))
+            ns.Print(count == 1 and L("%d Einstellung von %s übernommen.", count, source)
+                or L("%d Einstellungen von %s übernommen.", count, source))
         end
     end
     ready = true
@@ -234,17 +236,17 @@ SafeOn("PLAYER_LOGOUT", Capture)
 
 ns.AddOption(3, "Charaktere", {
     key = "accountCVars",
-    label = "Interface-Einstellungen für alle Charaktere",
-    tooltip = "Manche Interface-Einstellungen speichert das Spiel je Charakter. stray merkt sie sich vom zuletzt gespielten Charakter und übernimmt sie beim Einloggen eines anderen.\nGrafik und Ton gelten ohnehin für den ganzen Rechner und bleiben unberührt. Im Kampf wird nichts geändert.",
+    label = L["Interface-Einstellungen für alle Charaktere"],
+    tooltip = L["Manche Interface-Einstellungen speichert das Spiel je Charakter. stray merkt sie sich vom zuletzt gespielten Charakter und übernimmt sie beim Einloggen eines anderen.\nGrafik und Ton gelten ohnehin für den ganzen Rechner und bleiben unberührt. Im Kampf wird nichts geändert."],
     set = function(value)
         ns.db.accountCVars = value
         if not value then return end
         local ok, n = pcall(CountCandidates)
         if not ok then return end
         if n == 0 then
-            ns.Print("Dieser Client speichert keine Interface-Einstellungen je Charakter – es gibt nichts zu übernehmen.")
+            ns.Print(L["Dieser Client speichert keine Interface-Einstellungen je Charakter – es gibt nichts zu übernehmen."])
         else
-            ns.Print(("%d Interface-Einstellungen werden je Charakter gespeichert und ab jetzt für alle übernommen."):format(n))
+            ns.Print(L("%d Interface-Einstellungen werden je Charakter gespeichert und ab jetzt für alle übernommen.", n))
         end
         -- Ab jetzt gilt dieser Charakter als Vorlage
         if ready then pcall(Capture) end

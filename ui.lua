@@ -9,6 +9,7 @@
 -- Symbole in media/icons: Tabler Icons (MIT-Lizenz, tabler.io).
 
 local _, ns = ...
+local L = ns.L
 
 ---------------------------------------------------------------------------
 -- Maße und Farben
@@ -467,7 +468,7 @@ searchIcon:SetTexture(ICONS .. "search")
 searchIcon:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1)
 local placeholder = Text(search, 13, C.faint)
 placeholder:SetPoint("LEFT", 30, 0)
-placeholder:SetText("Suchen …")
+placeholder:SetText(L["Suchen …"])
 search:SetScript("OnEditFocusGained", function() searchFill:SetColor(C.hover) end)
 search:SetScript("OnEditFocusLost", function() searchFill:SetColor(C.card) end)
 
@@ -523,7 +524,7 @@ local masterSwitch = MakeSwitch(master)
 masterSwitch:SetPoint("RIGHT")
 local masterLabel = Text(master, 13, C.grey)
 masterLabel:SetPoint("RIGHT", masterSwitch, "LEFT", -10, 0)
-masterLabel:SetText("Modul aktiv")
+masterLabel:SetText(L["Modul aktiv"])
 master:Hide()
 
 ---------------------------------------------------------------------------
@@ -671,13 +672,13 @@ footDot:SetTexture(MEDIA .. "dot")
 local footText = Text(content, 13, C.grey)
 footText:SetPoint("LEFT", footDot, "RIGHT", 8, 0)
 
-local applyButton = MakeButton(content, "Übernehmen & neu laden", "primary")
+local applyButton = MakeButton(content, L["Übernehmen & neu laden"], "primary")
 applyButton:SetPoint("BOTTOMRIGHT", -18, (FOOT_H - 30) / 2)
 
-local editButton = MakeButton(content, "Bearbeitungsmodus", "dark")
+local editButton = MakeButton(content, L["Bearbeitungsmodus"], "dark")
 editButton:SetPoint("RIGHT", applyButton, "LEFT", -8, 0)
 
-local discardButton = MakeButton(content, "Verwerfen", "dark")
+local discardButton = MakeButton(content, L["Verwerfen"], "dark")
 discardButton:SetPoint("RIGHT", editButton, "LEFT", -8, 0)
 
 ---------------------------------------------------------------------------
@@ -984,7 +985,7 @@ local function Revert()
     end
 
     if combat and hasPending then
-        ns.Print("Leisten und Rahmen werden nach dem Kampf zurückgesetzt.")
+        ns.Print(L["Leisten und Rahmen werden nach dem Kampf zurückgesetzt."])
     end
     if Refresh and frame:IsShown() then Refresh() end
 end
@@ -1019,9 +1020,9 @@ local function ShowTooltip(row)
         GameTooltip:AddLine(option.tooltip, ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
     end
     if option.type == "slider" then
-        GameTooltip:AddLine("Mausrad mit gedrückter Umschalttaste verstellt den Regler.", C.grey[1], C.grey[2], C.grey[3], true)
+        GameTooltip:AddLine(L["Mausrad mit gedrückter Umschalttaste verstellt den Regler."], C.grey[1], C.grey[2], C.grey[3], true)
     elseif option.type == "choice" and row.cycle and row.cycle:IsShown() then
-        GameTooltip:AddLine("Linksklick: weiter, Rechtsklick: zurück.", C.grey[1], C.grey[2], C.grey[3], true)
+        GameTooltip:AddLine(L["Linksklick: weiter, Rechtsklick: zurück."], C.grey[1], C.grey[2], C.grey[3], true)
     end
     if not OptionEnabled(option) and option.disabledHint then
         GameTooltip:AddLine(option.disabledHint, 1, 0.3, 0.3, true)
@@ -1047,7 +1048,7 @@ local function ShowPreview(option, row)
         preview:SetPoint("CENTER", scroll, "CENTER")
     end
     previewImage:SetTexture(MEDIA .. option.preview)
-    previewCaption:SetText("Beispielbild: " .. option.label)
+    previewCaption:SetText(L("Beispielbild: %s", option.label or ""))
     preview:Show()
 end
 
@@ -1088,9 +1089,9 @@ local function CreateRow()
     row.switch = switch
 
     -- „Vorschau“-Knopf für Optionen mit Beispielbild
-    local previewButton = MakeButton(row, "Vorschau", "dark", 20)
+    local previewButton = MakeButton(row, L["Vorschau"], "dark", 20)
     previewButton.text:SetFont(FONT, 11, "")
-    previewButton:SetLabel("Vorschau")
+    previewButton:SetLabel(L["Vorschau"])
     previewButton:SetPoint("RIGHT", switch, "LEFT", -10, 0)
     previewButton:SetScript("OnClick", function() if row.option then ShowPreview(row.option, row) end end)
     row.previewButton = previewButton
@@ -1429,8 +1430,9 @@ local function Layout(blocks)
         card:ClearAllPoints()
         card:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, -top)
         card:SetWidth(width)
-        card.name:SetText(block.name)
-        card.page:SetText(block.page and ("· " .. block.page) or "")
+        -- Bereichs- und Seitennamen bleiben deutsche Schlüssel, übersetzt wird erst hier
+        card.name:SetText(L[block.name])
+        card.page:SetText(block.page and ("· " .. L[block.page]) or "")
         card.count:SetText(#block.options)
         card.badge:SetWidth(math.max(20, math.floor(card.count:GetStringWidth() + 12)))
 
@@ -1486,7 +1488,9 @@ local function SearchData(option)
     data = {
         keywords = words,
         label = Lower(option.label),
-        rest = Lower((option.tooltip or "") .. " " .. section .. " " .. (pageOf[section] or "")),
+        -- Bereich und Seite deutsch und in der angezeigten Sprache, damit beides gefunden wird
+        rest = Lower((option.tooltip or "") .. " " .. section .. " " .. L[section] .. " "
+            .. (pageOf[section] or "") .. " " .. L[pageOf[section] or ""]),
     }
     searchCache[option] = data
     return data
@@ -1585,7 +1589,7 @@ local function BuildNav()
             if lastGroup then y = y - 8 end
             local g = Text(side, 10, C.faint)
             g:SetPoint("TOPLEFT", 20, y - 6)
-            g:SetText(page.group)
+            g:SetText(L[page.group])
             table.insert(groupLabels, g)
             y = y - 24
             lastGroup = page.group
@@ -1609,7 +1613,7 @@ local function BuildNav()
 
         b.text = Text(b, 14, C.text)
         b.text:SetPoint("LEFT", b.tile, "RIGHT", 10, 0)
-        b.text:SetText(page.name)
+        b.text:SetText(L[page.name])
 
         b.count = Text(b, 11, C.faint)
         b.count:SetPoint("RIGHT", -10, 0)
@@ -1649,11 +1653,11 @@ local function UpdateFooter()
     if n > 0 then
         footDot:SetVertexColor(C.amber[1], C.amber[2], C.amber[3], 1)
         SetTextColor(footText, C.text)
-        footText:SetText(n == 1 and "1 ungespeicherte Änderung" or (n .. " ungespeicherte Änderungen"))
+        footText:SetText(n == 1 and L["1 ungespeicherte Änderung"] or L("%d ungespeicherte Änderungen", n))
     else
         footDot:SetVertexColor(C.faint[1], C.faint[2], C.faint[3], 1)
         SetTextColor(footText, C.grey)
-        footText:SetText("Keine ungespeicherten Änderungen")
+        footText:SetText(L["Keine ungespeicherten Änderungen"])
     end
     local combat = InCombat()
     discardButton:SetActive(n > 0)
@@ -1700,16 +1704,16 @@ function Refresh()
     if searching then
         local count
         blocks, count = SearchResults(query)
-        groupLine:SetText("SUCHE")
-        title:SetText("„" .. query .. "“")
-        subtitle:SetText(count == 0 and "Nichts gefunden."
-            or (count == 1 and "1 Option gefunden." or (count .. " Optionen gefunden.")))
-        emptyText:SetText(count == 0 and "Versuch ein anderes Wort, z. B. „Taschen“, „aggro“ oder „xp“." or "")
+        groupLine:SetText(L["SUCHE"])
+        title:SetText(L("„%s“", query))
+        subtitle:SetText(count == 0 and L["Nichts gefunden."]
+            or (count == 1 and L["1 Option gefunden."] or L("%d Optionen gefunden.", count)))
+        emptyText:SetText(count == 0 and L["Versuch ein anderes Wort, z. B. „Taschen“, „aggro“ oder „xp“."] or "")
     else
         local page = FindPage(selected)
-        groupLine:SetText(page and page.group or "")
-        title:SetText(selected or "")
-        subtitle:SetText(PAGE_SUBTITLES[selected] or "")
+        groupLine:SetText(page and L[page.group] or "")
+        title:SetText(L[selected or ""])
+        subtitle:SetText(L[PAGE_SUBTITLES[selected] or ""])
         masterOption = MasterOption(page)
         if page then
             for _, name in ipairs(page.sections) do
@@ -1826,7 +1830,7 @@ Panel(dialog, 12, C.card, C.line, "BACKGROUND")
 
 local dialogTitle = Text(dialog, 16, C.white)
 dialogTitle:SetPoint("TOPLEFT", 20, -20)
-dialogTitle:SetText("Ungespeicherte Änderungen")
+dialogTitle:SetText(L["Ungespeicherte Änderungen"])
 
 local dialogText = Text(dialog, 13, C.grey)
 dialogText:SetPoint("TOPLEFT", dialogTitle, "BOTTOMLEFT", 0, -10)
@@ -1834,18 +1838,18 @@ dialogText:SetWidth(360)
 dialogText:SetWordWrap(true)
 dialogText:SetJustifyV("TOP")
 
-local dialogReload = MakeButton(dialog, "Neu laden", "primary")
+local dialogReload = MakeButton(dialog, L["Neu laden"], "primary")
 dialogReload:SetPoint("BOTTOMRIGHT", -16, 16)
-local dialogDiscard = MakeButton(dialog, "Verwerfen", "dark")
+local dialogDiscard = MakeButton(dialog, L["Verwerfen"], "dark")
 dialogDiscard:SetPoint("RIGHT", dialogReload, "LEFT", -8, 0)
-local dialogBack = MakeButton(dialog, "Zurück", "dark")
+local dialogBack = MakeButton(dialog, L["Zurück"], "dark")
 dialogBack:SetPoint("RIGHT", dialogDiscard, "LEFT", -8, 0)
 
 function dialog:Update(n)
-    local text = (n == 1 and "Du hast 1 Einstellung geändert." or ("Du hast " .. n .. " Einstellungen geändert."))
-        .. " „Neu laden“ übernimmt alles sicher, „Verwerfen“ stellt den Stand beim Öffnen wieder her."
+    local text = (n == 1 and L["Du hast 1 Einstellung geändert."] or L("Du hast %d Einstellungen geändert.", n))
+        .. " " .. L["„Neu laden“ übernimmt alles sicher, „Verwerfen“ stellt den Stand beim Öffnen wieder her."]
     if InCombat() then
-        text = text .. "\nIm Kampf: Leisten und Rahmen werden erst nach dem Kampf zurückgesetzt."
+        text = text .. "\n" .. L["Im Kampf: Leisten und Rahmen werden erst nach dem Kampf zurückgesetzt."]
     end
     dialogText:SetText(text)
     dialogReload:SetActive(not InCombat())
@@ -1873,8 +1877,8 @@ dialogReload:SetScript("OnClick", function(self)
     if self.inactive or InCombat() then return end
     ReloadUI()
 end)
-ButtonTooltip(dialogReload, "Neu laden", function()
-    return InCombat() and "Im Kampf nicht möglich." or "Lädt die Oberfläche neu und übernimmt alle Änderungen."
+ButtonTooltip(dialogReload, L["Neu laden"], function()
+    return InCombat() and L["Im Kampf nicht möglich."] or L["Lädt die Oberfläche neu und übernimmt alle Änderungen."]
 end)
 
 -- Fußzeilen-Knöpfe
@@ -1884,15 +1888,15 @@ discardButton:SetScript("OnClick", function(self)
     Revert()
     Refresh()
 end)
-ButtonTooltip(discardButton, "Verwerfen", "Setzt alle Einstellungen auf den Stand beim Öffnen des Fensters zurück und wendet sie sofort wieder an.")
+ButtonTooltip(discardButton, L["Verwerfen"], L["Setzt alle Einstellungen auf den Stand beim Öffnen des Fensters zurück und wendet sie sofort wieder an."])
 
 applyButton:SetScript("OnClick", function(self)
     if self.inactive or InCombat() then return end
     ReloadUI()
 end)
-ButtonTooltip(applyButton, "Übernehmen & neu laden", function()
-    return InCombat() and "Im Kampf nicht möglich."
-        or "Lädt die Oberfläche neu, damit alle Änderungen sicher übernommen werden."
+ButtonTooltip(applyButton, L["Übernehmen & neu laden"], function()
+    return InCombat() and L["Im Kampf nicht möglich."]
+        or L["Lädt die Oberfläche neu, damit alle Änderungen sicher übernommen werden."]
 end)
 
 editButton:SetScript("OnClick", function(self)
@@ -1900,7 +1904,7 @@ editButton:SetScript("OnClick", function(self)
     -- Fenster schließt sich für den Bearbeitungsmodus; ungespeicherte Änderungen bleiben gezählt
     if ns.EnterEditMode then ns.EnterEditMode() end
 end)
-ButtonTooltip(editButton, "Bearbeitungsmodus", "Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein. „Fertig“ oder Esc beendet den Modus. Auch per /stray edit.")
+ButtonTooltip(editButton, L["Bearbeitungsmodus"], L["Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein. „Fertig“ oder Esc beendet den Modus. Auch per /stray edit."])
 
 ns.On("PLAYER_REGEN_DISABLED", function() if frame:IsShown() then UpdateFooter() end end)
 ns.On("PLAYER_REGEN_ENABLED", function() if frame:IsShown() then UpdateFooter() end end)
@@ -1966,7 +1970,7 @@ end
 SLASH_STRAY1 = "/stray"
 SlashCmdList["STRAY"] = function(msg)
     if not ns.db then
-        ns.Print("noch nicht geladen.")
+        ns.Print(L["noch nicht geladen."])
         return
     end
     msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")

@@ -7,6 +7,7 @@
 -- Keine Felder auf Blizzard-Frames: Merker stehen in lokalen Tabellen mit dem Frame als Schlüssel.
 
 local _, ns = ...
+local L = ns.L
 
 local SECTION = "stray-Oberfläche"
 local SECTION_XP = "Erfahrung"
@@ -256,7 +257,7 @@ end
 friendsCell.count = Text(friendsCell, 10, FONT_BODY, "OUTLINE")
 friendsCell.count:SetPoint("BOTTOMRIGHT", friendsCell, "BOTTOMRIGHT", -1, 1)
 
-local BNET_CLIENT_NAMES = { App = "Battle.net", BSAp = "Battle.net (Handy)", WoW = "WoW" }
+local BNET_CLIENT_NAMES = { App = "Battle.net", BSAp = L["Battle.net (Handy)"], WoW = "WoW" }
 
 local function WowFriends()
     local list = {}
@@ -342,7 +343,7 @@ local MAX_LINES = 30
 
 friendsCell:HookScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, TooltipAnchor())
-    GameTooltip:AddLine("Freunde")
+    GameTooltip:AddLine(L["Freunde"])
     local favorites, others = {}, {}
     for _, entry in ipairs(BNetFriends()) do
         table.insert(entry.favorite and favorites or others, entry)
@@ -351,24 +352,24 @@ friendsCell:HookScript("OnEnter", function(self)
     local shown = 0
     if #favorites > 0 then
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Favoriten", C.accent[1], C.accent[2], C.accent[3])
+        GameTooltip:AddLine(L["Favoriten"], C.accent[1], C.accent[2], C.accent[3])
         for _, entry in ipairs(favorites) do
             if shown < MAX_LINES then FriendLine(entry) shown = shown + 1 end
         end
     end
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine("Freunde (" .. #others .. ")", C.accent[1], C.accent[2], C.accent[3])
+    GameTooltip:AddLine(L("Freunde (%d)", #others), C.accent[1], C.accent[2], C.accent[3])
     if #others == 0 then
-        GameTooltip:AddLine("Niemand online", C.textDim[1], C.textDim[2], C.textDim[3])
+        GameTooltip:AddLine(L["Niemand online"], C.textDim[1], C.textDim[2], C.textDim[3])
     end
     for _, entry in ipairs(others) do
         if shown < MAX_LINES then FriendLine(entry) shown = shown + 1 end
     end
     if #favorites + #others > shown then
-        GameTooltip:AddLine("… und " .. (#favorites + #others - shown) .. " weitere", C.textDim[1], C.textDim[2], C.textDim[3])
+        GameTooltip:AddLine(L("… und %d weitere", #favorites + #others - shown), C.textDim[1], C.textDim[2], C.textDim[3])
     end
     GameTooltip:AddLine(" ")
-    GoldLine("Linksklick: Freundesliste öffnen")
+    GoldLine(L["Linksklick: Freundesliste öffnen"])
     GameTooltip:Show()
 end)
 friendsCell:HookScript("OnLeave", function() GameTooltip:Hide() end)
@@ -537,7 +538,7 @@ function LayoutBag()
     if not addonBag.empty then
         addonBag.empty = Text(addonBag, 11)
         addonBag.empty:SetPoint("CENTER")
-        addonBag.empty:SetText("leer")
+        addonBag.empty:SetText(L["leer"])
         addonBag.empty:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
     end
     addonBag.empty:SetShown(#shown == 0)
@@ -576,12 +577,12 @@ end)
 
 bagCell:HookScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, TooltipAnchor())
-    GameTooltip:AddLine("Addon-Tasche")
+    GameTooltip:AddLine(L["Addon-Tasche"])
     local n = 0
     for _ in pairs(collected) do n = n + 1 end
-    GameTooltip:AddLine("Minimap-Knöpfe anderer Addons: " .. n, C.text[1], C.text[2], C.text[3])
-    GoldLine("Linksklick: auf- und zuklappen")
-    GameTooltip:AddLine("Leatrix Plus „Hide addon buttons“ verträgt sich nicht damit – dort ausschalten, wenn Knöpfe fehlen.",
+    GameTooltip:AddLine(L("Minimap-Knöpfe anderer Addons: %d", n), C.text[1], C.text[2], C.text[3])
+    GoldLine(L["Linksklick: auf- und zuklappen"])
+    GameTooltip:AddLine(L["Leatrix Plus „Hide addon buttons“ verträgt sich nicht damit – dort ausschalten, wenn Knöpfe fehlen."],
         C.textDim[1], C.textDim[2], C.textDim[3], true)
     GameTooltip:Show()
 end)
@@ -627,7 +628,7 @@ local function OpenTracking(anchor)
     if _G.MiniMapTrackingDropDown and ToggleDropDownMenu then
         if pcall(ToggleDropDownMenu, 1, nil, _G.MiniMapTrackingDropDown, anchor, 0, 0) then return true end
     end
-    ns.Print("Kein Verfolgungs-Menü gefunden.")
+    ns.Print(L["Kein Verfolgungs-Menü gefunden."])
     return false
 end
 
@@ -677,7 +678,7 @@ local function OpenTrackingMenu(owner)
     local list = TrackingList()
     if list and #list > 0 and MenuUtil and MenuUtil.CreateContextMenu then
         local ok = pcall(MenuUtil.CreateContextMenu, owner or Minimap, function(_, root)
-            root:CreateTitle("Verfolgung")
+            root:CreateTitle(L["Verfolgung"])
             for _, t in ipairs(list) do
                 local cb = root:CreateCheckbox(t.name, t.isSelected, t.toggle)
                 if cb and cb.SetResponse and MenuResponse and MenuResponse.Refresh then
@@ -697,7 +698,7 @@ local function OpenCalendar()
     if GameTimeFrame and GameTimeFrame.Click then
         if pcall(GameTimeFrame.Click, GameTimeFrame) then return end
     end
-    ns.Print("Kein Kalender gefunden.")
+    ns.Print(L["Kein Kalender gefunden."])
 end
 
 local function OpenWorldMap()
@@ -714,40 +715,40 @@ end
 -- schon geladen und nicht geschützt ist (nur für normale Knöpfe der unteren Leiste).
 -- micro: erscheint auch als Knopf in der Taschen- und Menüleiste.
 local MENU_ENTRIES = {
-    { key = "char", label = "Charakter", micro = true, secure = { "CharacterMicroButton" },
+    { key = "char", label = L["Charakter"], micro = true, secure = { "CharacterMicroButton" },
         icons = { "Interface\\Icons\\INV_Chest_Cloth_17" } },
-    { key = "spell", label = "Zauberbuch", micro = true, secure = { "SpellbookMicroButton", "PlayerSpellsMicroButton" },
+    { key = "spell", label = L["Zauberbuch"], micro = true, secure = { "SpellbookMicroButton", "PlayerSpellsMicroButton" },
         icons = { "Interface\\Icons\\INV_Misc_Book_09" } },
-    { key = "talent", label = "Talente", micro = true, secure = { "TalentMicroButton" },
+    { key = "talent", label = L["Talente"], micro = true, secure = { "TalentMicroButton" },
         icons = { "Interface\\Icons\\Ability_Marksmanship" } },
-    { key = "prof", label = "Berufe", micro = true, secure = { "ProfessionMicroButton" },
+    { key = "prof", label = L["Berufe"], micro = true, secure = { "ProfessionMicroButton" },
         icons = { "Interface\\Icons\\INV_Pick_02", "Interface\\Icons\\Trade_Engineering" } },
-    { key = "quest", label = "Questlog", micro = true, secure = { "QuestLogMicroButton" },
+    { key = "quest", label = L["Questlog"], micro = true, secure = { "QuestLogMicroButton" },
         icons = { "Interface\\Icons\\INV_Misc_Book_08" } },
-    { key = "friends", label = "Freunde", micro = true, icons = { "Interface\\Icons\\INV_Misc_GroupNeedMore" },
+    { key = "friends", label = L["Freunde"], micro = true, icons = { "Interface\\Icons\\INV_Misc_GroupNeedMore" },
         has = function() return ToggleFriendsFrame ~= nil end,
         frame = function() return _G.FriendsFrame end,
         run = function() ToggleFriendsFrame(FRIEND_TAB_FRIENDS or 1) end },
-    { key = "guild", label = "Gilde", micro = true, secure = { "GuildMicroButton" },
+    { key = "guild", label = L["Gilde"], micro = true, secure = { "GuildMicroButton" },
         icons = { "Interface\\Icons\\INV_Shirt_GuildTabard_01" } },
-    { key = "lfg", label = "Gruppensuche", micro = true, secure = { "LFDMicroButton", "LFGMicroButton" },
+    { key = "lfg", label = L["Gruppensuche"], micro = true, secure = { "LFDMicroButton", "LFGMicroButton" },
         icons = { "Interface\\Icons\\INV_Misc_GroupLooking" } },
     { divider = true },
-    { key = "calendar", label = "Kalender",
+    { key = "calendar", label = L["Kalender"],
         has = function() return ToggleCalendar ~= nil or GameTimeFrame ~= nil end,
         frame = function() return _G.CalendarFrame end,
         run = OpenCalendar },
-    { key = "tracking", label = "Verfolgung",
+    { key = "tracking", label = L["Verfolgung"],
         has = function()
             return (C_Minimap and C_Minimap.GetNumTrackingTypes) ~= nil
                 or TrackingButton() ~= nil or _G.MiniMapTrackingDropDown ~= nil
         end,
         run = OpenTrackingMenu },
-    { key = "worldmap", label = "Weltkarte",
+    { key = "worldmap", label = L["Weltkarte"],
         has = function() return ToggleWorldMap ~= nil or WorldMapFrame ~= nil end,
         frame = function() return _G.WorldMapFrame end,
         run = OpenWorldMap },
-    { key = "alts", label = "Twinks",
+    { key = "alts", label = L["Twinks"],
         has = function() return ns.ToggleAlts ~= nil and ns.db and ns.db.alts and true or false end,
         run = function() ns.ToggleAlts() end },
 }
@@ -795,7 +796,7 @@ end
 local function RunEntry(entry, anchor)
     if entry.secure or not entry.run then return end
     if BlockedNow(entry) then
-        if UIErrorsFrame then UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT or "Im Kampf nicht möglich.", 1, 0.3, 0.3) end
+        if UIErrorsFrame then UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT or L["Im Kampf nicht möglich."], 1, 0.3, 0.3) end
         return
     end
     pcall(entry.run, anchor)
@@ -962,7 +963,7 @@ end
 
 local function OpenMenu(owner)
     if InCombat() then
-        ns.Print("Menü geht erst nach dem Kampf.")
+        ns.Print(L["Menü geht erst nach dem Kampf."])
         return
     end
     if not BuildMenu() then return end
@@ -1002,9 +1003,9 @@ mapButton:SetScript("OnEnter", function(self)
     self:SetAlpha(1)
     SetBorder(self, C.accent)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
-    GameTooltip:AddLine("Kartenmenü")
-    GoldLine("Linksklick: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte")
-    GameTooltip:AddLine("Geht nur außerhalb des Kampfes.", C.textDim[1], C.textDim[2], C.textDim[3], true)
+    GameTooltip:AddLine(L["Kartenmenü"])
+    GoldLine(L["Linksklick: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte"])
+    GameTooltip:AddLine(L["Geht nur außerhalb des Kampfes."], C.textDim[1], C.textDim[2], C.textDim[3], true)
     GameTooltip:Show()
 end)
 mapButton:SetScript("OnLeave", function(self)
@@ -1156,7 +1157,7 @@ local function ApplyColumn(toggled)
         if ns.MinimapButtonUndock then ns.MinimapButtonUndock() end
         if toggled and #collectedList > 0 then
             ReleaseButtons()
-            ns.Print("Die Minimap-Knöpfe anderer Addons sind zurück an der Minimap – nach /reload sitzen sie wieder richtig.")
+            ns.Print(L["Die Minimap-Knöpfe anderer Addons sind zurück an der Minimap – nach /reload sitzen sie wieder richtig."])
         end
     end
 end
@@ -1228,24 +1229,24 @@ end
 
 clock:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine("Uhrzeit und Leistung")
-    GameTooltip:AddDoubleLine("Ortszeit", date("%H:%M"), 1, 1, 1, 1, 1, 1)
+    GameTooltip:AddLine(L["Uhrzeit und Leistung"])
+    GameTooltip:AddDoubleLine(L["Ortszeit"], date("%H:%M"), 1, 1, 1, 1, 1, 1)
     if GetGameTime then
         local h, m = GetGameTime()
         h, m = Number(h), Number(m)
-        if h and m then GameTooltip:AddDoubleLine("Serverzeit", string.format("%02d:%02d", h, m), 1, 1, 1, 1, 1, 1) end
+        if h and m then GameTooltip:AddDoubleLine(L["Serverzeit"], string.format("%02d:%02d", h, m), 1, 1, 1, 1, 1, 1) end
     end
     if GetNetStats then
         local _, _, home, world = GetNetStats()
         home, world = Number(home), Number(world)
-        if home then GameTooltip:AddDoubleLine("Latenz (Heim)", home .. " ms", 1, 1, 1, 1, 1, 1) end
-        if world then GameTooltip:AddDoubleLine("Latenz (Welt)", world .. " ms", 1, 1, 1, 1, 1, 1) end
+        if home then GameTooltip:AddDoubleLine(L["Latenz (Heim)"], home .. " ms", 1, 1, 1, 1, 1, 1) end
+        if world then GameTooltip:AddDoubleLine(L["Latenz (Welt)"], world .. " ms", 1, 1, 1, 1, 1, 1) end
     end
     local fps = GetFramerate and Number(GetFramerate())
-    if fps then GameTooltip:AddDoubleLine("Bilder pro Sekunde", tostring(math.floor(fps + 0.5)), 1, 1, 1, 1, 1, 1) end
+    if fps then GameTooltip:AddDoubleLine(L["Bilder pro Sekunde"], tostring(math.floor(fps + 0.5)), 1, 1, 1, 1, 1, 1) end
     if TimeManager_Toggle or ToggleTimeManager then
         GameTooltip:AddLine(" ")
-        GoldLine("Linksklick: Uhr und Wecker")
+        GoldLine(L["Linksklick: Uhr und Wecker"])
     end
     GameTooltip:Show()
 end)
@@ -1484,11 +1485,11 @@ local function UpdateXP()
                 questBar:Hide()
             end
             local left = Pct(cur / max * 100) .. " %"
-            if xpData.level then left = "Stufe " .. xpData.level .. " · " .. left end
-            local mid = rested > 0 and ("Erholt " .. Pct(rested / max * 100) .. " %") or nil
+            if xpData.level then left = L("Stufe %d", xpData.level) .. " · " .. left end
+            local mid = rested > 0 and L("Erholt %s %%", Pct(rested / max * 100)) or nil
             local line = TrackerLine()
             if line then mid = mid and (mid .. " · " .. line) or line end
-            local right = questXP > 0 and ("Quests +" .. Num(questXP) .. " EP") or nil
+            local right = questXP > 0 and L("Quests +%s EP", Num(questXP)) or nil
             SetXPTexts(left, mid, right)
             xpBar:Show()
             return
@@ -1522,7 +1523,7 @@ local function UpdateXP()
         mainBar:SetMinMaxValues(0, 1)
         mainBar:SetValue(0.5)
         restBar:Hide()
-        SetXPTexts("Stufe ?", "Erfahrungsleiste (keine Fraktion beobachtet)", nil)
+        SetXPTexts(L["Stufe ?"], L["Erfahrungsleiste (keine Fraktion beobachtet)"], nil)
         xpBar:Show()
     else
         xpBar:Hide()
@@ -1532,31 +1533,31 @@ end
 xpBar:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
     if xpMode == "xp" and xpData.max then
-        GameTooltip:AddLine("Erfahrung" .. (xpData.level and (" – Stufe " .. xpData.level) or ""))
-        GameTooltip:AddDoubleLine("EP", Num(xpData.cur) .. " / " .. Num(xpData.max), 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddLine(xpData.level and L("Erfahrung – Stufe %d", xpData.level) or L["Erfahrung"])
+        GameTooltip:AddDoubleLine(L["EP"], Num(xpData.cur) .. " / " .. Num(xpData.max), 1, 1, 1, 1, 1, 1)
         local missing = xpData.max - xpData.cur
-        GameTooltip:AddDoubleLine("Fehlend", Num(missing) .. " (" .. Pct(missing / xpData.max * 100) .. " %)", 1, 1, 1, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Fehlend"], Num(missing) .. " (" .. Pct(missing / xpData.max * 100) .. " %)", 1, 1, 1, 1, 1, 1)
         if xpData.rested > 0 then
-            GameTooltip:AddDoubleLine("Erholt", Num(xpData.rested) .. " (" .. Pct(xpData.rested / xpData.max * 100) .. " %)",
+            GameTooltip:AddDoubleLine(L["Erholt"], Num(xpData.rested) .. " (" .. Pct(xpData.rested / xpData.max * 100) .. " %)",
                 1, 1, 1, C.accent[1], C.accent[2], C.accent[3])
         end
         if xpData.quest and xpData.quest > 0 then
-            GameTooltip:AddDoubleLine("Quests", "+" .. Num(xpData.quest) .. " EP (" .. Pct(xpData.quest / xpData.max * 100) .. " %)",
+            GameTooltip:AddDoubleLine(L["Quests"], L("+%s EP (%s %%)", Num(xpData.quest), Pct(xpData.quest / xpData.max * 100)),
                 1, 1, 1, ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
             if xpData.cur + xpData.quest >= xpData.max then
-                GameTooltip:AddLine("Reicht für die nächste Stufe.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+                GameTooltip:AddLine(L["Reicht für die nächste Stufe."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
             end
         end
     elseif xpMode == "rep" and xpData.name then
         GameTooltip:AddLine(xpData.name)
         if xpData.label ~= "" then GameTooltip:AddLine(xpData.label, 1, 1, 1) end
         if xpData.span > 0 then
-            GameTooltip:AddDoubleLine("Ruf", Num(xpData.value) .. " / " .. Num(xpData.span), 1, 1, 1, 1, 1, 1)
-            GameTooltip:AddDoubleLine("Fehlend", Num(xpData.span - xpData.value), 1, 1, 1, 1, 1, 1)
+            GameTooltip:AddDoubleLine(L["Ruf"], Num(xpData.value) .. " / " .. Num(xpData.span), 1, 1, 1, 1, 1, 1)
+            GameTooltip:AddDoubleLine(L["Fehlend"], Num(xpData.span - xpData.value), 1, 1, 1, 1, 1, 1)
         end
     else
-        GameTooltip:AddLine("Erfahrungsleiste")
-        GameTooltip:AddLine("Auf Höchststufe zeigt sie den Ruf der beobachteten Fraktion.", 1, 1, 1, true)
+        GameTooltip:AddLine(L["Erfahrungsleiste"])
+        GameTooltip:AddLine(L["Auf Höchststufe zeigt sie den Ruf der beobachteten Fraktion."], 1, 1, 1, true)
     end
     -- EP-Tracker (xptracker.lua): EP/h, Zeit bis Levelaufstieg, Spielzeit …
     if xpMode ~= "rep" and ns.XPTracker and ns.XPTracker.AddTooltip then
@@ -1564,7 +1565,7 @@ xpBar:SetScript("OnEnter", function(self)
         pcall(ns.XPTracker.AddTooltip, GameTooltip)
     end
     GameTooltip:AddLine(" ")
-    GoldLine("Shift + Ziehen: verschieben")
+    GoldLine(L["Shift + Ziehen: verschieben"])
     GameTooltip:Show()
 end)
 xpBar:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1614,7 +1615,7 @@ local function ApplyXP(toggled)
         HideBlizzardXP()
     else
         xpBar:Hide()
-        if toggled then ns.Print("Blizzards Erfahrungsleiste kommt nach /reload zurück.") end
+        if toggled then ns.Print(L["Blizzards Erfahrungsleiste kommt nach /reload zurück."]) end
     end
 end
 
@@ -1971,10 +1972,10 @@ local function BuildMicroButtons()
                     GameTooltip:AddLine(self.entry.label)
                     if self.entry.secure then
                         if not MicroUsable(self.entry) then
-                            GameTooltip:AddLine("Gerade nicht verfügbar", C.textDim[1], C.textDim[2], C.textDim[3])
+                            GameTooltip:AddLine(L["Gerade nicht verfügbar"], C.textDim[1], C.textDim[2], C.textDim[3])
                         end
                     elseif BlockedNow(self.entry) then
-                        GameTooltip:AddLine("Im Kampf gesperrt", 1, 0.3, 0.3)
+                        GameTooltip:AddLine(L["Im Kampf gesperrt"], 1, 0.3, 0.3)
                     end
                     GameTooltip:Show()
                 end)
@@ -2016,8 +2017,8 @@ local function BagName(bag)
         name = ok and String(name)
         if name then return name end
     end
-    if bag == 0 then return "Rucksack" end
-    return "Tasche " .. bag
+    if bag == 0 then return L["Rucksack"] end
+    return L("Tasche %d", bag)
 end
 
 -- Freie und gesamte Plätze über Rucksack und Taschen 1–4
@@ -2069,19 +2070,19 @@ bagButton:SetScript("OnReceiveDrag", function() PutIntoBackpack() end)
 
 bagButton:HookScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOPLEFT")
-    GameTooltip:AddLine("Taschen")
+    GameTooltip:AddLine(L["Taschen"])
     for bag = 0, 4 do
         local slots = ContainerCall("GetContainerNumSlots", bag) or 0
         if slots > 0 then
             local free = ContainerCall("GetContainerNumFreeSlots", bag) or 0
-            GameTooltip:AddDoubleLine(BagName(bag), free .. " frei von " .. slots,
+            GameTooltip:AddDoubleLine(BagName(bag), L("%d frei von %d", free, slots),
                 1, 1, 1, C.text[1], C.text[2], C.text[3])
         end
     end
     local free, total = BagTotals()
     GameTooltip:AddLine(" ")
-    GameTooltip:AddDoubleLine("Frei gesamt", free .. " von " .. total, 1, 1, 1, C.accent[1], C.accent[2], C.accent[3])
-    GoldLine("Linksklick: Taschen öffnen")
+    GameTooltip:AddDoubleLine(L["Frei gesamt"], L("%d von %d", free, total), 1, 1, 1, C.accent[1], C.accent[2], C.accent[3])
+    GoldLine(L["Linksklick: Taschen öffnen"])
     GameTooltip:Show()
 end)
 
@@ -2241,13 +2242,23 @@ local PART_APPLY = {
     hudXPBar = function() ApplyXP(true) end,
 }
 
--- Wert setzen und nur die Teile neu anwenden, deren Wirkung sich dadurch ändert
+-- Zuletzt angewandte Wirkung je Teil. Nicht aus ns.db ablesen: „Verwerfen“ (ui.lua) und Profile
+-- schreiben ns.db zurück, bevor sie set() aufrufen – ein Vorher/Nachher-Vergleich sähe dann nichts.
+local appliedUI = {}
+
+local function RememberUIState()
+    for _, k in ipairs(UI_PARTS) do appliedUI[k] = UIOn(k) end
+end
+
+-- Wert setzen und nur die Teile neu anwenden, deren Wirkung sich gegenüber dem Angewandten ändert
 local function SetUIValue(key, value)
-    local before = {}
-    for _, k in ipairs(UI_PARTS) do before[k] = UIOn(k) end
     ns.db[key] = value and true or false
     for _, k in ipairs(UI_PARTS) do
-        if UIOn(k) ~= before[k] then Report(pcall(PART_APPLY[k])) end
+        local now = UIOn(k)
+        if now ~= (appliedUI[k] or false) then
+            appliedUI[k] = now
+            Report(pcall(PART_APPLY[k]))
+        end
     end
 end
 
@@ -2255,15 +2266,15 @@ local function MainOn()
     return ns.db and ns.db.strayUI and true or false
 end
 
-local MAIN_HINT = "Erst „stray-Oberfläche“ einschalten (oben in diesem Bereich)."
+local MAIN_HINT = L["Erst „stray-Oberfläche“ einschalten (oben in diesem Bereich)."]
 
 ns.AddOption(3, SECTION, {
     key = "strayUI",
-    label = "stray-Oberfläche",
+    label = L["stray-Oberfläche"],
     keywords = { "oberfläche", "ui", "interface", "hud", "leisten", "bars", "minimap", "layout" },
-    tooltip = "Ein Schalter für die ganze stray-Oberfläche: eigene Aktionsleisten, Taschenleiste unten rechts, eckige Minimap, Menü per Mittelklick, Minimap-Knopfspalte, Uhrzeit und FPS sowie die Erfahrungsleiste oben.\n\n"
+    tooltip = L["Ein Schalter für die ganze stray-Oberfläche: eigene Aktionsleisten, Taschenleiste unten rechts, eckige Minimap, Menü per Mittelklick, Minimap-Knopfspalte, Uhrzeit und FPS sowie die Erfahrungsleiste oben.\n\n"
         .. "Beim ersten Einschalten kommen alle Teile mit. Mit den Schaltern darunter schaltest du einzelne Teile wieder ab. "
-        .. "Aus heißt: alles wie bei Blizzard (Blizzards Aktionsleisten erst nach dem Neuladen).",
+        .. "Aus heißt: alles wie bei Blizzard (Blizzards Aktionsleisten erst nach dem Neuladen)."],
     set = function(value)
         -- Nichts gewählt? Dann bringt der Hauptschalter alle Teile mit (Menüknöpfe unten bleiben aus)
         if value and ns.db then
@@ -2281,13 +2292,13 @@ ns.AddOption(3, SECTION, {
 
 ns.AddOption(3, SECTION, {
     key = "abEnabled",
-    label = "Eigene Aktionsleisten",
+    label = L["Eigene Aktionsleisten"],
     keywords = { "aktionsleisten", "actionbars", "bars", "leisten", "knöpfe", "buttons" },
-    tooltip = "Ersetzt Blizzards Aktionsleisten durch bis zu 5 schlichte stray-Leisten à 12 Knöpfe. Deine Belegung und deine Tasten bleiben: Leiste 1 ist die Hauptleiste (mit Seitenwechsel bei Haltung, Gestalt, Verstohlenheit und Umschalt+Mausrad), Leiste 2 die untere linke, Leiste 3 die untere rechte, Leiste 4 die rechte und Leiste 5 die Leiste „Rechts 2“. Haltungs- und Begleiterleiste bleiben von Blizzard.\n\n"
+    tooltip = L["Ersetzt Blizzards Aktionsleisten durch bis zu 5 schlichte stray-Leisten à 12 Knöpfe. Deine Belegung und deine Tasten bleiben: Leiste 1 ist die Hauptleiste (mit Seitenwechsel bei Haltung, Gestalt, Verstohlenheit und Umschalt+Mausrad), Leiste 2 die untere linke, Leiste 3 die untere rechte, Leiste 4 die rechte und Leiste 5 die Leiste „Rechts 2“. Haltungs- und Begleiterleiste bleiben von Blizzard.\n\n"
         .. "Die einzelnen Leisten stellst du auf der Seite Aktionsleisten ein (anzeigen, Knopfgröße, Knöpfe pro Reihe). Standard: Leisten 1–4 an, 5 aus.\n\n"
         .. "Verschieben über den Bearbeitungsmodus; dort und bei offenem stray-Fenster siehst du auch die leeren Plätze. Änderungen wirken nur außerhalb des Kampfes.\n\n"
         .. "Mit Blizzards Hauptleiste verschwindet auch die Blizzard-EP-Leiste: Schalte dafür „Erfahrungsleiste oben“ ein (weiter unten).\n\n"
-        .. "Ausschalten erfordert Neuladen für Blizzards Aktionsleisten.",
+        .. "Ausschalten erfordert Neuladen für Blizzards Aktionsleisten."],
     isEnabled = MainOn,
     disabledHint = MAIN_HINT,
     set = function(value) SetUIValue("abEnabled", value) end,
@@ -2295,27 +2306,27 @@ ns.AddOption(3, SECTION, {
 
 ns.AddOption(3, SECTION, {
     key = "bottomBar",
-    label = "Taschenleiste unten rechts",
+    label = L["Taschenleiste unten rechts"],
     keywords = { "taschen", "bags", "inventar", "inventory", "rucksack", "backpack", "menü", "micro" },
-    tooltip = "Schlanke Leiste unten rechts statt Blizzards Taschenleiste: ein Taschenknopf für Rucksack und alle Taschen. "
+    tooltip = L["Schlanke Leiste unten rechts statt Blizzards Taschenleiste: ein Taschenknopf für Rucksack und alle Taschen. "
         .. "Der Balken darunter zeigt, wie voll die Taschen sind (grün, ab drei Vierteln gelb, ab 90 % rot); der Tooltip listet jede Tasche mit freien Plätzen. "
         .. "Linksklick öffnet die Taschen bzw. das stray-Taschenfenster. Den Schlüsselbund zeigt stray nicht.\n\n"
-        .. "Shift + Ziehen verschiebt die Leiste (nicht im Kampf), ebenso der Bearbeitungsmodus.",
+        .. "Shift + Ziehen verschiebt die Leiste (nicht im Kampf), ebenso der Bearbeitungsmodus."],
     isEnabled = MainOn,
     disabledHint = MAIN_HINT,
     set = function(value) SetUIValue("bottomBar", value) end,
 })
 
-local BOTTOM_HINT = "Erst „Taschenleiste unten rechts“ einschalten (direkt darüber)."
+local BOTTOM_HINT = L["Erst „Taschenleiste unten rechts“ einschalten (direkt darüber)."]
 local function BottomOptionOn() return BottomActive() end
 
 ns.AddOption(3, SECTION, {
     key = "bottomMicroButtons",
-    label = "Menüknöpfe unten",
+    label = L["Menüknöpfe unten"],
     keywords = { "menü", "menu", "micro", "mikromenü", "charakter", "zauberbuch", "talente" },
-    tooltip = "Setzt links neben den Taschenknopf Blizzards Menüsymbole ohne Rahmen: Charakter (rundes Bild deines Charakters), Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde und Gruppensuche.\n\n"
+    tooltip = L["Setzt links neben den Taschenknopf Blizzards Menüsymbole ohne Rahmen: Charakter (rundes Bild deines Charakters), Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde und Gruppensuche.\n\n"
         .. "Sie klicken Blizzards eigene Menüknöpfe an und gehen deshalb auch im Kampf. Grau heißt: Blizzard hat den Knopf gerade abgeschaltet (z. B. Talente unter Stufe 10). "
-        .. "Das Spielmenü öffnest du wie gewohnt mit Esc. Ein- und Umbau im Kampf geschieht erst danach.",
+        .. "Das Spielmenü öffnest du wie gewohnt mit Esc. Ein- und Umbau im Kampf geschieht erst danach."],
     isEnabled = BottomOptionOn,
     disabledHint = BOTTOM_HINT,
     set = function(value)
@@ -2327,9 +2338,9 @@ ns.AddOption(3, SECTION, {
 ns.AddOption(3, SECTION, {
     key = "bottomBarSize",
     type = "slider",
-    label = "Größe Taschenleiste",
+    label = L["Größe Taschenleiste"],
     min = 20, max = 40, step = 1,
-    tooltip = "Höhe der Symbole in der Taschen- und Menüleiste in Pixeln.",
+    tooltip = L["Höhe der Symbole in der Taschen- und Menüleiste in Pixeln."],
     isEnabled = BottomOptionOn,
     disabledHint = BOTTOM_HINT,
     set = function(v)
@@ -2340,12 +2351,12 @@ ns.AddOption(3, SECTION, {
 
 ns.AddOption(3, SECTION, {
     key = "squareMinimap",
-    label = "Eckige Minimap oben rechts",
+    label = L["Eckige Minimap oben rechts"],
     keywords = { "minimap", "karte", "map", "eckig", "square" },
-    tooltip = "Macht die Minimap viereckig mit schmalem stray-Rand und setzt sie bündig in die obere rechte Bildschirmecke. Darüber steht der Gebietsname (Klick: Weltkarte), links im Kopf ein Briefsymbol bei neuer Post, darunter die Koordinaten, wenn Blizzards Einstellung „Spielerkoordinaten“ an ist.\n\n"
+    tooltip = L["Macht die Minimap viereckig mit schmalem stray-Rand und setzt sie bündig in die obere rechte Bildschirmecke. Darüber steht der Gebietsname (Klick: Weltkarte), links im Kopf ein Briefsymbol bei neuer Post, darunter die Koordinaten, wenn Blizzards Einstellung „Spielerkoordinaten“ an ist.\n\n"
         .. "Blizzards runder Rahmen, Zoomknöpfe, Zonenleiste, Verfolgungs- und Kalenderknopf werden ausgeblendet. Verfolgung und Kalender erreichst du über den kleinen Kartenmenü-Knopf oben links in der Karte oder, falls eingeschaltet, per Mittelklick auf die Karte.\n\n"
         .. "Blizzards Bearbeitungsmodus kann die Minimap dann nicht mehr anwählen; die Größe stellst du mit dem Regler darunter ein.\n\n"
-        .. "Ausschalten stellt die runde Karte wieder her. Sitzt danach etwas schief, hilft /reload. Im Kampf wird erst danach umgebaut.",
+        .. "Ausschalten stellt die runde Karte wieder her. Sitzt danach etwas schief, hilft /reload. Im Kampf wird erst danach umgebaut."],
     isEnabled = MainOn,
     disabledHint = MAIN_HINT,
     set = function(value) SetUIValue("squareMinimap", value) end,
@@ -2354,11 +2365,11 @@ ns.AddOption(3, SECTION, {
 ns.AddOption(3, SECTION, {
     key = "squareMinimapSize",
     type = "slider",
-    label = "Größe eckige Minimap",
+    label = L["Größe eckige Minimap"],
     min = 140, max = 260, step = 10,
-    tooltip = "Kantenlänge der eckigen Minimap in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Kantenlänge der eckigen Minimap in Pixeln. Im Kampf wird die Änderung erst danach übernommen."],
     isEnabled = function() return UIOn("squareMinimap") end,
-    disabledHint = "Erst „Eckige Minimap oben rechts“ einschalten (direkt darüber).",
+    disabledHint = L["Erst „Eckige Minimap oben rechts“ einschalten (direkt darüber)."],
     set = function(v)
         ns.db.squareMinimapSize = math.max(140, math.min(260, math.floor((tonumber(v) or 200) + 0.5)))
         if UIOn("squareMinimap") and ns.ApplySquareMinimap then pcall(ns.ApplySquareMinimap) end
@@ -2367,12 +2378,12 @@ ns.AddOption(3, SECTION, {
 
 ns.AddOption(3, SECTION, {
     key = "minimapMiddleMenu",
-    label = "Menü per Mittelklick auf die Minimap",
+    label = L["Menü per Mittelklick auf die Minimap"],
     keywords = { "minimap", "menü", "menu", "mittelklick", "middle click", "maustaste" },
-    tooltip = "Mittlere Maustaste auf der Minimap öffnet an der Maus ein kleines stray-Menü: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche sowie Kalender, Verfolgung, Weltkarte und, falls eingeschaltet, Twinks. "
+    tooltip = L["Mittlere Maustaste auf der Minimap öffnet an der Maus ein kleines stray-Menü: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche sowie Kalender, Verfolgung, Weltkarte und, falls eingeschaltet, Twinks. "
         .. "Dasselbe Menü öffnet der Kartenmenü-Knopf oben links in der Karte.\n\n"
         .. "Der Mittelklick pingt nicht: stray fängt nur die mittlere Taste ab, Links- und Rechtsklick sowie Mausrad gehen wie gewohnt an die Karte. "
-        .. "Im Kampf geht das Menü nicht auf, dann kommt ein Hinweis im Chat. Schließen per Klick daneben, zweitem Mittelklick oder Esc.",
+        .. "Im Kampf geht das Menü nicht auf, dann kommt ein Hinweis im Chat. Schließen per Klick daneben, zweitem Mittelklick oder Esc."],
     isEnabled = MainOn,
     disabledHint = MAIN_HINT,
     set = function(value) SetUIValue("minimapMiddleMenu", value) end,
@@ -2380,15 +2391,15 @@ ns.AddOption(3, SECTION, {
 
 ns.AddOption(3, SECTION, {
     key = "hudMinimapColumn",
-    label = "Minimap-Knopfspalte",
+    label = L["Minimap-Knopfspalte"],
     keywords = { "minimap", "freunde", "friends", "addon-knöpfe", "buttons" },
-    tooltip = "Senkrechte Knopfspalte neben der Minimap mit Freunden, stray-Knopf und Addon-Tasche.\n\n"
+    tooltip = L["Senkrechte Knopfspalte neben der Minimap mit Freunden, stray-Knopf und Addon-Tasche.\n\n"
         .. "Freunde: Zahl der Freunde online, Liste im Tooltip, Linksklick öffnet die Freundesliste.\n"
         .. "Addon-Tasche: sammelt die Minimap-Knöpfe anderer Addons und klappt sie per Klick auf "
         .. "(verträgt sich nicht mit Leatrix „Hide addon buttons“).\n"
         .. "Oben links in der Minimap sitzt ein kleines Kartenmenü (Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte). Bei der eckigen Minimap ist es immer da, auch ohne diese Spalte.\n\n"
         .. "Die Spalte steht rechts neben der Minimap, am rechten Bildschirmrand links davon. "
-        .. "Bei der eckigen Minimap sitzt sie links bündig daran.",
+        .. "Bei der eckigen Minimap sitzt sie links bündig daran."],
     isEnabled = MainOn,
     disabledHint = MAIN_HINT,
     set = function(value) SetUIValue("hudMinimapColumn", value) end,
@@ -2396,11 +2407,11 @@ ns.AddOption(3, SECTION, {
 
 ns.AddOption(3, SECTION, {
     key = "hudClock",
-    label = "Uhrzeit und FPS",
+    label = L["Uhrzeit und FPS"],
     keywords = { "uhr", "clock", "zeit", "time", "fps", "latenz", "latency", "ping" },
-    tooltip = "Kleine Zeile unter der Minimap mit Bildern pro Sekunde und Uhrzeit.\n\n"
+    tooltip = L["Kleine Zeile unter der Minimap mit Bildern pro Sekunde und Uhrzeit.\n\n"
         .. "Im Tooltip stehen Latenz und Serverzeit. Blizzards Uhr wird solange ausgeblendet. "
-        .. "Sind Blizzards Spielerkoordinaten an, rückt die Zeile darunter.",
+        .. "Sind Blizzards Spielerkoordinaten an, rückt die Zeile darunter."],
     isEnabled = MainOn,
     disabledHint = MAIN_HINT,
     set = function(value) SetUIValue("hudClock", value) end,
@@ -2408,11 +2419,11 @@ ns.AddOption(3, SECTION, {
 
 ns.AddOption(3, SECTION, {
     key = "hudXPBar",
-    label = "Erfahrungsleiste oben",
+    label = L["Erfahrungsleiste oben"],
     keywords = { "ep", "xp", "erfahrung", "experience", "ruf", "reputation", "leiste" },
-    tooltip = "Erfahrungsleiste oben in der Mitte: links Stufe und Fortschritt, in der Mitte erholte EP (heller Bereich) und, falls eingeschaltet, der EP-Tracker, rechts die EP fertiger Quests.\n\n"
+    tooltip = L["Erfahrungsleiste oben in der Mitte: links Stufe und Fortschritt, in der Mitte erholte EP (heller Bereich) und, falls eingeschaltet, der EP-Tracker, rechts die EP fertiger Quests.\n\n"
         .. "Auf Höchststufe zeigt sie den Ruf der beobachteten Fraktion. Breite, Höhe und Schrift stellst du im Bereich Erfahrung ein. Shift + Ziehen verschiebt sie. "
-        .. "Blizzards Leiste kommt nach dem Ausschalten mit /reload zurück.",
+        .. "Blizzards Leiste kommt nach dem Ausschalten mit /reload zurück."],
     isEnabled = MainOn,
     disabledHint = MAIN_HINT,
     set = function(value) SetUIValue("hudXPBar", value) end,
@@ -2420,7 +2431,7 @@ ns.AddOption(3, SECTION, {
 
 -- Bereich „Erfahrung“: Feinheiten der EP-Leiste ------------------------------------------
 
-local XP_HINT = "Erst „Erfahrungsleiste oben“ einschalten (Oberfläche → stray-Oberfläche)."
+local XP_HINT = L["Erst „Erfahrungsleiste oben“ einschalten (Oberfläche → stray-Oberfläche)."]
 local function XPOptionOn() return UIOn("hudXPBar") end
 
 local function RefreshXPBar()
@@ -2432,9 +2443,9 @@ end
 
 ns.AddOption(3, SECTION_XP, {
     key = "questXPBar",
-    label = "Quest-EP auf der EP-Leiste",
+    label = L["Quest-EP auf der EP-Leiste"],
     keywords = { "quest", "ep", "xp", "abgeben", "turn in" },
-    tooltip = "Zeigt auf der stray-Erfahrungsleiste einen goldenen Bereich: so viele EP bringen alle abgeschlossenen Quests, die du noch nicht abgegeben hast. Er beginnt am aktuellen EP-Stand, die Summe steht rechts in der Leiste und im Tooltip.",
+    tooltip = L["Zeigt auf der stray-Erfahrungsleiste einen goldenen Bereich: so viele EP bringen alle abgeschlossenen Quests, die du noch nicht abgegeben hast. Er beginnt am aktuellen EP-Stand, die Summe steht rechts in der Leiste und im Tooltip."],
     isEnabled = XPOptionOn,
     disabledHint = XP_HINT,
     set = function(value)
@@ -2446,9 +2457,9 @@ ns.AddOption(3, SECTION_XP, {
 ns.AddOption(3, SECTION_XP, {
     key = "xpBarWidth",
     type = "slider",
-    label = "Breite EP-Leiste",
+    label = L["Breite EP-Leiste"],
     min = 300, max = 1200, step = 10,
-    tooltip = "Breite der stray-Erfahrungsleiste in Pixeln.",
+    tooltip = L["Breite der stray-Erfahrungsleiste in Pixeln."],
     isEnabled = XPOptionOn,
     disabledHint = XP_HINT,
     set = function(v)
@@ -2460,9 +2471,9 @@ ns.AddOption(3, SECTION_XP, {
 ns.AddOption(3, SECTION_XP, {
     key = "xpBarHeight",
     type = "slider",
-    label = "Höhe EP-Leiste",
+    label = L["Höhe EP-Leiste"],
     min = 10, max = 40, step = 1,
-    tooltip = "Höhe der stray-Erfahrungsleiste in Pixeln.",
+    tooltip = L["Höhe der stray-Erfahrungsleiste in Pixeln."],
     isEnabled = XPOptionOn,
     disabledHint = XP_HINT,
     set = function(v)
@@ -2474,9 +2485,9 @@ ns.AddOption(3, SECTION_XP, {
 ns.AddOption(3, SECTION_XP, {
     key = "xpBarFontSize",
     type = "slider",
-    label = "Schriftgröße EP-Leiste",
+    label = L["Schriftgröße EP-Leiste"],
     min = 8, max = 20, step = 1,
-    tooltip = "Schriftgröße der Texte auf der stray-Erfahrungsleiste in Pixeln.",
+    tooltip = L["Schriftgröße der Texte auf der stray-Erfahrungsleiste in Pixeln."],
     isEnabled = XPOptionOn,
     disabledHint = XP_HINT,
     set = function(v)
@@ -2500,6 +2511,7 @@ end)
 SafeOn("PLAYER_LOGIN", function()
     if not ns.db then return end
     MigrateStrayUI() -- greift nur, falls ADDON_LOADED es nicht schon erledigt hat
+    RememberUIState() -- Stand beim Login (die Module wenden ihn selbst an)
     MigrateOldMicroBar()
     pcall(ApplyClock, false)
     pcall(ApplyXP, false)

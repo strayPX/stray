@@ -1,6 +1,6 @@
 # stray
 
-Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Minimap-Knopf öffnet das Einstellungsfenster: links die Bereiche und eine Suche, rechts die Optionen mit Schaltern und Kurzbeschreibung. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Alle Optionen sind anfangs aus (außer dem Minimap-Knopf).
+Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Minimap-Knopf öffnet das Einstellungsfenster: links die Seiten in drei Gruppen und eine Stichwort-Suche, rechts die Optionen in Karten. Fährst du mit der Maus über eine Option, erklärt ein Tooltip mehr. Beim Schließen übernimmst du Änderungen mit „Neu laden“ oder nimmst sie mit „Verwerfen“ zurück. Auf deutschen Clients ist stray deutsch, sonst englisch. Alle Optionen sind anfangs aus (außer dem Minimap-Knopf).
 
 ## Optionen
 
@@ -27,7 +27,7 @@ Kleines Komfort-Addon für **World of Warcraft: Forever**. `/stray` oder der Min
 - **Hilfe bei vollen Taschen:** markiert den billigsten Gegenstand als Löschkandidaten, Goldmünze an wertvollerer Beute. Gelöscht wird nichts automatisch.
 
 **Vorrat**
-- **Vorrats-Erinnerung:** Symbole nur, wenn Reagenzien, Munition, Essen/Wasser oder eigene Buffs fehlen; Warnschwelle einstellbar.
+- **Vorrats-Erinnerung:** Symbole nur, wenn Reagenzien, Munition, Essen/Wasser oder eigene Buffs fehlen; Warnschwelle einstellbar; optional mit laufendem Rand um die Symbole.
 
 **Chat**
 - **Links kopierbar:** Webadressen im Chat werden anklickbar und öffnen ein Feld zum Kopieren.
@@ -70,22 +70,23 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 
 **Gruppenrahmen**
 - **Gruppenrahmen anzeigen:** 5er-Gruppe als senkrechte Spalte mit Leben, Mana, entfernbaren Schwächungen und Reichweite; Breite, Höhe, Abstand per Schieberegler.
+- **Begleiter anzeigen:** Tiere und Dämonen links neben ihrem Besitzer, mit Lebensbalken und Mouseover-Heilen.
 - **Blizzards Gruppenrahmen ausblenden.**
 - **Heilvorhersage, Schilde, „Geschwächte Seele“:** immer Teil der Gruppenrahmen – laufende Heilung hellgrün, Schilde gestreift, Symbol mit Restzeit.
 
 **System**
-- **Bearbeiten:** alle eingeschalteten Anzeigen auf einmal verschieben (ohne Shift, mit Raster, Rechtsklick setzt zurück) – auch per `/stray edit`.
-- **Knopf „Anzeigen verschieben“** oben im stray-Fenster startet den Bearbeiten-Modus direkt.
+- **Bearbeitungsmodus:** alle eingeschalteten Anzeigen auf einmal verschieben (Raster, Einrasten, Rechtsklick setzt zurück) – Knopf unten im stray-Fenster oder `/stray edit`. Klick auf eine Anzeige öffnet ein Fenster für Position, Größe in Prozent und, wo möglich, Breite/Höhe; Pfeiltasten verschieben pixelgenau.
 - **Profile:** Einstellungen als Text exportieren und importieren.
 
-**Leisten & Minimap**
-- **Minimap-Knopfspalte:** Freunde, stray-Knopf, Addon-Tasche, Kartenmenü.
-- **Uhrzeit und FPS** unter der Minimap.
-- **Erfahrungsleiste oben.**
-- **Taschen- und Menüleiste** unten rechts.
+**stray-Oberfläche** (ein Hauptschalter, jeder Teil einzeln abschaltbar)
+- **Eigene Aktionsleisten**, **Taschenleiste unten rechts** (Porträt-Knopf, eine Tasche mit Füllbalken, Menüsymbole optional), **eckige Minimap**, **Menü per Mittelklick** auf die Minimap, **Minimap-Knopfspalte**, **Uhrzeit und FPS**, **Erfahrungsleiste oben**.
+
+**Erfahrung**
+- **EP-Leiste:** Stufe, Erholt und Quest-EP gut lesbar; Breite, Höhe, Schrift einstellbar.
+- **EP-Tracker:** EP pro Stunde, Zeit bis Levelaufstieg, Zeit je Stufe, Gesamtspielzeit, Verlauf – optional als Tabelle.
 
 **Aktionsleisten / Abklingzeiten**
-- **Eigene Aktionsleisten:** bis zu 5 × 12 Knöpfe, schlicht, Tasten bleiben; jede Leiste einzeln an/aus, mit eigener Knopfgröße und Knöpfen pro Reihe.
+- **Eigene Aktionsleisten** (Teil der stray-Oberfläche): bis zu 5 × 12 Knöpfe, schlicht, Tasten bleiben; jede Leiste einzeln an/aus, mit eigener Knopfgröße und Knöpfen pro Reihe.
 - **Abklingzeiten über den Leisten:** Blizzards Cooldown-Manager im stray-Stil.
 
 **Kamera & Karte**
@@ -116,7 +117,11 @@ Hinweis: Hat ein anderes Addon (z. B. Leatrix Plus oder Questie) die gleiche Aut
 
 ## Installation
 
-**Mit WowUp:** „Addons holen“ → „Von URL installieren“ → `https://github.com/strayPX/stray` einfügen. Fertig – Updates zeigt WowUp danach automatisch an.
+**Mit WowUp (CurseForge-Version):** World of Warcraft: Forever auswählen, nach **stray** suchen, installieren. Falls die Suche es noch nicht findet: „Mit URL installieren“ → `https://www.curseforge.com/wow/addons/stray`.
+
+**Mit WowUp (GitHub):** „Von URL installieren“ → `https://github.com/strayPX/stray`.
+
+Updates zeigt WowUp danach automatisch an.
 
 **Von Hand:** Die ZIP aus den [Releases](https://github.com/strayPX/stray/releases) entpacken, den Ordner `stray` nach `World of Warcraft\_forever_\Interface\AddOns\` kopieren und das Spiel neu starten.
 
@@ -124,8 +129,11 @@ Hinweis: Hat ein anderes Addon (z. B. Leatrix Plus oder Questie) die gleiche Aut
 
 All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
+**Symbole:** Die Seitensymbole im stray-Fenster (`media/icons/`) stammen aus [Tabler Icons](https://tabler.io/icons) (Version 3.19.0) von Paweł Kuna, MIT-Lizenz, Copyright (c) 2020–2024 Paweł Kuna. Sie wurden für stray in weiße TGA-Texturen umgewandelt. MIT-Lizenztext: Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ## Version
 
+- 0.22.0-alpha – Neues stray-Fenster (Zentrale, Stichwort-Suche, Neu laden/Verwerfen), Hauptschalter stray-Oberfläche, Mittelklick ohne Ping, neue Taschenleiste, lesbare EP-Leiste + EP-Tracker, Begleiter am Gruppenrahmen, Bearbeitungsmodus mit Fenster je Anzeige und Pfeiltasten, laufender Rand beim Vorrat, englische Übersetzung
 - 0.21.0-alpha – Taschenfenster (Größe ziehen, blättern, sortieren, Quest-Kategorie), zweites DMG-Meter-Fenster zum Andocken, neue Bearbeiten-Leiste (Einrasten, Esc), leere Aktionsplätze dauerhaft, neue Taschenleiste, eckige Minimap, Menü per mittlerer Maustaste
 - 0.20.0-alpha – Einstellungsfenster mit 9 Seiten statt 22 (Zwischenüberschriften, scrollbar); Testgruppe zeigt den eigenen Charakter
 - 0.19.0-alpha – Händlerpreis, Post-Twinkliste, Lehrer „Alles lernen“, volle Taschen, Vorrat, Quest-Hilfen, Swing-Timer, Gefahrenwarnung, Zauberrang, Einladungen, Notizen, Twink-Übersicht, Flugzeit, Würfelfenster; Manaleiste im Gruppenrahmen repariert

@@ -2,19 +2,20 @@
 -- wertvollste Wahlbelohnung mit einer Goldmünze markieren
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.questRewardMark = false
 
 ns.AddOption(2, "Quests", {
     key = "questAccept",
-    label = "Automatisch annehmen",
-    tooltip = "Nimmt neue Quests von NPCs und Gegenständen ohne Klick an. Graue Quests, von Mitspielern geteilte Quests und Begleitquests nimmst du selbst an.\n\nHalte Shift gedrückt, um das zu verhindern.",
+    label = L["Automatisch annehmen"],
+    tooltip = L["Nimmt neue Quests von NPCs und Gegenständen ohne Klick an. Graue Quests, von Mitspielern geteilte Quests und Begleitquests nimmst du selbst an.\n\nHalte Shift gedrückt, um das zu verhindern."],
 })
 
 ns.AddOption(2, "Quests", {
     key = "questTurnIn",
-    label = "Automatisch abgeben",
-    tooltip = "Gibt fertige Quests ohne Klick ab. Stehen mehrere Belohnungen zur Auswahl oder kostet die Abgabe Gold, entscheidest du selbst.\n\nHalte Shift gedrückt, um das zu verhindern.",
+    label = L["Automatisch abgeben"],
+    tooltip = L["Gibt fertige Quests ohne Klick ab. Stehen mehrere Belohnungen zur Auswahl oder kostet die Abgabe Gold, entscheidest du selbst.\n\nHalte Shift gedrückt, um das zu verhindern."],
 })
 
 -- Quests, bei denen wir bewusst angehalten haben (Auswahl/Gold) – nicht erneut automatisch öffnen
@@ -132,8 +133,8 @@ end)
 
 ns.AddOption(2, "Quests", {
     key = "questRewardMark",
-    label = "Wertvollste Belohnung markieren",
-    tooltip = "Stehen bei der Abgabe mehrere Belohnungen zur Wahl, bekommt die mit dem höchsten Verkaufswert eine kleine Goldmünze. Gezählt wird Verkaufspreis mal Anzahl.\n\nBei Gleichstand oder wenn ein Preis fehlt, wird nichts markiert. Gewählt wird nie automatisch.",
+    label = L["Wertvollste Belohnung markieren"],
+    tooltip = L["Stehen bei der Abgabe mehrere Belohnungen zur Wahl, bekommt die mit dem höchsten Verkaufswert eine kleine Goldmünze. Gezählt wird Verkaufspreis mal Anzahl.\n\nBei Gleichstand oder wenn ein Preis fehlt, wird nichts markiert. Gewählt wird nie automatisch."],
     set = function(value)
         ns.db.questRewardMark = value
         ns.UpdateRewardMark()
@@ -251,7 +252,7 @@ if hooksecurefunc and GameTooltip and GameTooltip.SetQuestItem then
         if ns.IsSecret(kind) or ns.IsSecret(index) then return end
         if kind ~= "choice" or index ~= markedIndex then return end
         if QuestInfoFrame and QuestInfoFrame.questLog then return end
-        tooltip:AddLine("stray: höchster Verkaufswert", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+        tooltip:AddLine(L["stray: höchster Verkaufswert"], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
         tooltip:Show()
     end)
 end

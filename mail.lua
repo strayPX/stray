@@ -17,6 +17,7 @@
 -- Taschen).
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.mailAlts = false
 ns.defaults.mailAltList = {} -- ["Name-Realm"] = { name, realm, faction, class, level, seen }
@@ -132,7 +133,7 @@ local function OnRowClick(self, button)
     if button == "RightButton" then
         local list = List()
         if list then list[e.name .. "-" .. e.realm] = nil end
-        ns.Print(("%s aus der Twink-Liste entfernt."):format(e.name))
+        ns.Print(L("%s aus der Twink-Liste entfernt.", e.name))
         Refresh()
         return
     end
@@ -146,9 +147,9 @@ local function OnRowEnter(self)
     if not e then return end
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
     GameTooltip:SetText(e.name, 1, 1, 1)
-    if e.level then GameTooltip:AddLine(("Stufe %d"):format(e.level), C.text[1], C.text[2], C.text[3]) end
-    GameTooltip:AddLine("Linksklick: als Empfänger eintragen", C.accent[1], C.accent[2], C.accent[3])
-    GameTooltip:AddLine("Rechtsklick: aus der Liste nehmen", C.dim[1], C.dim[2], C.dim[3])
+    if e.level then GameTooltip:AddLine(L("Stufe %d", e.level), C.text[1], C.text[2], C.text[3]) end
+    GameTooltip:AddLine(L["Linksklick: als Empfänger eintragen"], C.accent[1], C.accent[2], C.accent[3])
+    GameTooltip:AddLine(L["Rechtsklick: aus der Liste nehmen"], C.dim[1], C.dim[2], C.dim[3])
     GameTooltip:Show()
 end
 
@@ -189,14 +190,14 @@ local function CreatePanel()
 
     title = Text(panel, 12, C.accent)
     title:SetPoint("TOPLEFT", panel, "TOPLEFT", 7, -6)
-    title:SetText("Twinks")
+    title:SetText(L["Twinks"])
 
     emptyNote = Text(panel, 11, C.dim)
     emptyNote:SetPoint("TOPLEFT", panel, "TOPLEFT", 7, -(TOP_H + 6))
     emptyNote:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -7, -(TOP_H + 6))
     emptyNote:SetWordWrap(true)
     emptyNote:SetJustifyH("LEFT")
-    emptyNote:SetText("Noch keine Twinks auf diesem Realm. Logg sie einmal ein, dann stehen sie hier.")
+    emptyNote:SetText(L["Noch keine Twinks auf diesem Realm. Logg sie einmal ein, dann stehen sie hier."])
 
     moreNote = Text(panel, 11, C.dim)
     moreNote:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 7, 5)
@@ -243,7 +244,7 @@ Refresh = function()
     emptyNote:SetShown(#alts == 0)
     local extra = #alts - shown
     if extra > 0 then
-        moreNote:SetText(("+%d weitere"):format(extra))
+        moreNote:SetText(L("+%d weitere", extra))
         moreNote:Show()
     else
         moreNote:Hide()
@@ -282,8 +283,8 @@ end
 
 ns.AddOption(1, "NPCs", {
     key = "mailAlts",
-    label = "Twink-Liste beim Post senden",
-    tooltip = "Neben „Post senden“ steht eine Liste deiner anderen Charaktere auf diesem Realm und derselben Fraktion. Ein Klick trägt den Namen als Empfänger ein, Rechtsklick nimmt einen Charakter aus der Liste.\n\nstray merkt sich jeden Charakter beim Einloggen. Twinks, die du seit der Installation noch nicht eingeloggt hast, fehlen also noch.\n\n„Alle Briefe öffnen“ hat Blizzards Posteingang auf Forever schon selbst.",
+    label = L["Twink-Liste beim Post senden"],
+    tooltip = L["Neben „Post senden“ steht eine Liste deiner anderen Charaktere auf diesem Realm und derselben Fraktion. Ein Klick trägt den Namen als Empfänger ein, Rechtsklick nimmt einen Charakter aus der Liste.\n\nstray merkt sich jeden Charakter beim Einloggen. Twinks, die du seit der Installation noch nicht eingeloggt hast, fehlen also noch.\n\n„Alle Briefe öffnen“ hat Blizzards Posteingang auf Forever schon selbst."],
     set = function(value)
         ns.db.mailAlts = value
         if value then Setup() elseif panel then panel:Hide() end

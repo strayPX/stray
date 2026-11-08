@@ -3,6 +3,7 @@
 -- ohne es vorher anzuklicken. stray schaltet nur Blizzards eigene Einstellung um.
 
 local _, ns = ...
+local L = ns.L
 
 -- Mögliche Namen der Einstellung; der erste, den der Client kennt, wird benutzt
 local CANDIDATES = { "enableMouseoverCast" }
@@ -24,12 +25,12 @@ end
 
 ns.AddOption(2, "Zaubern", {
     key = "mouseoverCast",
-    label = "Mouseover-Zauber",
-    tooltip = "Zauber gehen auf das Gruppenmitglied oder Ziel unter deiner Maus, ohne es vorher anzuklicken – praktisch zum Heilen über die Gruppenrahmen. Schaltet Blizzards eigene Einstellung „Mouseover-Zauber“ (Optionen → Kampf) um.\n\nIst die Maus über keinem Ziel, wirkt der Zauber wie gewohnt auf dein aktuelles Ziel.",
+    label = L["Mouseover-Zauber"],
+    tooltip = L["Zauber gehen auf das Gruppenmitglied oder Ziel unter deiner Maus, ohne es vorher anzuklicken – praktisch zum Heilen über die Gruppenrahmen. Schaltet Blizzards eigene Einstellung „Mouseover-Zauber“ (Optionen → Kampf) um.\n\nIst die Maus über keinem Ziel, wirkt der Zauber wie gewohnt auf dein aktuelles Ziel."],
     get = function() return CVAR and ns.GetCVarOn(CVAR) or false end,
     set = function(value)
         if CVAR then ns.SetCVarValue(CVAR, value and "1" or "0") end
     end,
     isEnabled = function() return CVAR ~= nil end,
-    disabledHint = "Diese Spielversion hat die Einstellung „Mouseover-Zauber“ nicht.",
+    disabledHint = L["Diese Spielversion hat die Einstellung „Mouseover-Zauber“ nicht."],
 })

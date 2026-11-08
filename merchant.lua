@@ -1,17 +1,18 @@
 -- stray – Händler: graue Gegenstände verkaufen, Ausrüstung reparieren
 
 local _, ns = ...
+local L = ns.L
 
 ns.AddOption(1, "Händler", {
     key = "autoSell",
-    label = "Automatisch verkaufen",
-    tooltip = "Verkauft beim Händler alle grauen Gegenstände aus deinen Taschen. Gegenstände, die eine Quest im Questlog noch braucht, verkauft stray dabei nie. Halte Shift gedrückt, um das zu verhindern.\n\nDer Händler kann nur die letzten 12 verkauften Gegenstände zurückkaufen.",
+    label = L["Automatisch verkaufen"],
+    tooltip = L["Verkauft beim Händler alle grauen Gegenstände aus deinen Taschen. Gegenstände, die eine Quest im Questlog noch braucht, verkauft stray dabei nie. Halte Shift gedrückt, um das zu verhindern.\n\nDer Händler kann nur die letzten 12 verkauften Gegenstände zurückkaufen."],
 })
 
 ns.AddOption(1, "Händler", {
     key = "autoRepair",
-    label = "Automatisch reparieren",
-    tooltip = "Repariert deine Ausrüstung mit deinem Gold, wenn der Händler reparieren kann. Halte Shift gedrückt, um das zu verhindern.",
+    label = L["Automatisch reparieren"],
+    tooltip = L["Repariert deine Ausrüstung mit deinem Gold, wenn der Händler reparieren kann. Halte Shift gedrückt, um das zu verhindern."],
 })
 
 local GetNumSlots = (C_Container and C_Container.GetContainerNumSlots) or GetContainerNumSlots
@@ -53,7 +54,7 @@ local function TryRepair()
     if not canRepair or not cost or cost <= 0 then return true end
     if GetMoney() < cost then return false end
     RepairAllItems()
-    ns.Print("Ausrüstung für " .. ns.FormatMoney(cost) .. " repariert.")
+    ns.Print(L("Ausrüstung für %s repariert.", ns.FormatMoney(cost)))
     return true
 end
 
@@ -63,13 +64,16 @@ local function FinishSelling()
         ticker = nil
     end
     if soldCount > 0 then
-        ns.Print(("%d %s für %s verkauft."):format(
-            soldCount, soldCount == 1 and "Gegenstand" or "Gegenstände", ns.FormatMoney(soldValue)))
+        if soldCount == 1 then
+            ns.Print(L("1 Gegenstand für %s verkauft.", ns.FormatMoney(soldValue)))
+        else
+            ns.Print(L("%d Gegenstände für %s verkauft.", soldCount, ns.FormatMoney(soldValue)))
+        end
     end
     -- Nach dem Verkauf nochmal versuchen, falls das Gold vorher nicht gereicht hat
     if repairPending and merchantOpen then
         if not TryRepair() then
-            ns.Print("Nicht genug Gold zum Reparieren.")
+            ns.Print(L["Nicht genug Gold zum Reparieren."])
         end
     end
     repairPending = false
@@ -121,7 +125,7 @@ ns.On("MERCHANT_SHOW", function()
         if ticker then ticker:Cancel() end
         ticker = C_Timer.NewTicker(0.2, SellStep)
     elseif repairPending then
-        ns.Print("Nicht genug Gold zum Reparieren.")
+        ns.Print(L["Nicht genug Gold zum Reparieren."])
         repairPending = false
     end
 end)

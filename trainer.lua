@@ -12,6 +12,7 @@
 -- Hardware-Ereignis; gekauft wird nur innerhalb dieses Klicks.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.trainerLearnAll = false
 
@@ -34,7 +35,7 @@ local function ShortMoney(copper)
     local parts = {}
     if g > 0 then parts[#parts + 1] = g .. "g" end
     if s > 0 then parts[#parts + 1] = s .. "s" end
-    if k > 0 or #parts == 0 then parts[#parts + 1] = k .. "k" end
+    if k > 0 or #parts == 0 then parts[#parts + 1] = k .. L["k"] end
     return table.concat(parts, " ")
 end
 
@@ -81,15 +82,15 @@ local function Update()
     end
     local plan, total, tooExpensive = Plan()
     if #plan > 0 then
-        button.text:SetText(("Alles lernen (%s)"):format(ShortMoney(total)))
+        button.text:SetText(L("Alles lernen (%s)", ShortMoney(total)))
         button.text:SetTextColor(C.text[1], C.text[2], C.text[3])
         button:Enable()
     elseif tooExpensive > 0 then
-        button.text:SetText("Alles lernen: zu wenig Gold")
+        button.text:SetText(L["Alles lernen: zu wenig Gold"])
         button.text:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
         button:Disable()
     else
-        button.text:SetText("Alles lernen")
+        button.text:SetText(L["Alles lernen"])
         button.text:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
         button:Disable()
     end
@@ -101,11 +102,11 @@ local function LearnAll()
     if not (ns.db and ns.db.trainerLearnAll) or not BuyTrainerService then return end
     local plan, total, tooExpensive = Plan()
     if #plan == 0 then
-        if tooExpensive > 0 then ns.Print("Nicht genug Gold für die nächste Fertigkeit.") end
+        if tooExpensive > 0 then ns.Print(L["Nicht genug Gold für die nächste Fertigkeit."]) end
         return
     end
     if total > GetMoney() then
-        ns.Print("Nicht genug Gold.")
+        ns.Print(L["Nicht genug Gold."])
         return
     end
     -- Von hinten nach vorn: falls die Liste sich während des Kaufs verkürzt, stimmen die
@@ -121,11 +122,18 @@ local function LearnAll()
         end
     end
     if #names > 0 then
-        ns.Print(("%d %s für %s gelernt: %s"):format(#names,
-            #names == 1 and "Fertigkeit" or "Fertigkeiten", ns.FormatMoney(total), table.concat(names, ", ")))
+        if #names == 1 then
+            ns.Print(L("%d Fertigkeit für %s gelernt: %s", #names, ns.FormatMoney(total), table.concat(names, ", ")))
+        else
+            ns.Print(L("%d Fertigkeiten für %s gelernt: %s", #names, ns.FormatMoney(total), table.concat(names, ", ")))
+        end
     end
     if tooExpensive > 0 then
-        ns.Print(("%d weitere %s zu teuer."):format(tooExpensive, tooExpensive == 1 and "ist" or "sind"))
+        if tooExpensive == 1 then
+            ns.Print(L("%d weitere ist zu teuer.", tooExpensive))
+        else
+            ns.Print(L("%d weitere sind zu teuer.", tooExpensive))
+        end
     end
 end
 
@@ -165,7 +173,7 @@ local function CreateButton()
     button:SetScript("OnClick", LearnAll)
     button:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Alles lernen", 1, 1, 1)
+        GameTooltip:SetText(L["Alles lernen"], 1, 1, 1)
         local plan, total, tooExpensive = Plan()
         for _, entry in ipairs(plan) do
             local label = entry.name
@@ -173,14 +181,14 @@ local function CreateButton()
             GameTooltip:AddDoubleLine(label, ShortMoney(entry.cost), C.text[1], C.text[2], C.text[3], 1, 0.82, 0)
         end
         if #plan == 0 then
-            GameTooltip:AddLine("Gerade gibt es nichts zu lernen.", C.dim[1], C.dim[2], C.dim[3])
+            GameTooltip:AddLine(L["Gerade gibt es nichts zu lernen."], C.dim[1], C.dim[2], C.dim[3])
         else
-            GameTooltip:AddDoubleLine("Summe", ShortMoney(total), C.accent[1], C.accent[2], C.accent[3], 1, 0.82, 0)
+            GameTooltip:AddDoubleLine(L["Summe"], ShortMoney(total), C.accent[1], C.accent[2], C.accent[3], 1, 0.82, 0)
         end
         if tooExpensive > 0 then
-            GameTooltip:AddLine(("%d weitere: zu wenig Gold"):format(tooExpensive), 1, 0.3, 0.3)
+            GameTooltip:AddLine(L("%d weitere: zu wenig Gold", tooExpensive), 1, 0.3, 0.3)
         end
-        GameTooltip:AddLine("Neue Hauptberufe lernst du weiter selbst. Am Waffenmeister lernt der Knopf alle angebotenen Waffen.", C.dim[1], C.dim[2], C.dim[3], true)
+        GameTooltip:AddLine(L["Neue Hauptberufe lernst du weiter selbst. Am Waffenmeister lernt der Knopf alle angebotenen Waffen."], C.dim[1], C.dim[2], C.dim[3], true)
         GameTooltip:Show()
     end)
     button:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -195,8 +203,8 @@ end
 
 ns.AddOption(1, "NPCs", {
     key = "trainerLearnAll",
-    label = "Lehrer: Alles lernen",
-    tooltip = "Am Klassen- und Berufslehrer erscheint ein Knopf „Alles lernen“ mit dem Gesamtpreis. Ein Klick lernt alles, was du jetzt lernen kannst und bezahlen kannst. Reicht das Gold nicht für alles, lernt stray nur, was das Gold deckt.\n\nNeue Hauptberufe lernst du weiter selbst, weil Blizzard dabei nachfragt. Nebenberufe (Kochen, Erste Hilfe, Angeln) und am Waffenmeister alle angebotenen Waffen lernt der Knopf mit – Liste und Preis stehen im Tooltip des Knopfes.",
+    label = L["Lehrer: Alles lernen"],
+    tooltip = L["Am Klassen- und Berufslehrer erscheint ein Knopf „Alles lernen“ mit dem Gesamtpreis. Ein Klick lernt alles, was du jetzt lernen kannst und bezahlen kannst. Reicht das Gold nicht für alles, lernt stray nur, was das Gold deckt.\n\nNeue Hauptberufe lernst du weiter selbst, weil Blizzard dabei nachfragt. Nebenberufe (Kochen, Erste Hilfe, Angeln) und am Waffenmeister alle angebotenen Waffen lernt der Knopf mit – Liste und Preis stehen im Tooltip des Knopfes."],
     set = function(value)
         ns.db.trainerLearnAll = value
         Setup()

@@ -15,6 +15,7 @@
 -- einen laufenden Flug weder Ziel noch Fortschritt.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.flightBar = false
 ns.defaults.flightRouteTimes = {} -- ["Start → Ziel"] = Sekunden
@@ -127,18 +128,18 @@ dest:SetPoint("RIGHT", timeText, "LEFT", -6, 0)
 
 bar:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:SetText("Flugzeit", 1, 1, 1)
+    GameTooltip:SetText(L["Flugzeit"], 1, 1, 1)
     if flight then
         GameTooltip:AddLine(flight.from .. ARROW .. flight.to, C.text[1], C.text[2], C.text[3], true)
         if flight.known then
-            GameTooltip:AddLine(("Gemessene Dauer: %s"):format(FormatTime(flight.known)), C.accent[1], C.accent[2], C.accent[3])
+            GameTooltip:AddLine(L("Gemessene Dauer: %s", FormatTime(flight.known)), C.accent[1], C.accent[2], C.accent[3])
         else
-            GameTooltip:AddLine("Diese Strecke wird gerade zum ersten Mal gemessen.", C.dim[1], C.dim[2], C.dim[3], true)
+            GameTooltip:AddLine(L["Diese Strecke wird gerade zum ersten Mal gemessen."], C.dim[1], C.dim[2], C.dim[3], true)
         end
     else
-        GameTooltip:AddLine("Zeigt Ziel und Restzeit, solange du fliegst. Unbekannte Strecken misst stray beim ersten Flug.", C.text[1], C.text[2], C.text[3], true)
+        GameTooltip:AddLine(L["Zeigt Ziel und Restzeit, solange du fliegst. Unbekannte Strecken misst stray beim ersten Flug."], C.text[1], C.text[2], C.text[3], true)
     end
-    GameTooltip:AddLine("Shift + ziehen zum Verschieben", 0.5, 0.5, 0.5)
+    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end)
 bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -160,7 +161,7 @@ local function OnUpdate(_, elapsed)
     if flight.known and not flight.early then
         local left = flight.known - now
         fill:SetValue(math.min(1, now / flight.known))
-        timeText:SetText(left > 0 and FormatTime(left) or "gleich")
+        timeText:SetText(left > 0 and FormatTime(left) or L["gleich"])
     else
         fill:SetValue(1)
         timeText:SetText(FormatTime(now))
@@ -173,9 +174,9 @@ local function ShowFlight()
     if flight.known and not flight.early then
         dest:SetText(flight.to)
     elseif flight.early then
-        dest:SetText(flight.to .. " (vorzeitige Landung)")
+        dest:SetText(L("%s (vorzeitige Landung)", flight.to))
     else
-        dest:SetText(flight.to .. " – wird gemessen")
+        dest:SetText(L("%s – wird gemessen", flight.to))
     end
     throttle = 1
     bar:SetScript("OnUpdate", OnUpdate)
@@ -187,7 +188,7 @@ local function ShowPreview()
     bar:SetScript("OnUpdate", nil)
     fill:SetStatusBarColor(C.accent[1], C.accent[2], C.accent[3], 0.55)
     fill:SetValue(0.4)
-    dest:SetText("Beispiel: Sturmwind")
+    dest:SetText(L["Beispiel: Sturmwind"])
     timeText:SetText("1:23")
     bar:Show()
 end
@@ -233,7 +234,7 @@ Land = function()
         local times = Times()
         if times then times[flight.key] = math.floor(duration * 10 + 0.5) / 10 end
         if not flight.known then
-            ns.Print(("Flugzeit gemessen: %s – %s"):format(flight.key, FormatTime(duration)))
+            ns.Print(L("Flugzeit gemessen: %s – %s", flight.key, FormatTime(duration)))
         end
     end
     flight = nil
@@ -287,9 +288,9 @@ local function AddTimeLine(slot)
     local times = Times()
     local seconds = times and tonumber(times[from .. ARROW .. to])
     if seconds then
-        GameTooltip:AddLine(("Flugzeit: %s"):format(FormatTime(seconds)), C.accent[1], C.accent[2], C.accent[3])
+        GameTooltip:AddLine(L("Flugzeit: %s", FormatTime(seconds)), C.accent[1], C.accent[2], C.accent[3])
     else
-        GameTooltip:AddLine("Flugzeit: noch nicht gemessen", C.dim[1], C.dim[2], C.dim[3])
+        GameTooltip:AddLine(L["Flugzeit: noch nicht gemessen"], C.dim[1], C.dim[2], C.dim[3])
     end
     GameTooltip:Show()
 end
@@ -356,8 +357,8 @@ ns.OnConfig(function() UpdateBar() end)
 
 ns.AddOption(3, "Kamera & Karte", {
     key = "flightBar",
-    label = "Flugzeit-Balken",
-    tooltip = "Beim Flug mit dem Flugmeister zeigt ein Balken oben mittig Ziel und Restzeit. WoW nennt keine Flugdauer, deshalb misst stray jede Strecke beim ersten Flug selbst („wird gemessen“) und weiß sie ab dann. Am Flugmeister steht die bekannte Dauer im Tooltip der Ziele.\n\nMit Shift + linker Maustaste verschiebst du den Balken.",
+    label = L["Flugzeit-Balken"],
+    tooltip = L["Beim Flug mit dem Flugmeister zeigt ein Balken oben mittig Ziel und Restzeit. WoW nennt keine Flugdauer, deshalb misst stray jede Strecke beim ersten Flug selbst („wird gemessen“) und weiß sie ab dann. Am Flugmeister steht die bekannte Dauer im Tooltip der Ziele.\n\nMit Shift + linker Maustaste verschiebst du den Balken."],
     set = function(value)
         ns.db.flightBar = value
         Apply()

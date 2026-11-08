@@ -4,14 +4,15 @@
 -- Namen können versiegelt sein (Instanzen): dann nichts anzeigen und nichts speichern.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.playerNotes = false
 ns.defaults.playerNoteData = {} -- ["Name-Realm"] = "Text"
 
 ns.AddOption(3, "Sozial", {
     key = "playerNotes",
-    label = "Notizen zu Mitspielern",
-    tooltip = "Im Rechtsklick-Menü auf Spieler (Ziel, Gruppe, Name im Chat) gibt es „stray-Notiz …“.\nDie Notiz steht im Tooltip des Spielers. Kommt er in deine Gruppe, erinnert dich eine Chatzeile daran.",
+    label = L["Notizen zu Mitspielern"],
+    tooltip = L["Im Rechtsklick-Menü auf Spieler (Ziel, Gruppe, Name im Chat) gibt es „stray-Notiz …“.\nDie Notiz steht im Tooltip des Spielers. Kommt er in deine Gruppe, erinnert dich eine Chatzeile daran."],
 })
 
 local FONT_BODY = "Fonts\\ARIALN.TTF"
@@ -152,7 +153,7 @@ title:SetJustifyH("LEFT")
 
 local hint = Text(editor, 11, C.textDim)
 hint:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -3)
-hint:SetText("Enter speichert, Esc schließt. Leer speichern löscht die Notiz.")
+hint:SetText(L["Enter speichert, Esc schließt. Leer speichern löscht die Notiz."])
 
 local field = CreateFrame("Frame", nil, editor)
 field:SetPoint("TOPLEFT", 10, -46)
@@ -184,25 +185,25 @@ local function Save()
     text = text:gsub("|", "/")
     if text == "" then
         if ns.db.playerNoteData[currentKey] then
-            ns.Print(("Notiz zu %s gelöscht."):format(currentName or currentKey))
+            ns.Print(L("Notiz zu %s gelöscht.", currentName or currentKey))
         end
         ns.db.playerNoteData[currentKey] = nil
     else
         ns.db.playerNoteData[currentKey] = text
-        ns.Print(("Notiz zu %s gespeichert."):format(currentName or currentKey))
+        ns.Print(L("Notiz zu %s gespeichert.", currentName or currentKey))
     end
     editor:Hide()
 end
 
-local saveButton = Button(editor, "Speichern", 92)
+local saveButton = Button(editor, L["Speichern"], 92)
 saveButton:SetPoint("BOTTOMRIGHT", -10, 10)
 saveButton:SetScript("OnClick", Save)
 
-local cancelButton = Button(editor, "Abbrechen", 92)
+local cancelButton = Button(editor, L["Abbrechen"], 92)
 cancelButton:SetPoint("RIGHT", saveButton, "LEFT", -6, 0)
 cancelButton:SetScript("OnClick", function() editor:Hide() end)
 
-local deleteButton = Button(editor, "Löschen", 92)
+local deleteButton = Button(editor, L["Löschen"], 92)
 deleteButton:SetPoint("BOTTOMLEFT", 10, 10)
 deleteButton:SetScript("OnClick", function()
     box:SetText("")
@@ -219,7 +220,7 @@ end)
 local function OpenEditor(key, name)
     if not key then return end
     currentKey, currentName = key, name or key
-    title:SetText("stray-Notiz: " .. currentName)
+    title:SetText(L("stray-Notiz: %s", currentName))
     box:SetText(Note(key) or "")
     deleteButton:SetShown(Note(key) ~= nil)
     editor:Show()
@@ -258,7 +259,7 @@ local function ModifyMenu(_, rootDescription, contextData)
     local key, name = KeyFromContext(contextData)
     if not key or key == SelfKey() then return end
     rootDescription:CreateDivider()
-    local label = Note(key) and "stray-Notiz bearbeiten …" or "stray-Notiz …"
+    local label = Note(key) and L["stray-Notiz bearbeiten …"] or L["stray-Notiz …"]
     rootDescription:CreateButton(label, function()
         local ok, err = pcall(OpenEditor, key, name)
         if not ok then geterrorhandler()(err) end
@@ -286,7 +287,7 @@ local function OnUnitTooltip(tooltip)
     local key = UnitKey(unit)
     local text = Note(key)
     if not text then return end
-    tooltip:AddLine("Notiz: " .. text, C.accent[1], C.accent[2], C.accent[3], true)
+    tooltip:AddLine(L("Notiz: %s", text), C.accent[1], C.accent[2], C.accent[3], true)
     tooltip:Show()
 end
 
@@ -327,7 +328,7 @@ local function UpdateGroup()
         for key, name in pairs(current) do
             if not known[key] and key ~= own then
                 local text = Note(key)
-                if text then ns.Print(("Notiz zu %s: %s"):format(name, text)) end
+                if text then ns.Print(L("Notiz zu %s: %s", name, text)) end
             end
         end
     end

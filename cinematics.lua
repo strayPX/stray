@@ -1,17 +1,18 @@
 -- stray – Filmsequenzen: schnell bzw. immer überspringen
 
 local _, ns = ...
+local L = ns.L
 
 ns.AddOption(2, "Filmsequenzen", {
     key = "cinematicFast",
-    label = "Schnell überspringen",
-    tooltip = "Esc beendet Filmsequenzen und Videos sofort, ohne „Wirklich überspringen?“-Abfrage.",
+    label = L["Schnell überspringen"],
+    tooltip = L["Esc beendet Filmsequenzen und Videos sofort, ohne „Wirklich überspringen?“-Abfrage."],
 })
 
 ns.AddOption(2, "Filmsequenzen", {
     key = "cinematicAlways",
-    label = "Immer überspringen",
-    tooltip = "Filmsequenzen und Videos werden beim Start automatisch beendet. Sequenzen, die Blizzard als nicht abbrechbar markiert, laufen trotzdem.",
+    label = L["Immer überspringen"],
+    tooltip = L["Filmsequenzen und Videos werden beim Start automatisch beendet. Sequenzen, die Blizzard als nicht abbrechbar markiert, laufen trotzdem."],
 })
 
 local function CancelCinematic()
@@ -36,7 +37,7 @@ ns.On("CINEMATIC_START", function(canBeCancelled)
     if not ns.db or not ns.db.cinematicAlways then return end
     if canBeCancelled == false then return end
     C_Timer.After(0.1, CancelCinematic)
-    ns.Print("Filmsequenz übersprungen.")
+    ns.Print(L["Filmsequenz übersprungen."])
 end)
 
 -- Vorgerenderte Videos
@@ -44,7 +45,7 @@ if MovieFrame then
     MovieFrame:HookScript("OnShow", function()
         if not ns.db or not ns.db.cinematicAlways then return end
         C_Timer.After(0.1, StopMovie)
-        ns.Print("Video übersprungen.")
+        ns.Print(L["Video übersprungen."])
     end)
 end
 

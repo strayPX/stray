@@ -6,6 +6,7 @@
 -- stray löscht nie etwas selbst: „Aufnehmen“ legt den Gegenstand nur auf den Mauszeiger.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.bagTriage = false
 
@@ -289,11 +290,11 @@ end
 -- Legt den Löschkandidat auf den Mauszeiger. Gelöscht wird nur über Blizzards Bestätigung.
 function ns.TriagePickup()
     if not candidate then
-        ns.Print("Kein Löschkandidat.")
+        ns.Print(L["Kein Löschkandidat."])
         return
     end
     if CursorHasItem and CursorHasItem() then
-        ns.Print("Auf dem Mauszeiger liegt schon etwas.")
+        ns.Print(L["Auf dem Mauszeiger liegt schon etwas."])
         return
     end
     local ok, info = pcall(Container.GetContainerItemInfo, candidate.bag, candidate.slot)
@@ -303,7 +304,7 @@ function ns.TriagePickup()
     end
     if not Container.PickupContainerItem then return end
     Container.PickupContainerItem(candidate.bag, candidate.slot)
-    ns.Print((candidate.link or "Gegenstand") .. " liegt auf dem Mauszeiger. Zum Zerstören neben die Fenster klicken – WoW fragt dann nach. Rechtsklick legt ihn zurück.")
+    ns.Print(L("%s liegt auf dem Mauszeiger. Zum Zerstören neben die Fenster klicken – WoW fragt dann nach. Rechtsklick legt ihn zurück.", candidate.link or L["Gegenstand"]))
 end
 
 -- Tooltipzeile am Löschkandidaten
@@ -317,7 +318,7 @@ local function OnItemTooltip(tooltip, data)
     if not ok or type(owner) ~= "table" then return end
     local bag, slot = ButtonBagSlot(owner)
     if bag ~= candidate.bag or slot ~= candidate.slot then return end
-    tooltip:AddLine("stray: billigster Gegenstand – Löschkandidat", RED[1], RED[2], RED[3])
+    tooltip:AddLine(L["stray: billigster Gegenstand – Löschkandidat"], RED[1], RED[2], RED[3])
     pcall(tooltip.Show, tooltip)
 end
 
@@ -364,8 +365,8 @@ end)
 
 ns.AddOption(1, "Taschen", {
     key = "bagTriage",
-    label = "Hilfe bei vollen Taschen",
-    tooltip = "Ist höchstens noch ein Platz frei, markiert stray den billigsten Gegenstand (Verkaufspreis × Anzahl) rot als Löschkandidat – in Blizzards Taschen, im stray-Taschenfenster und im Tooltip. Beute, die mehr wert ist, bekommt beim Plündern eine Goldmünze.\n\nNie vorgeschlagen werden Questgegenstände, angeheftete Gegenstände, Gegenstände ohne Verkaufswert und alles ab „selten“ (blau).\n\nstray löscht nichts selbst. Im stray-Taschenfenster legt „Löschkandidat aufnehmen“ den Gegenstand nur auf den Mauszeiger.",
+    label = L["Hilfe bei vollen Taschen"],
+    tooltip = L["Ist höchstens noch ein Platz frei, markiert stray den billigsten Gegenstand (Verkaufspreis × Anzahl) rot als Löschkandidat – in Blizzards Taschen, im stray-Taschenfenster und im Tooltip. Beute, die mehr wert ist, bekommt beim Plündern eine Goldmünze.\n\nNie vorgeschlagen werden Questgegenstände, angeheftete Gegenstände, Gegenstände ohne Verkaufswert und alles ab „selten“ (blau).\n\nstray löscht nichts selbst. Im stray-Taschenfenster legt „Löschkandidat aufnehmen“ den Gegenstand nur auf den Mauszeiger."],
     set = function(value)
         ns.db.bagTriage = value
         Apply()

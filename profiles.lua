@@ -6,6 +6,7 @@
 -- Größen je Anzeige (scale.*), Minimap-Winkel und Werkzeugleisten-Punkt.
 
 local _, ns = ...
+local L = ns.L
 
 local PREFIX = "stray1:"
 
@@ -400,7 +401,7 @@ local function ApplyImport(result)
         end
     end
     if failed > 0 then
-        ns.Print(failed .. " Einstellung(en) konnten nicht übernommen werden.")
+        ns.Print(L("%d Einstellung(en) konnten nicht übernommen werden.", failed))
     end
     ReloadUI()
 end
@@ -433,8 +434,8 @@ local function FillExportBox(popup)
 end
 
 StaticPopupDialogs["STRAY_PROFILE_EXPORT"] = {
-    text = "stray-Profil – mit Strg+C kopieren:",
-    button1 = CLOSE or "Schließen",
+    text = L["stray-Profil – mit Strg+C kopieren:"],
+    button1 = CLOSE or L["Schließen"],
     hasEditBox = true,
     editBoxWidth = 350,
     maxLetters = 0,
@@ -457,13 +458,13 @@ StaticPopupDialogs["STRAY_PROFILE_EXPORT"] = {
 
 StaticPopupDialogs["STRAY_PROFILE_CONFIRM"] = {
     text = "%s",
-    button1 = "Übernehmen",
-    button2 = CANCEL or "Abbrechen",
+    button1 = L["Übernehmen"],
+    button2 = CANCEL or L["Abbrechen"],
     OnAccept = function()
         local result = pending
         pending = nil
         local ok, err = pcall(ApplyImport, result)
-        if not ok then ns.Print("Import fehlgeschlagen: " .. tostring(err)) end
+        if not ok then ns.Print(L("Import fehlgeschlagen: %s", tostring(err))) end
     end,
     OnCancel = function() pending = nil end,
     timeout = 0,
@@ -472,42 +473,38 @@ StaticPopupDialogs["STRAY_PROFILE_CONFIRM"] = {
     preferredIndex = 3,
 }
 
-local function Plural(n, one, many)
-    return n .. " " .. (n == 1 and one or many)
-end
-
 local function CheckImport(text)
     local ok, result = pcall(ParseImport, text)
     if not ok then
-        ns.Print("Profil konnte nicht gelesen werden.")
+        ns.Print(L["Profil konnte nicht gelesen werden."])
         return
     end
     if not result then
-        ns.Print("Das ist kein stray-Profil.")
+        ns.Print(L["Das ist kein stray-Profil."])
         return
     end
 
     local changes = #result.changes
     local notes = {}
-    if result.unknown > 0 then table.insert(notes, result.unknown .. " unbekannte ignoriert") end
-    if result.invalid > 0 then table.insert(notes, result.invalid .. " ungültige übersprungen") end
+    if result.unknown > 0 then table.insert(notes, L("%d unbekannte ignoriert", result.unknown)) end
+    if result.invalid > 0 then table.insert(notes, L("%d ungültige übersprungen", result.invalid)) end
     local noteText = (#notes > 0) and (", " .. table.concat(notes, ", ")) or ""
 
     if changes == 0 then
-        ns.Print("Das Profil entspricht schon deinen Einstellungen" .. noteText .. ".")
+        ns.Print(L("Das Profil entspricht schon deinen Einstellungen%s.", noteText))
         return
     end
 
-    local verb = (changes == 1) and " wird geändert" or " werden geändert"
-    local message = Plural(changes, "Einstellung", "Einstellungen") .. verb .. noteText .. ". Übernehmen und neu laden?"
+    local message = (changes == 1) and L("1 Einstellung wird geändert%s. Übernehmen und neu laden?", noteText)
+        or L("%d Einstellungen werden geändert%s. Übernehmen und neu laden?", changes, noteText)
     pending = result
     Later(function() StaticPopup_Show("STRAY_PROFILE_CONFIRM", message) end)
 end
 
 StaticPopupDialogs["STRAY_PROFILE_IMPORT"] = {
-    text = "stray-Profil mit Strg+V einfügen:",
-    button1 = "Prüfen",
-    button2 = CANCEL or "Abbrechen",
+    text = L["stray-Profil mit Strg+V einfügen:"],
+    button1 = L["Prüfen"],
+    button2 = CANCEL or L["Abbrechen"],
     hasEditBox = true,
     editBoxWidth = 350,
     maxLetters = 0,
@@ -539,7 +536,7 @@ local function ShowExport()
     if not ns.db then return end
     local ok, text = pcall(BuildExport)
     if not ok then
-        ns.Print("Export fehlgeschlagen: " .. tostring(text))
+        ns.Print(L("Export fehlgeschlagen: %s", tostring(text)))
         return
     end
     exportText = text
@@ -561,17 +558,17 @@ end
 ns.AddOption(3, "Profile", {
     key = "profileExport",
     type = "button",
-    label = "Profil exportieren",
-    buttonText = "Exportieren",
-    tooltip = "Zeigt alle stray-Einstellungen als Text zum Kopieren.\nDen Text kannst du z. B. einem Freund schicken, der ihn mit „Profil importieren“ übernimmt.",
+    label = L["Profil exportieren"],
+    buttonText = L["Exportieren"],
+    tooltip = L["Zeigt alle stray-Einstellungen als Text zum Kopieren.\nDen Text kannst du z. B. einem Freund schicken, der ihn mit „Profil importieren“ übernimmt."],
     onClick = ShowExport,
 })
 
 ns.AddOption(3, "Profile", {
     key = "profileImport",
     type = "button",
-    label = "Profil importieren",
-    buttonText = "Importieren",
-    tooltip = "Übernimmt stray-Einstellungen aus einem eingefügten Profil-Text.\nVorher siehst du, wie viele Einstellungen sich ändern. Danach wird die Oberfläche neu geladen.",
+    label = L["Profil importieren"],
+    buttonText = L["Importieren"],
+    tooltip = L["Übernimmt stray-Einstellungen aus einem eingefügten Profil-Text.\nVorher siehst du, wie viele Einstellungen sich ändern. Danach wird die Oberfläche neu geladen."],
     onClick = ShowImport,
 })

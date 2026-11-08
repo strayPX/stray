@@ -6,6 +6,7 @@
 --    MerchantFrame_UpdateMerchantInfo; eigene Overlay-Texturen in einer lokalen Tabelle.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.vendorPrice = false
 ns.defaults.knownColor = false
@@ -124,10 +125,10 @@ local function OnItemTooltip(tooltip, data)
     local price = SellPrice(link or itemID)
     if not price or price <= 0 then return end
 
-    tooltip:AddLine("Verkaufspreis: " .. ns.FormatMoney(price), 1, 1, 1)
+    tooltip:AddLine(L("Verkaufspreis: %s", ns.FormatMoney(price)), 1, 1, 1)
     local count = OwnerCount(tooltip, itemID)
     if type(count) == "number" and count >= 2 then
-        tooltip:AddLine(("Stapel (%d): %s"):format(count, ns.FormatMoney(price * count)), 1, 1, 1)
+        tooltip:AddLine(L("Stapel (%d): %s", count, ns.FormatMoney(price * count)), 1, 1, 1)
     end
     pcall(tooltip.Show, tooltip)
 end
@@ -251,14 +252,14 @@ end)
 
 ns.AddOption(1, "Händler", {
     key = "vendorPrice",
-    label = "Verkaufspreis im Tooltip",
-    tooltip = "Zeigt in jedem Gegenstands-Tooltip, was der Händler dafür zahlt. Bei Stapeln steht zusätzlich der Wert des ganzen Stapels dabei (in den Taschen, beim Händler und in der Beute).\n\nZeigt WoW den Preis schon selbst, fügt stray nichts hinzu.",
+    label = L["Verkaufspreis im Tooltip"],
+    tooltip = L["Zeigt in jedem Gegenstands-Tooltip, was der Händler dafür zahlt. Bei Stapeln steht zusätzlich der Wert des ganzen Stapels dabei (in den Taschen, beim Händler und in der Beute).\n\nZeigt WoW den Preis schon selbst, fügt stray nichts hinzu."],
 })
 
 ns.AddOption(1, "Händler", {
     key = "knownColor",
-    label = "Bekanntes grün färben",
-    tooltip = "Rezepte, Begleiter, Reittiere und Bücher, die du schon kennst („" .. KNOWN_TEXT .. "“), werden beim Händler grün eingefärbt. So kaufst du nichts doppelt.",
+    label = L["Bekanntes grün färben"],
+    tooltip = L("Rezepte, Begleiter, Reittiere und Bücher, die du schon kennst („%s“), werden beim Händler grün eingefärbt. So kaufst du nichts doppelt.", KNOWN_TEXT),
     set = function(value)
         ns.db.knownColor = value
         if value then

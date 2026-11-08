@@ -6,6 +6,7 @@
 -- Platz: links neben dem Lebensbalken (Bedrohung sitzt rechts und als Rahmen um den Balken).
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.questMobMarks = false
 
@@ -231,8 +232,8 @@ end)
 
 ns.AddOption(2, "Quests", {
     key = "questMobMarks",
-    label = "Quest-Gegner markieren",
-    tooltip = "Gegner, die du für eine offene Quest töten oder plündern musst, bekommen links an der Namensplakette ein gelbes Ausrufezeichen und deinen Fortschritt, z. B. „3/8“.\n\nNur außerhalb von Instanzen. Im Kampf bleibt die Markierung stehen und wird danach aktualisiert. Gegnerische Namensplaketten müssen eingeschaltet sein (Taste V).",
+    label = L["Quest-Gegner markieren"],
+    tooltip = L["Gegner, die du für eine offene Quest töten oder plündern musst, bekommen links an der Namensplakette ein gelbes Ausrufezeichen und deinen Fortschritt, z. B. „3/8“.\n\nNur außerhalb von Instanzen. Im Kampf bleibt die Markierung stehen und wird danach aktualisiert. Gegnerische Namensplaketten müssen eingeschaltet sein (Taste V)."],
     set = function(value)
         ns.db.questMobMarks = value
         if value then pcall(RefreshAll) else ReleaseAll() end

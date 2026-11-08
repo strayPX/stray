@@ -20,6 +20,7 @@
 -- (auch nach Pfeiltasten, Eingaben und Größenänderung im Fenster).
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.editGrid = true     -- Raster im Bearbeitungsmodus
 ns.defaults.editSnap = true     -- Einrasten an anderen Anzeigen und der Bildschirmmitte
@@ -42,7 +43,7 @@ local C = {
 }
 local ACCENT = C.accent
 
-local HINT = "Ziehen verschiebt · Linksklick wählt eine Anzeige (Fenster mit Position und Größe, Pfeiltasten) · Rechtsklick setzt eine Anzeige zurück · ausgeschaltete Anzeigen erscheinen nicht · Esc hebt die Auswahl auf, sonst beendet es den Modus"
+local HINT = L["Ziehen verschiebt · Linksklick wählt eine Anzeige (Fenster mit Position und Größe, Pfeiltasten) · Rechtsklick setzt eine Anzeige zurück · ausgeschaltete Anzeigen erscheinen nicht · Esc hebt die Auswahl auf, sonst beendet es den Modus"]
 
 local overlays = {}
 local bar, grid, panel
@@ -295,6 +296,18 @@ local function Recolor(list, c)
     for _, t in ipairs(list) do t:SetColorTexture(c[1], c[2], c[3], c[4] or 1) end
 end
 
+-- Name einer Anzeige zum Anzeigen übersetzen. Das Label aus ns.RegisterMovable bleibt deutscher
+-- Schlüssel; bei Namen mit Nummer ohne eigene Übersetzung („Aktionsleiste 3“) zählt der Teil davor.
+local function LabelText(label)
+    if type(label) ~= "string" then return label end
+    local text = L[label]
+    if text == label and not ns.isGerman then
+        local base, num = label:match("^(.-) (%d+)$")
+        if base and L[base] ~= base then text = L[base] .. " " .. num end
+    end
+    return text
+end
+
 local function StringWidth(fs)
     if fs.GetUnboundedStringWidth then return fs:GetUnboundedStringWidth() end
     return fs:GetStringWidth()
@@ -344,7 +357,7 @@ local function CreateOverlay(entry)
 
     o.label = Text(o, 12, { 1, 1, 1 }, nil, "OUTLINE")
     o.label:SetPoint("CENTER")
-    o.label:SetText(entry.label)
+    o.label:SetText(LabelText(entry.label))
 
     -- Ziehen von Klicken unterscheiden: OnClick nach einem Ziehen wählt nicht aus
     o:SetScript("OnMouseDown", function() o.dragged = false end)
@@ -376,10 +389,10 @@ local function CreateOverlay(entry)
     o:SetScript("OnEnter", function(self)
         if o.moving then return end
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(entry.label, 1, 1, 1)
-        GameTooltip:AddLine("Ziehen: verschieben", ACCENT[1], ACCENT[2], ACCENT[3])
-        GameTooltip:AddLine("Linksklick: auswählen (Position, Größe, Pfeiltasten)", ACCENT[1], ACCENT[2], ACCENT[3])
-        GameTooltip:AddLine("Rechtsklick: auf Standard zurücksetzen", ACCENT[1], ACCENT[2], ACCENT[3])
+        GameTooltip:SetText(LabelText(entry.label), 1, 1, 1)
+        GameTooltip:AddLine(L["Ziehen: verschieben"], ACCENT[1], ACCENT[2], ACCENT[3])
+        GameTooltip:AddLine(L["Linksklick: auswählen (Position, Größe, Pfeiltasten)"], ACCENT[1], ACCENT[2], ACCENT[3])
+        GameTooltip:AddLine(L["Rechtsklick: auf Standard zurücksetzen"], ACCENT[1], ACCENT[2], ACCENT[3])
         GameTooltip:Show()
     end)
     o:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -527,10 +540,10 @@ local function ToggleButton(label, makeIcon, isOn, toggle, tipTitle, tipLine)
     b:SetScript("OnClick", function(self)
         toggle()
         self:Refresh()
-        ShowTip(self, tipTitle .. (isOn() and ": an" or ": aus"), tipLine)
+        ShowTip(self, isOn() and L("%s: an", tipTitle) or L("%s: aus", tipTitle), tipLine)
     end)
     b:SetScript("OnEnter", function(self)
-        ShowTip(self, tipTitle .. (isOn() and ": an" or ": aus"), tipLine)
+        ShowTip(self, isOn() and L("%s: an", tipTitle) or L("%s: aus", tipTitle), tipLine)
     end)
     b:Refresh()
     return b
@@ -555,9 +568,9 @@ local function TextButton(parent, label, width, onClick, tipTitle, tipLine)
 end
 
 StaticPopupDialogs["STRAY_EDIT_RESET"] = {
-    text = "stray: Alle Anzeigen auf ihre Standardposition und -größe zurücksetzen?",
-    button1 = "Zurücksetzen",
-    button2 = "Abbrechen",
+    text = L["stray: Alle Anzeigen auf ihre Standardposition und -größe zurücksetzen?"],
+    button1 = L["Zurücksetzen"],
+    button2 = CANCEL or L["Abbrechen"],
     OnAccept = function()
         if InCombatLockdown() then return end
         for _, entry in ipairs(ns.movables) do
@@ -708,7 +721,7 @@ local function CreatePanel()
     close:SetScript("OnClick", function() Deselect() end)
     close:SetScript("OnEnter", function(self)
         cx:SetTextColor(1, 1, 1)
-        ShowTip(self, "Schließen", "Hebt die Auswahl auf (auch mit Esc).")
+        ShowTip(self, L["Schließen"], L["Hebt die Auswahl auf (auch mit Esc)."])
     end)
     close:SetScript("OnLeave", function()
         cx:SetTextColor(C.textSide[1], C.textSide[2], C.textSide[3])
@@ -718,29 +731,29 @@ local function CreatePanel()
     local function Frame() return selected and selected.frame end
 
     -- Position ab Bildschirmmitte
-    panel.posRow = Row("Position")
+    panel.posRow = Row(L["Position"])
     local function GetX() local f = Frame(); if f then return (Center(f)) end end
     local function GetY() local f = Frame(); if not f then return end local _, y = Center(f); return y end
     local xl = SmallText(panel.posRow, "X")
     xl:SetPoint("LEFT", LABEL_W + 4, 0)
     panel.xBox = NumberField(panel.posRow, 50, GetX, function(v)
         local f = Frame(); if f then MoveTo(f, v, nil) end
-    end, "X", "Waagerechter Abstand der Mitte zur Bildschirmmitte in Pixeln (negativ = links). Enter übernimmt, Mausrad ±1, mit Shift ±10.")
+    end, "X", L["Waagerechter Abstand der Mitte zur Bildschirmmitte in Pixeln (negativ = links). Enter übernimmt, Mausrad ±1, mit Shift ±10."])
     panel.xBox:SetPoint("LEFT", xl, "RIGHT", 5, 0)
     local yl = SmallText(panel.posRow, "Y")
     yl:SetPoint("LEFT", panel.xBox, "RIGHT", 9, 0)
     panel.yBox = NumberField(panel.posRow, 50, GetY, function(v)
         local f = Frame(); if f then MoveTo(f, nil, v) end
-    end, "Y", "Senkrechter Abstand der Mitte zur Bildschirmmitte in Pixeln (negativ = unten). Enter übernimmt, Mausrad ±1, mit Shift ±10.")
+    end, "Y", L["Senkrechter Abstand der Mitte zur Bildschirmmitte in Pixeln (negativ = unten). Enter übernimmt, Mausrad ±1, mit Shift ±10."])
     panel.yBox:SetPoint("LEFT", yl, "RIGHT", 5, 0)
 
     -- Größe in Prozent
-    panel.scaleRow = Row("Größe")
+    panel.scaleRow = Row(L["Größe"])
     panel.scaleBox = NumberField(panel.scaleRow, 50, function()
         local f = Frame(); if f then return (f:GetScale() or 1) * 100 end
     end, function(v)
         local f = Frame(); if f then SetScalePercent(f, v) end
-    end, "Größe", "Größe der ganzen Anzeige in Prozent (" .. SCALE_MIN .. "–" .. SCALE_MAX .. "). Enter übernimmt, Mausrad ±1, mit Shift ±10.")
+    end, L["Größe"], L("Größe der ganzen Anzeige in Prozent (%d–%d). Enter übernimmt, Mausrad ±1, mit Shift ±10.", SCALE_MIN, SCALE_MAX))
     panel.scaleBox:SetPoint("LEFT", LABEL_W + 4 + 12, 0)
     local pctl = SmallText(panel.scaleRow, "%  (" .. SCALE_MIN .. "–" .. SCALE_MAX .. ")")
     pctl:SetPoint("LEFT", panel.scaleBox, "RIGHT", 5, 0)
@@ -748,15 +761,15 @@ local function CreatePanel()
     -- Breite und Höhe (nur, wenn das Modul sie meldet)
     panel.sizeRows = {}
     for _, which in ipairs({ "width", "height" }) do
-        local row = Row(which == "width" and "Breite" or "Höhe")
-        local name = which == "width" and "Breite" or "Höhe"
+        local name = which == "width" and L["Breite"] or L["Höhe"]
+        local row = Row(name)
         row.box = NumberField(row, 50, function()
             local spec = selected and SizeSpec(selected, which)
             return spec and SizeValue(spec)
         end, function(v)
             local spec = selected and SizeSpec(selected, which)
             if spec and (not spec.enabled or spec.enabled()) then SetSize(spec, v) end
-        end, name, name .. " der Anzeige in Pixeln, wie der Regler im stray-Fenster. Enter übernimmt, Mausrad ±1, mit Shift ±10.")
+        end, name, L("%s der Anzeige in Pixeln, wie der Regler im stray-Fenster. Enter übernimmt, Mausrad ±1, mit Shift ±10.", name))
         row.box:SetPoint("LEFT", LABEL_W + 4 + 12, 0)
         row.range = SmallText(row, "")
         row.range:SetPoint("LEFT", row.box, "RIGHT", 5, 0)
@@ -767,29 +780,29 @@ local function CreatePanel()
     local half = math.floor((PANEL_W - 2 * PAD - 6) / 2)
     panel.btnRow1 = CreateFrame("Frame", nil, panel)
     panel.btnRow1:SetSize(PANEL_W - 2 * PAD, BTN_H)
-    local centerH = TextButton(panel.btnRow1, "Mitte waagerecht", half, function()
+    local centerH = TextButton(panel.btnRow1, L["Mitte waagerecht"], half, function()
         local f = Frame(); if f then MoveTo(f, 0, nil); RefreshPanel(true) end
-    end, "Waagerecht mittig", "Setzt die Anzeige waagerecht auf die Bildschirmmitte (X = 0).")
+    end, L["Waagerecht mittig"], L["Setzt die Anzeige waagerecht auf die Bildschirmmitte (X = 0)."])
     centerH:SetPoint("LEFT")
-    local centerV = TextButton(panel.btnRow1, "Mitte senkrecht", half, function()
+    local centerV = TextButton(panel.btnRow1, L["Mitte senkrecht"], half, function()
         local f = Frame(); if f then MoveTo(f, nil, 0); RefreshPanel(true) end
-    end, "Senkrecht mittig", "Setzt die Anzeige senkrecht auf die Bildschirmmitte (Y = 0).")
+    end, L["Senkrecht mittig"], L["Setzt die Anzeige senkrecht auf die Bildschirmmitte (Y = 0)."])
     centerV:SetPoint("RIGHT")
 
     panel.btnRow2 = CreateFrame("Frame", nil, panel)
     panel.btnRow2:SetSize(PANEL_W - 2 * PAD, BTN_H)
-    local reset = TextButton(panel.btnRow2, "Zurücksetzen", half, function()
+    local reset = TextButton(panel.btnRow2, L["Zurücksetzen"], half, function()
         if selected then ResetEntry(selected); RefreshPanel(true) end
-    end, "Zurücksetzen", "Setzt Position und Größe dieser Anzeige auf den Standard (auch Breite/Höhe, wo vorhanden).")
+    end, L["Zurücksetzen"], L["Setzt Position und Größe dieser Anzeige auf den Standard (auch Breite/Höhe, wo vorhanden)."])
     reset:SetPoint("LEFT")
-    local closeBtn = TextButton(panel.btnRow2, "Schließen", half, function() Deselect() end,
-        "Schließen", "Hebt die Auswahl auf (auch mit Esc).")
+    local closeBtn = TextButton(panel.btnRow2, L["Schließen"], half, function() Deselect() end,
+        L["Schließen"], L["Hebt die Auswahl auf (auch mit Esc)."])
     closeBtn:SetPoint("RIGHT")
 
     panel.hint = Text(panel, 11, C.textDim, FONT_BODY)
     panel.hint:SetWidth(PANEL_W - 2 * PAD)
     panel.hint:SetJustifyH("LEFT")
-    panel.hint:SetText("Pfeiltasten: 1 px · mit Shift: 10 px\nEsc hebt die Auswahl auf")
+    panel.hint:SetText(L["Pfeiltasten: 1 px · mit Shift: 10 px\nEsc hebt die Auswahl auf"])
 
     -- Tastatur: nur Pfeiltasten und Esc abfangen, alles andere geht ans Spiel weiter.
     -- EnableKeyboard/SetPropagateKeyboardInput sind im Kampf gesperrt; der Modus endet dort ohnehin.
@@ -873,7 +886,7 @@ function RefreshPanel(relayout)
     if not selected or not ns.editMode then return end
     if not panel then CreatePanel() end
     if relayout or not panel:IsShown() then
-        panel.title:SetText(selected.label or "")
+        panel.title:SetText(LabelText(selected.label or ""))
         LayoutPanel()
     end
     panel.xBox:Refresh()
@@ -941,7 +954,7 @@ local function CreateBar()
     logo:SetPoint("LEFT", 8, 0)
     local title = Text(bar, 12, C.text, FONT_BODY)
     title:SetPoint("LEFT", logo, "RIGHT", 6, 0)
-    title:SetText("Bearbeitungsmodus")
+    title:SetText(L["Bearbeitungsmodus"])
     local tw = StringWidth(title)
     if not tw or tw < 1 then tw = 110 end
     local x = 8 + 16 + 6 + tw + 10
@@ -951,16 +964,16 @@ local function CreateBar()
     sep:SetPoint("LEFT", x, 0)
     x = x + 1 + 10
 
-    local gridButton = ToggleButton("Raster", GridIcon, GridOn, function()
+    local gridButton = ToggleButton(L["Raster"], GridIcon, GridOn, function()
         ns.db.editGrid = not GridOn()
         if grid then grid:SetShown(GridOn()) end
-    end, "Raster", "Zeigt ein Hilfsraster. Ohne Einrasten landen Anzeigen beim Loslassen auf dem " .. GRID .. "-px-Raster.")
+    end, L["Raster"], L("Zeigt ein Hilfsraster. Ohne Einrasten landen Anzeigen beim Loslassen auf dem %d-px-Raster.", GRID))
     gridButton:SetPoint("LEFT", x, 0)
     x = x + gridButton:GetWidth() + 4
 
-    local snapButton = ToggleButton("Einrasten", SnapIcon, SnapOn, function()
+    local snapButton = ToggleButton(L["Einrasten"], SnapIcon, SnapOn, function()
         ns.db.editSnap = not SnapOn()
-    end, "Einrasten", "Beim Loslassen rastet eine Anzeige an Kanten und Mitten anderer stray-Anzeigen und an der Bildschirmmitte ein. Geht vor dem Raster.")
+    end, L["Einrasten"], L["Beim Loslassen rastet eine Anzeige an Kanten und Mitten anderer stray-Anzeigen und an der Bildschirmmitte ein. Geht vor dem Raster."])
     snapButton:SetPoint("LEFT", x, 0)
     x = x + snapButton:GetWidth() + 4
 
@@ -973,7 +986,7 @@ local function CreateBar()
     reset:SetPoint("LEFT", x, 0)
     reset:SetScript("OnClick", function() StaticPopup_Show("STRAY_EDIT_RESET") end)
     reset:SetScript("OnEnter", function(self)
-        ShowTip(self, "Alles zurücksetzen", "Setzt alle stray-Anzeigen auf ihre Standardposition und -größe (mit Rückfrage).")
+        ShowTip(self, L["Alles zurücksetzen"], L["Setzt alle stray-Anzeigen auf ihre Standardposition und -größe (mit Rückfrage)."])
     end)
     x = x + reset:GetWidth() + 8
 
@@ -993,17 +1006,17 @@ local function CreateBar()
     dhl:SetColorTexture(1, 1, 1, 0.07)
     local dtext = Text(done, 12, { 1, 1, 1 }, FONT_BODY)
     dtext:SetPoint("CENTER")
-    dtext:SetText("Fertig")
+    dtext:SetText(L["Fertig"])
     done:SetPoint("LEFT", x, 0)
     done:SetScript("OnClick", function() ExitEditMode() end)
-    done:SetScript("OnEnter", function(self) ShowTip(self, "Fertig", "Positionen speichern und den Bearbeitungsmodus beenden (auch mit Esc).") end)
+    done:SetScript("OnEnter", function(self) ShowTip(self, L["Fertig"], L["Positionen speichern und den Bearbeitungsmodus beenden (auch mit Esc)."]) end)
     done:SetScript("OnLeave", function() GameTooltip:Hide() end)
     x = x + done:GetWidth() + 4
 
     bar:SetWidth(math.floor(x + 0.5))
 
     -- Erklärtext nur als Tooltip über der Leiste
-    bar:SetScript("OnEnter", function(self) ShowTip(self, "Bearbeitungsmodus", HINT) end)
+    bar:SetScript("OnEnter", function(self) ShowTip(self, L["Bearbeitungsmodus"], HINT) end)
     bar:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Leiste selbst verschieben und Position merken
@@ -1036,7 +1049,7 @@ end
 function ns.EnterEditMode()
     if ns.editMode then return end
     if InCombatLockdown() then
-        ns.Print("Der Bearbeitungsmodus geht nur außerhalb des Kampfes.")
+        ns.Print(L["Der Bearbeitungsmodus geht nur außerhalb des Kampfes."])
         return
     end
     if not bar then CreateBar() end
@@ -1076,7 +1089,7 @@ function ExitEditMode()
     if grid then grid:Hide() end
     GameTooltip:Hide()
     ns.NotifyConfig()
-    ns.Print("Positionen gespeichert.")
+    ns.Print(L["Positionen gespeichert."])
 end
 ns.ExitEditMode = ExitEditMode
 
@@ -1092,9 +1105,9 @@ end)
 ns.AddOption(3, "Bearbeiten", {
     key = "editModeButton",
     type = "button",
-    label = "Bearbeitungsmodus",
-    buttonText = "Bearbeiten",
+    label = L["Bearbeitungsmodus"],
+    buttonText = L["Bearbeiten"],
     keywords = { "bearbeiten", "verschieben", "position", "größe", "skalierung", "edit mode", "move", "layout", "scale", "unlock" },
-    tooltip = "Blendet alle eingeschalteten stray-Anzeigen ein und macht sie frei verschiebbar – ohne Shift. Linksklick wählt eine Anzeige aus: Daneben öffnet sich ein kleines Fenster mit X/Y (ab Bildschirmmitte), Größe in Prozent und – wo vorhanden – Breite und Höhe; Pfeiltasten schieben sie um 1 px, mit Shift um 10 px. Rechtsklick setzt eine Anzeige auf Standard zurück. Esc hebt die Auswahl auf, ein weiteres Esc oder „Fertig“ beendet den Modus. Die Leiste oben schaltet Raster und Einrasten an anderen Anzeigen und der Bildschirmmitte.\n\nBetrifft alle eingeschalteten stray-Anzeigen: Gruppenrahmen, Aktionsleisten, Abklingzeiten, Bedrohungsliste, DMG-Meter, Haltbarkeit, Erfahrungsleiste, Taschen- und Menüleiste, Taschenfenster, Swing-Timer, Vorrat, Flugzeit, Würfelfenster, Gefahr-Hinweis und die Warntexte. Geht nur außerhalb des Kampfes. Auch per /stray edit.",
+    tooltip = L["Blendet alle eingeschalteten stray-Anzeigen ein und macht sie frei verschiebbar – ohne Shift. Linksklick wählt eine Anzeige aus: Daneben öffnet sich ein kleines Fenster mit X/Y (ab Bildschirmmitte), Größe in Prozent und – wo vorhanden – Breite und Höhe; Pfeiltasten schieben sie um 1 px, mit Shift um 10 px. Rechtsklick setzt eine Anzeige auf Standard zurück. Esc hebt die Auswahl auf, ein weiteres Esc oder „Fertig“ beendet den Modus. Die Leiste oben schaltet Raster und Einrasten an anderen Anzeigen und der Bildschirmmitte.\n\nBetrifft alle eingeschalteten stray-Anzeigen: Gruppenrahmen, Aktionsleisten, Abklingzeiten, Bedrohungsliste, DMG-Meter, Haltbarkeit, Erfahrungsleiste, Taschen- und Menüleiste, Taschenfenster, Swing-Timer, Vorrat, Flugzeit, Würfelfenster, Gefahr-Hinweis und die Warntexte. Geht nur außerhalb des Kampfes. Auch per /stray edit."],
     onClick = function() ns.EnterEditMode() end,
 })

@@ -16,6 +16,7 @@
 -- Die Ereignisse sind nur registriert, solange die passende Option an ist.
 
 local _, ns = ...
+local L = ns.L
 
 local IsSecret = ns.IsSecret
 
@@ -33,7 +34,7 @@ local METER_TYPE = Enum and Enum.DamageMeterType
 local HAS_API = (type(DM) == "table" and DM.GetCombatSessionFromType and type(SESSION_TYPE) == "table"
     and type(METER_TYPE) == "table") and true or false
 local HAS_RESET = HAS_API and DM.ResetAllCombatSessions and true or false
-local NO_API = "Diese Spielversion hat keinen eingebauten Schadensmesser."
+local NO_API = L["Diese Spielversion hat keinen eingebauten Schadensmesser."]
 
 local function ApiAvailable() return HAS_API end
 
@@ -73,7 +74,7 @@ local C = {
     menuBg   = { 0.067, 0.102, 0.157, 0.97 },
 }
 
-local MODE_LABEL = { damage = "Schaden", healing = "Heilung" }
+local MODE_LABEL = { damage = L["Schaden"], healing = L["Heilung"] }
 
 ---------------------------------------------------------------------------
 -- Kleine Bausteine
@@ -193,7 +194,7 @@ local noticeShown = false
 local function NoticeLocked()
     if noticeShown then return end
     noticeShown = true
-    ns.Print("WoW Forever lässt die Werte des DMG-Meters hier gerade nicht anzeigen – stray versucht es weiter, spätestens nach dem Kampf klappt es wieder.")
+    ns.Print(L["WoW Forever lässt die Werte des DMG-Meters hier gerade nicht anzeigen – stray versucht es weiter, spätestens nach dem Kampf klappt es wieder."])
 end
 
 ---------------------------------------------------------------------------
@@ -255,7 +256,7 @@ local function SessionList()
             local id = s.sessionID
             -- Versiegelte oder fehlende ID: nicht wählbar, still überspringen
             if not IsSecret(id) and (type(id) == "number" or type(id) == "string") then
-                local short = PlainString(s, "name", "sessionName") or ("Kampf %d"):format(i)
+                local short = PlainString(s, "name", "sessionName") or L("Kampf %d", i)
                 local label = short
                 local duration = s.durationSeconds
                 if PlainNumber(duration) then
@@ -344,20 +345,20 @@ end
 
 local function DemoEntries(mode)
     local me = ns.Public(UnitName("player"))
-    if type(me) ~= "string" then me = "Du" end
+    if type(me) ~= "string" then me = L["Du"] end
     local _, myClass = UnitClass("player")
     myClass = ns.Public(myClass)
     local list = {
-        { name = "Beispiel-Magier", class = "MAGE", total = 48200, perSec = 402 },
+        { name = L["Beispiel-Magier"], class = "MAGE", total = 48200, perSec = 402 },
         { name = me, class = myClass, total = 41500, perSec = 346, me = true },
-        { name = "Beispiel-Jäger", class = "HUNTER", total = 36800, perSec = 307 },
-        { name = "Beispiel-Krieger", class = "WARRIOR", total = 22100, perSec = 184 },
-        { name = "Beispiel-Priester", class = "PRIEST", total = 9400, perSec = 78 },
+        { name = L["Beispiel-Jäger"], class = "HUNTER", total = 36800, perSec = 307 },
+        { name = L["Beispiel-Krieger"], class = "WARRIOR", total = 22100, perSec = 184 },
+        { name = L["Beispiel-Priester"], class = "PRIEST", total = 9400, perSec = 78 },
     }
     if mode == "healing" then
         list = {
-            { name = "Beispiel-Priester", class = "PRIEST", total = 52300, perSec = 436 },
-            { name = "Beispiel-Druide", class = "DRUID", total = 28900, perSec = 241 },
+            { name = L["Beispiel-Priester"], class = "PRIEST", total = 52300, perSec = 436 },
+            { name = L["Beispiel-Druide"], class = "DRUID", total = 28900, perSec = 241 },
             { name = me, class = myClass, total = 6100, perSec = 51, me = true },
         }
     end
@@ -546,20 +547,20 @@ local function CreateMeter(cfg)
 
     local function MainTooltip(owner)
         GameTooltip:SetOwner(owner, "ANCHOR_LEFT")
-        GameTooltip:SetText(cfg.label, 1, 1, 1)
-        GameTooltip:AddLine("Klick auf den Titel: Gesamt, aktueller Kampf oder ein einzelner Kampf.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
-        GameTooltip:AddLine("Werte: gesamt (pro Sekunde). Die Daten kommen aus dem eingebauten Schadensmesser des Spiels.", 0.7, 0.7, 0.7, true)
-        GameTooltip:AddLine("S || H oben rechts: Schaden oder Heilung.", 0.7, 0.7, 0.7, true)
-        GameTooltip:AddLine("Shift + ziehen zum Verschieben", 0.5, 0.5, 0.5)
+        GameTooltip:SetText(L[cfg.label], 1, 1, 1)
+        GameTooltip:AddLine(L["Klick auf den Titel: Gesamt, aktueller Kampf oder ein einzelner Kampf."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+        GameTooltip:AddLine(L["Werte: gesamt (pro Sekunde). Die Daten kommen aus dem eingebauten Schadensmesser des Spiels."], 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L["S || H oben rechts: Schaden oder Heilung."], 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
         if cfg.dockable then
-            GameTooltip:AddLine("An die Ober- oder Unterkante des ersten DMG-Meters ziehen: andocken. Wegziehen löst es wieder.", 0.5, 0.5, 0.5, true)
+            GameTooltip:AddLine(L["An die Ober- oder Unterkante des ersten DMG-Meters ziehen: andocken. Wegziehen löst es wieder."], 0.5, 0.5, 0.5, true)
             if win.Docked() then
-                GameTooltip:AddLine("Angedockt: Ziehgriff ändert nur die Höhe", 0.5, 0.5, 0.5)
+                GameTooltip:AddLine(L["Angedockt: Ziehgriff ändert nur die Höhe"], 0.5, 0.5, 0.5)
             else
-                GameTooltip:AddLine("Unten rechts ziehen: Größe ändern", 0.5, 0.5, 0.5)
+                GameTooltip:AddLine(L["Unten rechts ziehen: Größe ändern"], 0.5, 0.5, 0.5)
             end
         else
-            GameTooltip:AddLine("Unten rechts ziehen: Größe ändern", 0.5, 0.5, 0.5)
+            GameTooltip:AddLine(L["Unten rechts ziehen: Größe ändern"], 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
     end
@@ -587,12 +588,12 @@ local function CreateMeter(cfg)
     resetHover:SetAllPoints()
     resetHover:SetColorTexture(1, 1, 1, 0.12)
 
-    local healingButton = LetterButton(main, "H")
+    local healingButton = LetterButton(main, L["H"])
     healingButton:SetPoint("RIGHT", resetButton, "LEFT", -6, 0)
     local modeSeparator = Text(main, 11, C.textDim, FONT)
     modeSeparator:SetPoint("RIGHT", healingButton, "LEFT", 0, 0)
     modeSeparator:SetText("||") -- „||“ = ein sichtbarer Strich (| ist WoWs Steuerzeichen)
-    local damageButton = LetterButton(main, "S")
+    local damageButton = LetterButton(main, L["S"])
     damageButton:SetPoint("RIGHT", modeSeparator, "LEFT", 0, 0)
     ForwardDrag(damageButton)
     ForwardDrag(healingButton)
@@ -766,7 +767,7 @@ local function CreateMeter(cfg)
         self:SetAlpha(1)
         if sizing then return end
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText(win.Docked() and "Ziehen: Höhe ändern" or "Ziehen: Größe ändern", 1, 1, 1)
+        GameTooltip:SetText(win.Docked() and L["Ziehen: Höhe ändern"] or L["Ziehen: Größe ändern"], 1, 1, 1)
         GameTooltip:Show()
     end)
     grip:SetScript("OnLeave", function(self)
@@ -821,12 +822,12 @@ local function CreateMeter(cfg)
 
     local function BuildMenu()
         local items = {
-            { label = "Gesamt", view = "overall" },
-            { label = "Aktueller Kampf", view = "current" },
+            { label = L["Gesamt"], view = "overall" },
+            { label = L["Aktueller Kampf"], view = "current" },
         }
         local sessions = SessionList()
         if #sessions == 0 then
-            items[#items + 1] = { label = "Keine einzelnen Kämpfe" }
+            items[#items + 1] = { label = L["Keine einzelnen Kämpfe"] }
         else
             for _, s in ipairs(sessions) do
                 items[#items + 1] = { label = s.label, view = s.id, viewLabel = s.short }
@@ -871,8 +872,8 @@ local function CreateMeter(cfg)
     end)
     resetButton:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:SetText("Zurücksetzen", 1, 1, 1)
-        GameTooltip:AddLine("Löscht alle Kämpfe in beiden DMG-Meter-Fenstern – auch in Blizzards eigenem Schadensmesser. Geht nur außerhalb des Kampfes.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+        GameTooltip:SetText(L["Zurücksetzen"], 1, 1, 1)
+        GameTooltip:AddLine(L["Löscht alle Kämpfe in beiden DMG-Meter-Fenstern – auch in Blizzards eigenem Schadensmesser. Geht nur außerhalb des Kampfes."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
         GameTooltip:Show()
     end)
     resetButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -890,9 +891,9 @@ local function CreateMeter(cfg)
     -----------------------------------------------------------------------
 
     local function ViewLabel()
-        if win.view == "current" then return "Aktueller Kampf" end
-        if win.view == "overall" then return "Gesamt" end
-        return win.viewLabel or "Kampf"
+        if win.view == "current" then return L["Aktueller Kampf"] end
+        if win.view == "overall" then return L["Gesamt"] end
+        return win.viewLabel or L["Kampf"]
     end
 
     function win.ShowEmpty(message)
@@ -914,7 +915,7 @@ local function CreateMeter(cfg)
 
     local function UpdateHeader(mode, demo)
         local text = MODE_LABEL[mode] .. " – " .. ViewLabel()
-        if demo then text = text .. " · Beispiel" end
+        if demo then text = text .. " · " .. L["Beispiel"] end
         title:SetText(text)
         damageButton:SetActive(mode == "damage")
         healingButton:SetActive(mode == "healing")
@@ -952,7 +953,7 @@ local function CreateMeter(cfg)
         main:Show()
 
         if #entries == 0 then
-            win.ShowEmpty("Noch keine Daten.")
+            win.ShowEmpty(L["Noch keine Daten."])
             return
         end
 
@@ -970,7 +971,7 @@ local function CreateMeter(cfg)
         end
         if not allOk then
             NoticeLocked()
-            win.ShowEmpty("Werte gerade nicht anzeigbar.")
+            win.ShowEmpty(L["Werte gerade nicht anzeigbar."])
         end
     end
 
@@ -1023,7 +1024,7 @@ Flush = function()
     for _, win in ipairs(windows) do
         if not pcall(win.Update, cache) then
             NoticeLocked()
-            pcall(win.ShowEmpty, "Werte gerade nicht anzeigbar.")
+            pcall(win.ShowEmpty, L["Werte gerade nicht anzeigbar."])
         end
     end
 end
@@ -1151,18 +1152,18 @@ end
 local function DoReset(auto)
     if not HAS_RESET then return false end
     if InCombatLockdown() then
-        if not auto then ns.Print("Zurücksetzen geht erst nach dem Kampf.") end
+        if not auto then ns.Print(L["Zurücksetzen geht erst nach dem Kampf."]) end
         return false
     end
     if not pcall(DM.ResetAllCombatSessions) then
-        ns.Print("Der DMG-Meter ließ sich nicht zurücksetzen.")
+        ns.Print(L["Der DMG-Meter ließ sich nicht zurücksetzen."])
         return false
     end
     ResetViews()
     if auto then
-        ns.Print("DMG-Meter zurückgesetzt (Instanz verlassen).")
+        ns.Print(L["DMG-Meter zurückgesetzt (Instanz verlassen)."])
     else
-        ns.Print("DMG-Meter zurückgesetzt.")
+        ns.Print(L["DMG-Meter zurückgesetzt."])
     end
     Request()
     return true
@@ -1170,9 +1171,9 @@ end
 
 if StaticPopupDialogs then
     StaticPopupDialogs["STRAY_DAMAGEMETER_RESET"] = {
-        text = "Alle Kämpfe im DMG-Meter zurücksetzen?\n\nDas betrifft auch Blizzards eigenen Schadensmesser.",
-        button1 = YES or "Ja",
-        button2 = NO or "Nein",
+        text = L["Alle Kämpfe im DMG-Meter zurücksetzen?\n\nDas betrifft auch Blizzards eigenen Schadensmesser."],
+        button1 = YES or L["Ja"],
+        button2 = NO or L["Nein"],
         OnAccept = function() DoReset(false) end,
         timeout = 0,
         whileDead = true,
@@ -1328,8 +1329,8 @@ end
 
 ns.AddOption(2, "DMG-Meter", {
     key = "dmShow",
-    label = "DMG-Meter anzeigen",
-    tooltip = "Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (so hell wie die Gruppenrahmen), dein eigener Balken hat links einen blauen Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit S || H zwischen Schaden und Heilung um; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben.",
+    label = L["DMG-Meter anzeigen"],
+    tooltip = L["Zeigt Schaden oder Heilung deiner Gruppe in einem eigenen Fenster. Balken mit Gesamtwert und Wert pro Sekunde in Klassenfarbe (so hell wie die Gruppenrahmen), dein eigener Balken hat links einen blauen Strich. Wie viele Balken zu sehen sind, ergibt sich aus der Fenstergröße – unten rechts ziehen zum Ändern. Oben rechts schaltest du mit S || H zwischen Schaden und Heilung um; ein Klick auf den Titel wählt Gesamt, den aktuellen Kampf oder einen einzelnen Kampf. Die Werte kommen aus dem eingebauten Schadensmesser des Spiels.\n\nSolange das stray-Fenster offen ist und noch keine Daten da sind, zeigt das Fenster Beispielwerte – dann kannst du es mit Shift + linker Maustaste verschieben."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("dmShow"),
@@ -1337,10 +1338,10 @@ ns.AddOption(2, "DMG-Meter", {
 
 ns.AddOption(2, "DMG-Meter", {
     key = "dm2Show",
-    label = "Zweites Fenster",
-    tooltip = "Zeigt ein zweites DMG-Meter-Fenster mit eigenem Modus (Standard: Heilung), eigener Ansicht und eigener Größe – zum Beispiel oben Heilung und unten Schaden.\n\nZiehst du es mit Shift an die Ober- oder Unterkante des ersten Fensters, dockt es an: gleiche Breite, links bündig, und es wandert mit dem ersten Fenster mit. Angedockt änderst du nur seine Höhe. Wegziehen löst es wieder. Beim ersten Einschalten sitzt es angedockt über dem ersten Fenster. Zurücksetzen gilt für beide Fenster.",
+    label = L["Zweites Fenster"],
+    tooltip = L["Zeigt ein zweites DMG-Meter-Fenster mit eigenem Modus (Standard: Heilung), eigener Ansicht und eigener Größe – zum Beispiel oben Heilung und unten Schaden.\n\nZiehst du es mit Shift an die Ober- oder Unterkante des ersten Fensters, dockt es an: gleiche Breite, links bündig, und es wandert mit dem ersten Fenster mit. Angedockt änderst du nur seine Höhe. Wegziehen löst es wieder. Beim ersten Einschalten sitzt es angedockt über dem ersten Fenster. Zurücksetzen gilt für beide Fenster."],
     isEnabled = function() return HAS_API and ns.db and ns.db.dmShow and true or false end,
-    disabledHint = "Erst „DMG-Meter anzeigen“ einschalten (direkt darüber).",
+    disabledHint = L["Erst „DMG-Meter anzeigen“ einschalten (direkt darüber)."],
     set = function(value)
         ns.db.dm2Show = value
         -- Erstes Einschalten (noch nie verschoben): oben angedockt
@@ -1355,8 +1356,8 @@ ns.AddOption(2, "DMG-Meter", {
 
 ns.AddOption(2, "DMG-Meter", {
     key = "dmAutoReset",
-    label = "Nach Instanz zurücksetzen",
-    tooltip = "Setzt den DMG-Meter zurück, sobald du einen Dungeon oder Schlachtzug verlässt. Im Chat erscheint dann eine kurze Meldung. Das betrifft auch Blizzards eigenen Schadensmesser, weil beide dieselben Daten nutzen.",
+    label = L["Nach Instanz zurücksetzen"],
+    tooltip = L["Setzt den DMG-Meter zurück, sobald du einen Dungeon oder Schlachtzug verlässt. Im Chat erscheint dann eine kurze Meldung. Das betrifft auch Blizzards eigenen Schadensmesser, weil beide dieselben Daten nutzen."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("dmAutoReset"),

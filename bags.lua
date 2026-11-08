@@ -1,19 +1,20 @@
 -- stray – Taschen: Zerstören ohne Tipparbeit bzw. ohne Nachfrage
 
 local _, ns = ...
+local L = ns.L
 
 local CONFIRM_WORD = DELETE_ITEM_CONFIRM_STRING or "LÖSCHEN"
 
 ns.AddOption(1, "Taschen", {
     key = "deleteFill",
-    label = "„" .. CONFIRM_WORD .. "“ vorausfüllen",
-    tooltip = "Beim Zerstören wertvoller Gegenstände steht das Bestätigungswort schon im Feld. Du klickst nur noch auf „Ja“ oder drückst Enter.",
+    label = L("„%s“ vorausfüllen", CONFIRM_WORD),
+    tooltip = L["Beim Zerstören wertvoller Gegenstände steht das Bestätigungswort schon im Feld. Du klickst nur noch auf „Ja“ oder drückst Enter."],
 })
 
 ns.AddOption(1, "Taschen", {
     key = "deleteNoConfirm",
-    label = "Ohne Nachfrage zerstören",
-    tooltip = "Zerstört Gegenstände sofort, ohne Ja/Nein-Abfrage – auch epische und legendäre.\n\nZerstörte Gegenstände sind endgültig weg.",
+    label = L["Ohne Nachfrage zerstören"],
+    tooltip = L["Zerstört Gegenstände sofort, ohne Ja/Nein-Abfrage – auch epische und legendäre.\n\nZerstörte Gegenstände sind endgültig weg."],
 })
 
 -- Zerstören-Abfragen von WoW; true = Bestätigungswort muss eingetippt werden

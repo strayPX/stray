@@ -14,6 +14,7 @@
 -- Symbole für Machtwort: Schild und „Geschwächte Seele“ – alles nicht-sichere Kinder von „art“.
 
 local _, ns = ...
+local L = ns.L
 
 local IsSecret = ns.IsSecret
 local Public = ns.Public
@@ -514,12 +515,12 @@ end
 -- Gibt zurück: Statustext oder nil (versiegelt → kein Status)
 local function StatusText(unit)
     local connected = UnitIsConnected(unit)
-    if not IsSecret(connected) and connected == false then return "Offline" end
+    if not IsSecret(connected) and connected == false then return L["Offline"] end
     local dead = UnitIsDeadOrGhost(unit)
     if not IsSecret(dead) and dead then
         local ghost = UnitIsGhost(unit)
-        if not IsSecret(ghost) and ghost then return "Geist" end
-        return "Tot"
+        if not IsSecret(ghost) and ghost then return L["Geist"] end
+        return L["Tot"]
     end
     return nil
 end
@@ -831,7 +832,7 @@ local function PaintPetHealth(t, unit)
 
     local dead = UnitIsDeadOrGhost(unit)
     if not IsSecret(dead) and dead then
-        t.status:SetText("Tot")
+        t.status:SetText(L["Tot"])
         t.status:Show()
         t.pct:Hide()
         t.health:SetStatusBarColor(0.35, 0.35, 0.35)
@@ -1067,23 +1068,23 @@ end
 
 local SAMPLES = {
     -- Du selbst (Name, Klasse und Ressource des eingeloggten Charakters): Schild größer als das fehlende Leben → Überschild-Strich
-    { isPlayer = true, name = "Du", class = "PRIEST", hp = 0.92, power = "MANA", mp = 0.7, absorb = 0.15 },
+    { isPlayer = true, name = L["Du"], class = "PRIEST", hp = 0.92, power = "MANA", mp = 0.7, absorb = 0.15 },
     -- Kael: laufende Heilung +30 % (eigene 20 % hell, fremde 10 % dunkler)
     { name = "Kael", class = "MAGE", hp = 0.64, power = "MANA", mp = 0.45, dispel = "Poison", icon = "Interface\\Icons\\Ability_Creature_Poison_03", healOwn = 0.2, healOther = 0.1 },
     { name = "Mira", class = "DRUID", hp = 1.0, power = "MANA", mp = 0.9, faded = true },
-    { name = "Brom", class = "WARRIOR", hp = 0, power = "RAGE", mp = 0, status = "Tot" },
+    { name = "Brom", class = "WARRIOR", hp = 0, power = "RAGE", mp = 0, status = L["Tot"] },
     -- Sera (Jägerin): Schild (gestreift) mit Schild-Symbol und „Geschwächte Seele“ (noch 9 von 15 s),
     -- dazu ihr Begleiter links daneben (nur mit „Begleiter anzeigen“)
     { name = "Sera", class = "HUNTER", hp = 0.38, power = "MANA", mp = 0.8, target = true, absorb = 0.25, soulLeft = 9, soulDuration = 15,
-      pet = { name = "Wolf", hp = 0.55 } },
+      pet = { name = L["Wolf"], hp = 0.55 } },
 }
 
 local samples = {}
 
 local function SamplePetEnter(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Begleiter – Beispiel", 1, 1, 1)
-    GameTooltip:AddLine("So erscheint das Tier oder der Dämon eines Gruppenmitglieds links neben seinem Rahmen. Breite und Höhe stellst du im stray-Fenster ein.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:SetText(L["Begleiter – Beispiel"], 1, 1, 1)
+    GameTooltip:AddLine(L["So erscheint das Tier oder der Dämon eines Gruppenmitglieds links neben seinem Rahmen. Breite und Höhe stellst du im stray-Fenster ein."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
     GameTooltip:Show()
 end
 
@@ -1101,9 +1102,9 @@ end
 
 local function SampleEnter(self)
     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-    GameTooltip:SetText("Gruppenrahmen – Beispiel", 1, 1, 1)
-    GameTooltip:AddLine("Shift + ziehen zum Verschieben. Breite, Höhe und Abstand stellst du im stray-Fenster ein.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
-    GameTooltip:AddLine("Die Testgruppe verschwindet, wenn du das stray-Fenster schließt (oder echte Gruppenrahmen in deiner Gruppe laufen).", 0.7, 0.7, 0.7, true)
+    GameTooltip:SetText(L["Gruppenrahmen – Beispiel"], 1, 1, 1)
+    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben. Breite, Höhe und Abstand stellst du im stray-Fenster ein."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:AddLine(L["Die Testgruppe verschwindet, wenn du das stray-Fenster schließt (oder echte Gruppenrahmen in deiner Gruppe laufen)."], 0.7, 0.7, 0.7, true)
     GameTooltip:Show()
 end
 
@@ -1485,19 +1486,19 @@ ns.OnConfig(function() UpdatePreview() end)
 ---------------------------------------------------------------------------
 
 local function CombatNote()
-    if InCombatLockdown() then ns.Print("Gruppenrahmen: Die Änderung gilt nach dem Kampf.") end
+    if InCombatLockdown() then ns.Print(L["Gruppenrahmen: Die Änderung gilt nach dem Kampf."]) end
 end
 
 local function ReloadNote()
     if blizzardHidden then
-        ns.Print("Blizzards Gruppenrahmen kommen nach /reload zurück.")
+        ns.Print(L["Blizzards Gruppenrahmen kommen nach /reload zurück."])
     end
 end
 
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyFrames",
-    label = "Gruppenrahmen anzeigen",
-    tooltip = "Eigene Gruppenrahmen für Heiler: du und deine 5er-Gruppe als senkrechte Spalte (nicht im Schlachtzug). Lebensbalken in Klassenfarbe, Leben in Prozent, Ressourcenbalken, „Tot“/„Geist“/„Offline“; wer außer Reichweite ist, wird blass. Hat jemand eine Schwächung, die du entfernen kannst, bekommt die Kachel einen farbigen Rahmen (Gift grün, Krankheit braun, Fluch lila, Magie blau) und ein kleines Symbol. Außerdem zeigen die Kacheln eingehende Heilung (hellgrün), Schilde (hellblau gestreift, mit Symbol) und „Geschwächte Seele“ mit Restzeit.\n\nLinksklick wählt das Mitglied als Ziel, Rechtsklick öffnet sein Menü. Mit eingeschaltetem „Mouseover-Zauber“ (Kampf → Zaubern) heilt deine normale Heiltaste das Mitglied unter der Maus.\n\nVerschieben mit Shift + Ziehen; solange das stray-Fenster offen ist, zeigt eine Testgruppe mit 5 Spielern Größe und Position – auch wenn die Gruppenrahmen noch aus sind. Änderungen wirken nur außerhalb des Kampfes.",
+    label = L["Gruppenrahmen anzeigen"],
+    tooltip = L["Eigene Gruppenrahmen für Heiler: du und deine 5er-Gruppe als senkrechte Spalte (nicht im Schlachtzug). Lebensbalken in Klassenfarbe, Leben in Prozent, Ressourcenbalken, „Tot“/„Geist“/„Offline“; wer außer Reichweite ist, wird blass. Hat jemand eine Schwächung, die du entfernen kannst, bekommt die Kachel einen farbigen Rahmen (Gift grün, Krankheit braun, Fluch lila, Magie blau) und ein kleines Symbol. Außerdem zeigen die Kacheln eingehende Heilung (hellgrün), Schilde (hellblau gestreift, mit Symbol) und „Geschwächte Seele“ mit Restzeit.\n\nLinksklick wählt das Mitglied als Ziel, Rechtsklick öffnet sein Menü. Mit eingeschaltetem „Mouseover-Zauber“ (Kampf → Zaubern) heilt deine normale Heiltaste das Mitglied unter der Maus.\n\nVerschieben mit Shift + Ziehen; solange das stray-Fenster offen ist, zeigt eine Testgruppe mit 5 Spielern Größe und Position – auch wenn die Gruppenrahmen noch aus sind. Änderungen wirken nur außerhalb des Kampfes."],
     set = function(value)
         ns.db.partyFrames = value
         CombatNote()
@@ -1508,10 +1509,10 @@ ns.AddOption(3, "Gruppenrahmen", {
 
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyHideBlizzard",
-    label = "Blizzards Gruppenrahmen ausblenden",
-    tooltip = "Blendet Blizzards eigene Gruppenrahmen aus, solange die stray-Gruppenrahmen an sind. So siehst du jedes Mitglied nur einmal.\n\nWieder einblenden: Option ausschalten und /reload eingeben (Neuladen nötig).",
+    label = L["Blizzards Gruppenrahmen ausblenden"],
+    tooltip = L["Blendet Blizzards eigene Gruppenrahmen aus, solange die stray-Gruppenrahmen an sind. So siehst du jedes Mitglied nur einmal.\n\nWieder einblenden: Option ausschalten und /reload eingeben (Neuladen nötig)."],
     isEnabled = function() return ns.db and ns.db.partyFrames and true or false end,
-    disabledHint = "Erst „Gruppenrahmen anzeigen“ einschalten (oben auf dieser Seite).",
+    disabledHint = L["Erst „Gruppenrahmen anzeigen“ einschalten (oben auf dieser Seite)."],
     set = function(value)
         ns.db.partyHideBlizzard = value
         CombatNote()
@@ -1523,36 +1524,36 @@ ns.AddOption(3, "Gruppenrahmen", {
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyWidth",
     type = "slider",
-    label = "Breite",
+    label = L["Breite"],
     min = 60, max = 200, step = 1,
-    tooltip = "Breite jeder Kachel in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Breite jeder Kachel in Pixeln. Im Kampf wird die Änderung erst danach übernommen."],
     set = function(v) ns.db.partyWidth = v; ns.PartyApplyLayout() end,
 })
 
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyHeight",
     type = "slider",
-    label = "Höhe",
+    label = L["Höhe"],
     min = 24, max = 80, step = 1,
-    tooltip = "Höhe jeder Kachel in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Höhe jeder Kachel in Pixeln. Im Kampf wird die Änderung erst danach übernommen."],
     set = function(v) ns.db.partyHeight = v; ns.PartyApplyLayout() end,
 })
 
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partySpacing",
     type = "slider",
-    label = "Abstand",
+    label = L["Abstand"],
     min = 0, max = 20, step = 1,
-    tooltip = "Abstand zwischen den Kacheln in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Abstand zwischen den Kacheln in Pixeln. Im Kampf wird die Änderung erst danach übernommen."],
     set = function(v) ns.db.partySpacing = v; ns.PartyApplyLayout() end,
 })
 
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyBrightness",
     type = "slider",
-    label = "Helligkeit der Balken",
+    label = L["Helligkeit der Balken"],
     min = 30, max = 100, step = 5,
-    tooltip = "Dunkelt die Klassenfarben der Lebensbalken ab, damit die Rahmen nicht so grell leuchten (100 = volle Klassenfarbe). Die Testgruppe zeigt die Änderung sofort.",
+    tooltip = L["Dunkelt die Klassenfarben der Lebensbalken ab, damit die Rahmen nicht so grell leuchten (100 = volle Klassenfarbe). Die Testgruppe zeigt die Änderung sofort."],
     set = function(v)
         ns.db.partyBrightness = v
         RepaintSamples()
@@ -1568,11 +1569,11 @@ end
 
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyPets",
-    label = "Begleiter anzeigen",
-    tooltip = "Zeigt das Tier oder den Dämon eines Gruppenmitglieds (Jäger, Hexenmeister …) als kleines Fenster links neben seinem Rahmen: Name, Lebensbalken und Leben in Prozent. Auch dein eigener Begleiter erscheint neben deinem Rahmen.\n\nLinksklick wählt den Begleiter als Ziel, Rechtsklick öffnet sein Menü; mit „Mouseover-Zauber“ (Kampf → Zaubern) heilst du ihn direkt unter der Maus. Die Testgruppe zeigt einen Begleiter bei der Jägerin. Ein- und Ausschalten wirkt nur außerhalb des Kampfes.",
+    label = L["Begleiter anzeigen"],
+    tooltip = L["Zeigt das Tier oder den Dämon eines Gruppenmitglieds (Jäger, Hexenmeister …) als kleines Fenster links neben seinem Rahmen: Name, Lebensbalken und Leben in Prozent. Auch dein eigener Begleiter erscheint neben deinem Rahmen.\n\nLinksklick wählt den Begleiter als Ziel, Rechtsklick öffnet sein Menü; mit „Mouseover-Zauber“ (Kampf → Zaubern) heilst du ihn direkt unter der Maus. Die Testgruppe zeigt einen Begleiter bei der Jägerin. Ein- und Ausschalten wirkt nur außerhalb des Kampfes."],
     keywords = PET_KEYWORDS,
     isEnabled = function() return ns.db and ns.db.partyFrames and true or false end,
-    disabledHint = "Erst „Gruppenrahmen anzeigen“ einschalten (oben auf dieser Seite).",
+    disabledHint = L["Erst „Gruppenrahmen anzeigen“ einschalten (oben auf dieser Seite)."],
     set = function(value)
         ns.db.partyPets = value
         CombatNote()
@@ -1583,23 +1584,23 @@ ns.AddOption(3, "Gruppenrahmen", {
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyPetWidth",
     type = "slider",
-    label = "Begleiter: Breite",
+    label = L["Begleiter: Breite"],
     min = 40, max = 160, step = 1,
-    tooltip = "Breite des Begleiter-Fensters in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Breite des Begleiter-Fensters in Pixeln. Im Kampf wird die Änderung erst danach übernommen."],
     keywords = PET_KEYWORDS,
     isEnabled = PetsOptionOn,
-    disabledHint = "Erst „Begleiter anzeigen“ einschalten.",
+    disabledHint = L["Erst „Begleiter anzeigen“ einschalten."],
     set = function(v) ns.db.partyPetWidth = v; ns.PartyApplyLayout() end,
 })
 
 ns.AddOption(3, "Gruppenrahmen", {
     key = "partyPetHeight",
     type = "slider",
-    label = "Begleiter: Höhe",
+    label = L["Begleiter: Höhe"],
     min = 14, max = 60, step = 1,
-    tooltip = "Höhe des Begleiter-Fensters in Pixeln; es sitzt mittig neben dem Rahmen des Besitzers. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Höhe des Begleiter-Fensters in Pixeln; es sitzt mittig neben dem Rahmen des Besitzers. Im Kampf wird die Änderung erst danach übernommen."],
     keywords = PET_KEYWORDS,
     isEnabled = PetsOptionOn,
-    disabledHint = "Erst „Begleiter anzeigen“ einschalten.",
+    disabledHint = L["Erst „Begleiter anzeigen“ einschalten."],
     set = function(v) ns.db.partyPetHeight = v; ns.PartyApplyLayout() end,
 })

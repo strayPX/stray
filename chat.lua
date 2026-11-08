@@ -3,19 +3,20 @@
 -- EventRegistry-Ereignis „SetItemRef“ weiter, ohne Blizzard-Code zu verändern (kein Taint).
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.chatCoords = false
 
 ns.AddOption(1, "Chat", {
     key = "chatLinks",
-    label = "Links kopierbar",
-    tooltip = "Webadressen im Chat werden blau und anklickbar. Ein Klick öffnet ein Feld, aus dem du den Link mit Strg+C kopierst.",
+    label = L["Links kopierbar"],
+    tooltip = L["Webadressen im Chat werden blau und anklickbar. Ein Klick öffnet ein Feld, aus dem du den Link mit Strg+C kopierst."],
 })
 
 ns.AddOption(1, "Chat", {
     key = "chatCoords",
-    label = "Koordinaten anklickbar",
-    tooltip = "Koordinaten im Chat wie „45.2, 67.8“ oder „45,2 67,8“ werden zu Links. Ganze Zahlen wie „45 67“ nur mit einem Wort davor, z. B. „bei 45 67“ oder „/way 45 67“.\nEin Klick setzt einen Kartenpin auf deiner aktuellen Karte.\nIn Instanzen ist der Chat versiegelt, dort bleibt alles unverändert.",
+    label = L["Koordinaten anklickbar"],
+    tooltip = L["Koordinaten im Chat wie „45.2, 67.8“ oder „45,2 67,8“ werden zu Links. Ganze Zahlen wie „45 67“ nur mit einem Wort davor, z. B. „bei 45 67“ oder „/way 45 67“.\nEin Klick setzt einen Kartenpin auf deiner aktuellen Karte.\nIn Instanzen ist der Chat versiegelt, dort bleibt alles unverändert."],
 })
 
 local LINK_COLOR = "|cff4fb3ff"
@@ -263,31 +264,31 @@ local function SetPin(xText, yText)
     local x, y = tonumber(xText), tonumber(yText)
     if not x or not y then return end
     if not C_Map or not C_Map.GetBestMapForUnit or not C_Map.SetUserWaypoint or not UiMapPoint or not UiMapPoint.CreateFromCoordinates then
-        ns.Print("Kartenpins gibt es in diesem Client nicht.")
+        ns.Print(L["Kartenpins gibt es in diesem Client nicht."])
         return
     end
     local okMap, mapID = pcall(C_Map.GetBestMapForUnit, "player")
     if not okMap or ns.IsSecret(mapID) or type(mapID) ~= "number" then
-        ns.Print("Keine Karte für den Pin gefunden.")
+        ns.Print(L["Keine Karte für den Pin gefunden."])
         return
     end
     if C_Map.CanSetUserWaypointOnMap then
         local okCan, can = pcall(C_Map.CanSetUserWaypointOnMap, mapID)
         if okCan and not ns.IsSecret(can) and can == false then
-            ns.Print("Auf dieser Karte kann kein Pin gesetzt werden.")
+            ns.Print(L["Auf dieser Karte kann kein Pin gesetzt werden."])
             return
         end
     end
     local point = UiMapPoint.CreateFromCoordinates(mapID, x / 100, y / 100)
     local okSet, wasSet = pcall(C_Map.SetUserWaypoint, point)
     if not okSet or wasSet == false then
-        ns.Print("Pin konnte nicht gesetzt werden.")
+        ns.Print(L["Pin konnte nicht gesetzt werden."])
         return
     end
     if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
         pcall(C_SuperTrack.SetSuperTrackedUserWaypoint, true)
     end
-    ns.Print(("Pin gesetzt (%s, %s)"):format(xText, yText))
+    ns.Print(L("Pin gesetzt (%s, %s)", xText, yText))
 end
 
 ---------------------------------------------------------------------------
@@ -300,8 +301,8 @@ end
 
 local copyURL -- zuletzt angezeigte Adresse (statt eines Feldes auf Blizzards Popup)
 StaticPopupDialogs["STRAY_COPY_URL"] = {
-    text = "Link kopieren mit Strg+C:",
-    button1 = CLOSE or "Schließen",
+    text = L["Link kopieren mit Strg+C:"],
+    button1 = CLOSE or L["Schließen"],
     hasEditBox = true,
     editBoxWidth = 320,
     OnShow = function(self, data)

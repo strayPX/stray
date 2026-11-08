@@ -2,38 +2,39 @@
 -- Gruppeneinladungen von Freunden/Gilde annehmen oder von Fremden ablehnen
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.inviteAcceptFriends = false
 ns.defaults.inviteDeclineStrangers = false
 
 ns.AddOption(3, "Sozial", {
     key = "declineDuels",
-    label = "Duelle ablehnen",
-    tooltip = "Duellanfragen werden sofort abgelehnt. Im Chat steht, wer dich herausgefordert hat.",
+    label = L["Duelle ablehnen"],
+    tooltip = L["Duellanfragen werden sofort abgelehnt. Im Chat steht, wer dich herausgefordert hat."],
 })
 
 ns.AddOption(3, "Sozial", {
     key = "acceptRes",
-    label = "Wiederbelebung annehmen",
-    tooltip = "Nimmt Wiederbelebungen von Mitspielern automatisch an – aber nicht, solange der Wiederbelebende noch im Kampf ist.",
+    label = L["Wiederbelebung annehmen"],
+    tooltip = L["Nimmt Wiederbelebungen von Mitspielern automatisch an – aber nicht, solange der Wiederbelebende noch im Kampf ist."],
 })
 
 ns.AddOption(3, "Sozial", {
     key = "acceptSummon",
-    label = "Beschwörung annehmen",
-    tooltip = "Nimmt Beschwörungen (z. B. vom Hexenmeister) automatisch an – nicht, wenn du gerade im Kampf bist.",
+    label = L["Beschwörung annehmen"],
+    tooltip = L["Nimmt Beschwörungen (z. B. vom Hexenmeister) automatisch an – nicht, wenn du gerade im Kampf bist."],
 })
 
 ns.AddOption(3, "Sozial", {
     key = "inviteAcceptFriends",
-    label = "Einladungen von Freunden und Gilde annehmen",
-    tooltip = "Gruppeneinladungen von Freunden, Battle.net-Freunden und Gildenmitgliedern werden automatisch angenommen.\nNicht, solange du in einer Warteschlange bist, und nicht bei Einladungen über die Gruppensuche.",
+    label = L["Einladungen von Freunden und Gilde annehmen"],
+    tooltip = L["Gruppeneinladungen von Freunden, Battle.net-Freunden und Gildenmitgliedern werden automatisch angenommen.\nNicht, solange du in einer Warteschlange bist, und nicht bei Einladungen über die Gruppensuche."],
 })
 
 ns.AddOption(3, "Sozial", {
     key = "inviteDeclineStrangers",
-    label = "Einladungen von Fremden ablehnen",
-    tooltip = "Gruppeneinladungen von Spielern, die weder Freund noch in deiner Gilde sind, werden sofort abgelehnt. Im Chat steht, wer dich eingeladen hat.\nEinladungen über die Gruppensuche bleiben unberührt.",
+    label = L["Einladungen von Fremden ablehnen"],
+    tooltip = L["Gruppeneinladungen von Spielern, die weder Freund noch in deiner Gilde sind, werden sofort abgelehnt. Im Chat steht, wer dich eingeladen hat.\nEinladungen über die Gruppensuche bleiben unberührt."],
 })
 
 local function HidePopups(...)
@@ -52,7 +53,7 @@ ns.On("DUEL_REQUESTED", function(name)
     CancelDuel()
     HidePopups("DUEL_REQUESTED")
     C_Timer.After(0, function() HidePopups("DUEL_REQUESTED") end)
-    ns.Print(("Duell von %s abgelehnt."):format(name or "?"))
+    ns.Print(L("Duell von %s abgelehnt.", name or "?"))
 end)
 
 ---------------------------------------------------------------------------
@@ -70,12 +71,12 @@ end
 local function AcceptRes(name)
     if not UnitIsDeadOrGhost("player") then return end
     if InCombat(name) then
-        ns.Print(("Wiederbelebung von %s nicht automatisch angenommen – noch im Kampf."):format(name or "?"))
+        ns.Print(L("Wiederbelebung von %s nicht automatisch angenommen – noch im Kampf.", name or "?"))
         return
     end
     AcceptResurrect()
     HidePopups("RESURRECT", "RESURRECT_NO_SICKNESS", "RESURRECT_NO_TIMER")
-    ns.Print(("Wiederbelebung von %s angenommen."):format(name or "?"))
+    ns.Print(L("Wiederbelebung von %s angenommen.", name or "?"))
 end
 
 ns.On("RESURRECT_REQUEST", function(name)
@@ -110,7 +111,7 @@ end
 ns.On("CONFIRM_SUMMON", function()
     if not ns.db or not ns.db.acceptSummon then return end
     if UnitAffectingCombat("player") then
-        ns.Print("Beschwörung nicht automatisch angenommen – du bist im Kampf.")
+        ns.Print(L["Beschwörung nicht automatisch angenommen – du bist im Kampf."])
         return
     end
     C_Timer.After(0.5, function()
@@ -119,7 +120,7 @@ ns.On("CONFIRM_SUMMON", function()
         summoner, area = ns.Public(summoner), ns.Public(area)
         ConfirmSummonNow()
         HidePopups("CONFIRM_SUMMON", "CONFIRM_SUMMON_SCENARIO", "CONFIRM_SUMMON_STARTING_AREA")
-        ns.Print(("Beschwörung von %s nach %s angenommen."):format(summoner or "?", area or "?"))
+        ns.Print(L("Beschwörung von %s nach %s angenommen.", summoner or "?", area or "?"))
     end)
 end)
 
@@ -168,14 +169,14 @@ local function AcceptAndClose(name)
         if tries < 10 then C_Timer.After(0.3, Check) end
     end
     C_Timer.After(0.2, Check)
-    ns.Print(("Einladung von %s angenommen."):format(name or "?"))
+    ns.Print(L("Einladung von %s angenommen.", name or "?"))
 end
 
 local function Decline(name)
     DeclineGroup()
     HidePopups("PARTY_INVITE")
     C_Timer.After(0, function() HidePopups("PARTY_INVITE") end)
-    ns.Print(("Einladung von %s abgelehnt."):format(name or "?"))
+    ns.Print(L("Einladung von %s abgelehnt.", name or "?"))
 end
 
 ns.On("PARTY_INVITE_REQUEST", function(name, isTank, isHealer, isDamage, _, _, inviterGUID, questSessionActive)

@@ -3,6 +3,7 @@
 -- sonst schreibt stray die Zahl selbst auf den Rucksack-Knopf.
 
 local _, ns = ...
+local L = ns.L
 
 local CVAR = "displayFreeBagSlots"
 local GetFree = (C_Container and C_Container.GetContainerNumFreeSlots) or GetContainerNumFreeSlots
@@ -55,8 +56,8 @@ end
 
 ns.AddOption(1, "Taschen", {
     key = "freeSlots",
-    label = "Freie Taschenplätze",
-    tooltip = "Zeigt auf dem Rucksack-Knopf unten an der Leiste, wie viele Plätze in deinen Taschen noch frei sind – rot, wenn alles voll ist. Spezialtaschen wie Köcher zählen nicht mit.",
+    label = L["Freie Taschenplätze"],
+    tooltip = L["Zeigt auf dem Rucksack-Knopf unten an der Leiste, wie viele Plätze in deinen Taschen noch frei sind – rot, wenn alles voll ist. Spezialtaschen wie Köcher zählen nicht mit."],
     get = function()
         if useBlizzard then return ns.GetCVarOn(CVAR) end
         return ns.db.freeSlots

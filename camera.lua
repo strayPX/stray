@@ -1,6 +1,7 @@
 -- stray – Kamera & Karte: maximale Kamera-Entfernung, Minimap per Mausrad zoomen
 
 local _, ns = ...
+local L = ns.L
 
 ---------------------------------------------------------------------------
 -- Kamera
@@ -38,8 +39,8 @@ end
 
 ns.AddOption(3, "Kamera & Karte", {
     key = "cameraMax",
-    label = "Maximale Kamera-Entfernung",
-    tooltip = "Du kannst so weit herauszoomen, wie das Spiel erlaubt – deutlich weiter als normal. Ausschalten stellt den Blizzard-Standard wieder her.",
+    label = L["Maximale Kamera-Entfernung"],
+    tooltip = L["Du kannst so weit herauszoomen, wie das Spiel erlaubt – deutlich weiter als normal. Ausschalten stellt den Blizzard-Standard wieder her."],
     set = function(value)
         ns.db.cameraMax = value
         ApplyCamera(not value)
@@ -104,8 +105,8 @@ end
 
 ns.AddOption(3, "Kamera & Karte", {
     key = "minimapWheel",
-    label = "Minimap mit Mausrad zoomen",
-    tooltip = "Mausrad über der Minimap zoomt hinein und heraus. Die Plus- und Minus-Knöpfe werden dafür ausgeblendet.",
+    label = L["Minimap mit Mausrad zoomen"],
+    tooltip = L["Mausrad über der Minimap zoomt hinein und heraus. Die Plus- und Minus-Knöpfe werden dafür ausgeblendet."],
     set = function(value)
         ns.db.minimapWheel = value
         ApplyMinimap(true)

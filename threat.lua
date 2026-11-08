@@ -16,9 +16,10 @@
 -- Alles Auswertende läuft in pcall, damit nie eine Fehlerflut entsteht.
 
 local _, ns = ...
+local L = ns.L
 
 local HAS_API = (UnitDetailedThreatSituation and UnitThreatSituation) and true or false
-local NO_API = "Diese Spielversion liefert keine Bedrohungswerte."
+local NO_API = L["Diese Spielversion liefert keine Bedrohungswerte."]
 
 local function ApiAvailable() return HAS_API end
 
@@ -30,7 +31,7 @@ local noticeShown = {}
 local function NoticeLocked(part)
     if noticeShown[part] then return end
     noticeShown[part] = true
-    ns.Print(("WoW Forever lässt die Bedrohungswerte im Kampf hier nicht anzeigen – „%s“ pausiert deshalb."):format(part))
+    ns.Print(L("WoW Forever lässt die Bedrohungswerte im Kampf hier nicht anzeigen – „%s“ pausiert deshalb.", L[part]))
 end
 
 -- Steht die Einheit auf der Bedrohungsliste? Ein versiegelter Status heißt „ja“;
@@ -178,10 +179,10 @@ end
 
 list:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("Bedrohung", 1, 1, 1)
-    GameTooltip:AddLine("Prozent = wie nah jemand daran ist, die Aggro zu ziehen. 100 % = hat die Aggro.", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
-    GameTooltip:AddLine("Sortiert: wer die Aggro hat zuerst, dann nach Bedrohung. Liefert WoW Forever versiegelte Werte, bleibt die Reihenfolge fest (du zuerst).", 0.7, 0.7, 0.7, true)
-    GameTooltip:AddLine("Shift + ziehen zum Verschieben", 0.5, 0.5, 0.5)
+    GameTooltip:SetText(L["Bedrohung"], 1, 1, 1)
+    GameTooltip:AddLine(L["Prozent = wie nah jemand daran ist, die Aggro zu ziehen. 100 % = hat die Aggro."], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true)
+    GameTooltip:AddLine(L["Sortiert: wer die Aggro hat zuerst, dann nach Bedrohung. Liefert WoW Forever versiegelte Werte, bleibt die Reihenfolge fest (du zuerst)."], 0.7, 0.7, 0.7, true)
+    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end)
 list:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -264,10 +265,10 @@ end
 
 local function DemoEntries()
     return {
-        { unit = "player", name = ns.Public(UnitName("player")) or "Du", pct = 100 },
-        { name = "Beispiel-Magier", pct = 92 },
-        { name = "Beispiel-Jäger", pct = 71 },
-        { name = "Beispiel-Heiler", pct = 44 },
+        { unit = "player", name = ns.Public(UnitName("player")) or L["Du"], pct = 100 },
+        { name = L["Beispiel-Magier"], pct = 92 },
+        { name = L["Beispiel-Jäger"], pct = 71 },
+        { name = L["Beispiel-Heiler"], pct = 44 },
     }
 end
 
@@ -301,10 +302,10 @@ local function UpdateList()
             list:Hide()
             return
         end
-        entries, title = DemoEntries(), "Beispiel – Shift + ziehen"
+        entries, title = DemoEntries(), L["Beispiel – Shift + ziehen"]
     end
 
-    header:SetText("Bedrohung · " .. (title or "?"))
+    header:SetText(L("Bedrohung · %s", title or "?"))
     local shown = math.min(#entries, MAX_ROWS)
     local allOk = true
     for i = 1, MAX_ROWS do
@@ -371,8 +372,8 @@ local function MovableWarning(f, key, y, label, optionKey, sample)
         end
     end)
 end
-MovableWarning(tankWarning, "tankwarn", -150, "Tank-Warnung", "threatTankWarn", "Aggro verloren: Defias-Späher greift Mira an")
-MovableWarning(aggroWarning, "aggrowarn", -190, "Aggro-Warnung", "threatAggroWarn", "Gleich ziehst du Aggro! 92 %")
+MovableWarning(tankWarning, "tankwarn", -150, "Tank-Warnung", "threatTankWarn", L["Aggro verloren: Defias-Späher greift Mira an"])
+MovableWarning(aggroWarning, "aggrowarn", -190, "Aggro-Warnung", "threatAggroWarn", L["Gleich ziehst du Aggro! 92 %"])
 
 local function ShowWarning(f, message)
     f.anim:Stop()
@@ -546,9 +547,9 @@ local function CheckLost(unit, guid)
         -- Kein Pfeilzeichen: die WoW-Schrift kennt es nicht
         local message
         if type(victim) == "string" then
-            message = ("Aggro verloren: %s greift %s an"):format(mob, victim)
+            message = L("Aggro verloren: %s greift %s an", mob, victim)
         else
-            message = ("Aggro verloren: %s"):format(mob)
+            message = L("Aggro verloren: %s", mob)
         end
         ShowWarning(tankWarning, message)
     end
@@ -605,7 +606,7 @@ local function CheckAggro()
     if isTanking or type(scaled) ~= "number" then return end
     if scaled >= 90 and armed then
         armed = false
-        ShowWarning(aggroWarning, ("Gleich ziehst du Aggro! %d %%"):format(math.floor(scaled)))
+        ShowWarning(aggroWarning, L("Gleich ziehst du Aggro! %d %%", math.floor(scaled)))
     elseif scaled < 80 then
         armed = true
     end
@@ -749,8 +750,8 @@ end
 ns.AddOption(2, "Bedrohung", {
     key = "threatList",
     preview = "threat_list",
-    label = "Bedrohungsliste",
-    tooltip = "Zeigt die Bedrohung deiner Gruppe für dein aktuelles Ziel. Ein Balken pro Gruppenmitglied und Begleiter: 100 % = hat die Aggro, je näher an 100 %, desto knapper. Sortiert wird nach Bedrohung (wer die Aggro hat, steht oben); liefert WoW Forever versiegelte Werte, bleibt die Reihenfolge fest (du zuerst). Funktioniert auch solo; außerhalb des Kampfes ist die Liste ausgeblendet.\n\nSolange das stray-Fenster offen ist, zeigt die Liste Beispielwerte – dann kannst du sie mit Shift + linker Maustaste verschieben.",
+    label = L["Bedrohungsliste"],
+    tooltip = L["Zeigt die Bedrohung deiner Gruppe für dein aktuelles Ziel. Ein Balken pro Gruppenmitglied und Begleiter: 100 % = hat die Aggro, je näher an 100 %, desto knapper. Sortiert wird nach Bedrohung (wer die Aggro hat, steht oben); liefert WoW Forever versiegelte Werte, bleibt die Reihenfolge fest (du zuerst). Funktioniert auch solo; außerhalb des Kampfes ist die Liste ausgeblendet.\n\nSolange das stray-Fenster offen ist, zeigt die Liste Beispielwerte – dann kannst du sie mit Shift + linker Maustaste verschieben."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("threatList", function() pcall(UpdateList) end),
@@ -759,8 +760,8 @@ ns.AddOption(2, "Bedrohung", {
 ns.AddOption(2, "Bedrohung", {
     key = "threatPlates",
     preview = "threat_plates",
-    label = "Rahmen an Namensplaketten",
-    tooltip = "Farbiger Rahmen an gegnerischen Namensplaketten zeigt deinen Aggro-Status. Rot = du hast Aggro, gelb = die Aggro wechselt gleich, grün = du hast keine Aggro. Kein Rahmen = du stehst nicht auf seiner Bedrohungsliste.\n\nGegnerische Namensplaketten müssen eingeschaltet sein (Taste V).",
+    label = L["Rahmen an Namensplaketten"],
+    tooltip = L["Farbiger Rahmen an gegnerischen Namensplaketten zeigt deinen Aggro-Status. Rot = du hast Aggro, gelb = die Aggro wechselt gleich, grün = du hast keine Aggro. Kein Rahmen = du stehst nicht auf seiner Bedrohungsliste.\n\nGegnerische Namensplaketten müssen eingeschaltet sein (Taste V)."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("threatPlates", function(value)
@@ -771,8 +772,8 @@ ns.AddOption(2, "Bedrohung", {
 ns.AddOption(2, "Bedrohung", {
     key = "threatPercent",
     preview = "threat_percent",
-    label = "Prozent an Namensplaketten",
-    tooltip = "Zeigt deine Bedrohung in Prozent neben gegnerischen Namensplaketten. 0 % = keine, 100 % = du hast die Aggro. Die Farbe passt zum Rahmen.\n\nGegnerische Namensplaketten müssen eingeschaltet sein (Taste V).",
+    label = L["Prozent an Namensplaketten"],
+    tooltip = L["Zeigt deine Bedrohung in Prozent neben gegnerischen Namensplaketten. 0 % = keine, 100 % = du hast die Aggro. Die Farbe passt zum Rahmen.\n\nGegnerische Namensplaketten müssen eingeschaltet sein (Taste V)."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("threatPercent", function(value)
@@ -783,8 +784,8 @@ ns.AddOption(2, "Bedrohung", {
 ns.AddOption(2, "Bedrohung", {
     key = "threatTankWarn",
     preview = "threat_tankwarn",
-    label = "Tank-Warnung",
-    tooltip = "Warnt mit Ton und großem Text, wenn du bei einem Gegner die Aggro verlierst. In der Bildschirmmitte steht dann, wen er jetzt angreift. Geprüft werden dein Ziel und alle Gegner mit sichtbarer Namensplakette; auch solo aktiv.\n\nDamit mehr als dein Ziel geprüft wird, müssen gegnerische Namensplaketten eingeschaltet sein (Taste V).",
+    label = L["Tank-Warnung"],
+    tooltip = L["Warnt mit Ton und großem Text, wenn du bei einem Gegner die Aggro verlierst. In der Bildschirmmitte steht dann, wen er jetzt angreift. Geprüft werden dein Ziel und alle Gegner mit sichtbarer Namensplakette; auch solo aktiv.\n\nDamit mehr als dein Ziel geprüft wird, müssen gegnerische Namensplaketten eingeschaltet sein (Taste V)."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("threatTankWarn"),
@@ -793,8 +794,8 @@ ns.AddOption(2, "Bedrohung", {
 ns.AddOption(2, "Bedrohung", {
     key = "threatAggroWarn",
     preview = "threat_aggrowarn",
-    label = "Aggro-Warnung ab 90 %",
-    tooltip = "Warnt, kurz bevor du deinem Ziel die Aggro abnimmst. Erreichst du 90 % der Bedrohung, die zum Aggroziehen nötig ist, erscheint „Gleich ziehst du Aggro!“ – Zeit, langsamer zu machen. Wer die Aggro schon hat oder wessen Begleiter tankt, bekommt keine Warnung; unter 80 % oder nach einem Zielwechsel ist sie wieder bereit.",
+    label = L["Aggro-Warnung ab 90 %"],
+    tooltip = L["Warnt, kurz bevor du deinem Ziel die Aggro abnimmst. Erreichst du 90 % der Bedrohung, die zum Aggroziehen nötig ist, erscheint „Gleich ziehst du Aggro!“ – Zeit, langsamer zu machen. Wer die Aggro schon hat oder wessen Begleiter tankt, bekommt keine Warnung; unter 80 % oder nach einem Zielwechsel ist sie wieder bereit."],
     isEnabled = ApiAvailable,
     disabledHint = NO_API,
     set = Setter("threatAggroWarn"),

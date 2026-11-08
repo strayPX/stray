@@ -15,6 +15,7 @@
 -- Nach /reload läuft die gespeicherte Spielzeit einfach weiter (man war ja eingeloggt).
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.xpTracker = false
 ns.defaults.xpTrackerTable = false
@@ -128,7 +129,7 @@ local function Duration(sec)
     local days = math.floor(sec / 86400)
     local hours = math.floor((sec % 86400) / 3600)
     local mins = math.floor((sec % 3600) / 60)
-    if days > 0 then return ("%dT %dh"):format(days, hours) end
+    if days > 0 then return L("%dT %dh", days, hours) end
     if hours > 0 then return ("%dh %02dm"):format(hours, mins) end
     if mins > 0 then return ("%dm"):format(mins) end
     return "<1m"
@@ -343,7 +344,7 @@ local function BuildLine()
     if not entry then return nil end
     local seconds, rate = TimeToLevel(entry)
     if not rate or rate <= 0 then return nil end
-    return ("bis Level %s · EP/h %s"):format(Duration(seconds), ShortNumber(rate))
+    return L("bis Level %s · EP/h %s", Duration(seconds), ShortNumber(rate))
 end
 
 local function Notify(force)
@@ -389,25 +390,25 @@ local function FillTooltip(tt)
         tt:AddDoubleLine(label, value, dim[1], dim[2], dim[3], txt[1], txt[2], txt[3])
     end
     tt:AddLine(" ")
-    tt:AddLine("EP-Tracker", acc[1], acc[2], acc[3])
+    tt:AddLine(L["EP-Tracker"], acc[1], acc[2], acc[3])
     if not AtMaxLevel() then
         local sessionRate, recentRate = Rates(entry)
         local seconds = TimeToLevel(entry)
-        Row("EP/h (Sitzung)", sessionRate and ShortNumber(sessionRate) or "–")
-        Row("EP/h (letzte 10 min)", recentRate and ShortNumber(recentRate) or "–")
-        Row("Bis Levelaufstieg", seconds and Duration(seconds) or "–")
+        Row(L["EP/h (Sitzung)"], sessionRate and ShortNumber(sessionRate) or "–")
+        Row(L["EP/h (letzte 10 min)"], recentRate and ShortNumber(recentRate) or "–")
+        Row(L["Bis Levelaufstieg"], seconds and Duration(seconds) or "–")
     end
-    Row("Zeit auf dieser Stufe", Duration(TimeOnLevel(entry)))
-    Row("Spielzeit gesamt", Duration(CurrentPlayed(entry)))
+    Row(L["Zeit auf dieser Stufe"], Duration(TimeOnLevel(entry)))
+    Row(L["Spielzeit gesamt"], Duration(CurrentPlayed(entry)))
     local levels = SortedLevels(entry)
     if #levels > 0 then
-        tt:AddLine("Letzte Stufen", acc[1], acc[2], acc[3])
+        tt:AddLine(L["Letzte Stufen"], acc[1], acc[2], acc[3])
         for i = 1, math.min(#levels, HISTORY_TOOLTIP) do
             local level = levels[i]
             local record = entry.levels[level]
             local value = Duration(Number(record.duration))
-            if Number(record.played) then value = value .. "  (gesamt " .. Duration(record.played) .. ")" end
-            Row(("Stufe %d"):format(level), value)
+            if Number(record.played) then value = value .. L("  (gesamt %s)", Duration(record.played)) end
+            Row(L("Stufe %d", level), value)
         end
     end
 end
@@ -423,11 +424,11 @@ end
 ---------------------------------------------------------------------------
 
 local ROWS = {
-    { key = "session", label = "EP/h Sitzung" },
-    { key = "recent",  label = "EP/h 10 min" },
-    { key = "toLevel", label = "Bis Level" },
-    { key = "onLevel", label = "Auf Stufe" },
-    { key = "played",  label = "Spielzeit" },
+    { key = "session", label = L["EP/h Sitzung"] },
+    { key = "recent",  label = L["EP/h 10 min"] },
+    { key = "toLevel", label = L["Bis Level"] },
+    { key = "onLevel", label = L["Auf Stufe"] },
+    { key = "played",  label = L["Spielzeit"] },
 }
 local ROW_H = 15
 local WIDTH = 170
@@ -465,7 +466,7 @@ end
 
 local title = MakeText(12, C.accent[1], C.accent[2], C.accent[3])
 title:SetPoint("TOPLEFT", 6, -5)
-title:SetText("EP-Tracker")
+title:SetText(L["EP-Tracker"])
 
 local cells = {}
 for i, row in ipairs(ROWS) do
@@ -484,14 +485,14 @@ ns.MakeMovable(panel, "xptracker", { "TOP", "TOP", 0, -60 })
 panel:SetScript("OnEnter", function(self)
     if not GameTooltip then return end
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-    GameTooltip:AddLine("EP-Tracker")
-    GameTooltip:AddLine("Shift + Ziehen verschiebt die Tabelle.", C.textDim[1], C.textDim[2], C.textDim[3])
+    GameTooltip:AddLine(L["EP-Tracker"])
+    GameTooltip:AddLine(L["Shift + Ziehen verschiebt die Tabelle."], C.textDim[1], C.textDim[2], C.textDim[3])
     ns.XPTracker.AddTooltip(GameTooltip)
     GameTooltip:Show()
 end)
 panel:SetScript("OnLeave", function() if GameTooltip then GameTooltip:Hide() end end)
 
-local SAMPLE = { session = "84k", recent = "92k", toLevel = "1h 42m", onLevel = "38m", played = "2T 7h" }
+local SAMPLE = { session = "84k", recent = "92k", toLevel = "1h 42m", onLevel = "38m", played = L["2T 7h"] }
 
 local function UpdatePanel()
     if not Enabled() or not ns.db.xpTrackerTable then panel:Hide() return end
@@ -507,7 +508,7 @@ local function UpdatePanel()
         values.onLevel = TimeOnLevel(entry) and Duration(TimeOnLevel(entry)) or nil
         values.played = CurrentPlayed(entry) and Duration(CurrentPlayed(entry)) or nil
     end
-    if maxed then values.session, values.recent, values.toLevel = "Höchststufe", "–", "–" end
+    if maxed then values.session, values.recent, values.toLevel = L["Höchststufe"], "–", "–" end
     -- Bei offenem stray-Fenster fehlende Werte mit Beispielen füllen, damit man die Größe sieht
     local preview = ns.IsConfigOpen()
     for key, cell in pairs(cells) do
@@ -515,7 +516,7 @@ local function UpdatePanel()
         if not v and preview then v = SAMPLE[key] end
         cell:SetText(v or "–")
     end
-    title:SetText(preview and "EP-Tracker · Beispiel" or "EP-Tracker")
+    title:SetText(preview and L["EP-Tracker · Beispiel"] or L["EP-Tracker"])
     panel:Show()
 end
 
@@ -609,13 +610,13 @@ end)
 
 ns.AddOption(3, SECTION, {
     key = "xpTracker",
-    label = "EP-Tracker",
-    tooltip = "Zeigt an der Erfahrungsleiste, wie lange es noch bis zum Levelaufstieg dauert und "
+    label = L["EP-Tracker"],
+    tooltip = L["Zeigt an der Erfahrungsleiste, wie lange es noch bis zum Levelaufstieg dauert und "
         .. "wie viele EP pro Stunde du bekommst.\n\n"
         .. "Im Tooltip der Leiste: EP/h der Sitzung und der letzten 10 Minuten, Zeit auf der Stufe, "
         .. "Gesamtspielzeit und die letzten Stufen mit ihrer Dauer. Der Verlauf wird je Charakter gespeichert.\n\n"
         .. "Beim Einloggen fragt stray einmal die Spielzeit ab (wie /played), ohne Chatzeile. "
-        .. "Auf Höchststufe bleibt die Zeile an der Leiste leer.",
+        .. "Auf Höchststufe bleibt die Zeile an der Leiste leer."],
     keywords = { "xp", "ep", "exp", "experience", "erfahrung", "level", "stufe", "levelup",
         "xp/h", "ep/h", "tracker", "playtime", "played", "spielzeit" },
     set = function(value)
@@ -626,9 +627,9 @@ ns.AddOption(3, SECTION, {
 
 ns.AddOption(3, SECTION, {
     key = "xpTrackerTable",
-    label = "EP-Tracker als Tabelle",
-    tooltip = "Kleine Tabelle mit EP/h, Zeit bis zum Levelaufstieg, Zeit auf der Stufe und Spielzeit.\n\n"
-        .. "Shift + Ziehen verschiebt sie, ebenso der Bearbeitungsmodus. Braucht den EP-Tracker.",
+    label = L["EP-Tracker als Tabelle"],
+    tooltip = L["Kleine Tabelle mit EP/h, Zeit bis zum Levelaufstieg, Zeit auf der Stufe und Spielzeit.\n\n"
+        .. "Shift + Ziehen verschiebt sie, ebenso der Bearbeitungsmodus. Braucht den EP-Tracker."],
     keywords = { "xp", "ep", "exp", "level", "stufe", "playtime", "spielzeit", "tabelle", "table", "tracker" },
     isEnabled = function() return ns.db and ns.db.xpTracker and true or false end,
     set = function(value)

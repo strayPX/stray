@@ -3,13 +3,14 @@
 -- Händler …), wählt stray sie automatisch. Shift verhindert das.
 
 local _, ns = ...
+local L = ns.L
 
 local IsSecret = ns.IsSecret
 
 ns.AddOption(1, "Quests", {
     key = "gossipSkip",
-    label = "Gesprächsmenü überspringen",
-    tooltip = "Hat ein NPC nur eine Gesprächsoption und keine Quests – etwa Flugmeister, Gastwirt, Bankier oder Händler –, wählt stray sie automatisch. Halte Shift gedrückt, um das Menü zu sehen.\n\nOptionen mit Bestätigung (z. B. Gold bezahlen) fragt WoW weiterhin ab.",
+    label = L["Gesprächsmenü überspringen"],
+    tooltip = L["Hat ein NPC nur eine Gesprächsoption und keine Quests – etwa Flugmeister, Gastwirt, Bankier oder Händler –, wählt stray sie automatisch. Halte Shift gedrückt, um das Menü zu sehen.\n\nOptionen mit Bestätigung (z. B. Gold bezahlen) fragt WoW weiterhin ab."],
 })
 
 local lastNpc, lastTime = nil, 0

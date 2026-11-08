@@ -9,6 +9,7 @@
 -- Passt nicht alles hinein, wird zeilenweise geblättert (Knöpfe neu setzen statt ScrollFrame).
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.bagHeight = 0 -- 0 = Höhe automatisch nach Inhalt
 
@@ -56,13 +57,13 @@ local FIRST_BAG = 0
 local LAST_BAG = (type(NUM_BAG_SLOTS) == "number" and NUM_BAG_SLOTS) or 4
 
 local CATEGORIES = {
-    { key = "all", label = "Alle" },
-    { key = "gear", label = "Ausrüstung" },
-    { key = "consumable", label = "Verbrauchbar" },
-    { key = "trade", label = "Handwerk" },
-    { key = "quest", label = "Quest" },
-    { key = "new", label = "Neu" },
-    { key = "pinned", label = "Angeheftet" },
+    { key = "all", label = L["Alle"] },
+    { key = "gear", label = L["Ausrüstung"] },
+    { key = "consumable", label = L["Verbrauchbar"] },
+    { key = "trade", label = L["Handwerk"] },
+    { key = "quest", label = L["Quest"] },
+    { key = "new", label = L["Neu"] },
+    { key = "pinned", label = L["Angeheftet"] },
 }
 
 local ITEM_CLASS = (Enum and Enum.ItemClass) or {}
@@ -319,7 +320,7 @@ headLine:SetPoint("TOPLEFT", 1, -HEAD); headLine:SetPoint("TOPRIGHT", -1, -HEAD)
 
 local title = Text(head, 14, C.text)
 title:SetPoint("LEFT", 12, 0)
-title:SetText("Taschen")
+title:SetText(L["Taschen"])
 
 local slotsText = Text(head, 12, C.textDim, FONT_BODY)
 slotsText:SetPoint("LEFT", title, "RIGHT", 10, -1)
@@ -348,7 +349,7 @@ Tex(search, "BACKGROUND", { 0.039, 0.059, 0.090, 1 }):SetAllPoints()
 Border(search, { 0.133, 0.220, 0.353, 1 })
 local placeholder = Text(search, 12, { 0.365, 0.451, 0.576, 1 }, FONT_BODY)
 placeholder:SetPoint("LEFT", 8, 0)
-placeholder:SetText("Suchen …")
+placeholder:SetText(L["Suchen …"])
 search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 search:SetScript("OnEditFocusGained", function() placeholder:Hide() end)
@@ -386,22 +387,22 @@ sortButton:SetScript("OnMouseDown", function() sortIcon:SetVertexColor(0.7, 0.7,
 sortButton:SetScript("OnMouseUp", function() sortIcon:SetVertexColor(1, 1, 1) end)
 sortButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Taschen sortieren")
+    GameTooltip:SetText(L["Taschen sortieren"])
     GameTooltip:Show()
 end)
 sortButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 sortButton:SetScript("OnClick", function()
     if InCombatLockdown() then
-        ns.Print("Sortieren geht erst nach dem Kampf.")
+        ns.Print(L["Sortieren geht erst nach dem Kampf."])
         return
     end
     if not (C_Container and C_Container.SortBags) then
-        ns.Print("Sortieren gibt es in diesem Client nicht.")
+        ns.Print(L["Sortieren gibt es in diesem Client nicht."])
         return
     end
     if SOUNDKIT and SOUNDKIT.UI_BAG_SORTING_01 then pcall(PlaySound, SOUNDKIT.UI_BAG_SORTING_01) end
     local ok = pcall(C_Container.SortBags)
-    if not ok then ns.Print("Sortieren hat nicht geklappt.") end
+    if not ok then ns.Print(L["Sortieren hat nicht geklappt."]) end
     -- Neu gezeichnet wird über BAG_UPDATE_DELAYED, sobald WoW die Gegenstände verschoben hat
 end)
 
@@ -422,7 +423,7 @@ grid:SetSize(SLOT, SLOT)
 
 local emptyText = Text(frame, 12, C.textDim, FONT_BODY)
 emptyText:SetPoint("TOPLEFT", grid, "TOPLEFT", 2, -4)
-emptyText:SetText("Keine Gegenstände.")
+emptyText:SetText(L["Keine Gegenstände."])
 emptyText:Hide()
 
 -- Scrollbalken rechts neben dem Raster (Stil wie ui.lua). Die Klickfläche ist breiter
@@ -477,7 +478,7 @@ moneyText:SetPoint("BOTTOMLEFT", 12, 8)
 local hintText = Text(frame, 11, C.textDim, FONT_BODY)
 hintText:SetPoint("BOTTOMRIGHT", -22, 9) -- rechts daneben sitzt der Ziehgriff
 hintText:SetJustifyH("RIGHT")
-hintText:SetText("Alt+Rechtsklick: anheften")
+hintText:SetText(L["Alt+Rechtsklick: anheften"])
 
 -- „Löschkandidat aufnehmen“ (nur sichtbar, wenn triage.lua einen Kandidaten meldet)
 local triageButton = CreateFrame("Button", nil, frame)
@@ -489,15 +490,15 @@ triageHover:SetAllPoints()
 triageHover:SetColorTexture(1, 1, 1, 0.07)
 local triageLabel = Text(triageButton, 11, C.text, FONT_BODY)
 triageLabel:SetPoint("CENTER", 0, 0)
-triageLabel:SetText("Löschkandidat aufnehmen")
+triageLabel:SetText(L["Löschkandidat aufnehmen"])
 triageButton:SetWidth(150)
 triageButton:SetScript("OnClick", function()
     if ns.TriagePickup then ns.TriagePickup() end
 end)
 triageButton:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Löschkandidat aufnehmen")
-    GameTooltip:AddLine("Legt den rot markierten, billigsten Gegenstand auf den Mauszeiger. stray löscht nichts selbst – das Zerstören bestätigst du bei WoW.", 1, 1, 1, true)
+    GameTooltip:SetText(L["Löschkandidat aufnehmen"])
+    GameTooltip:AddLine(L["Legt den rot markierten, billigsten Gegenstand auf den Mauszeiger. stray löscht nichts selbst – das Zerstören bestätigst du bei WoW."], 1, 1, 1, true)
     GameTooltip:Show()
 end)
 triageButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -661,10 +662,10 @@ local function TogglePin(b)
     local pinned = Pinned()
     if pinned[d.itemID] then
         pinned[d.itemID] = nil
-        ns.Print((d.link or "Gegenstand") .. " gelöst.")
+        ns.Print(L("%s gelöst.", d.link or L["Gegenstand"]))
     else
         pinned[d.itemID] = true
-        ns.Print((d.link or "Gegenstand") .. " angeheftet.")
+        ns.Print(L("%s angeheftet.", d.link or L["Gegenstand"]))
     end
     RequestUpdate(0)
     if ns.TriageRefresh then pcall(ns.TriageRefresh) end
@@ -724,7 +725,7 @@ local function Build()
                 local b = CreateItemButton(bag, slot)
                 if not b then
                     broken = true
-                    ns.Print("Taschenfenster: Blizzards Taschenknopf-Vorlage fehlt – es bleiben Blizzards Taschen.")
+                    ns.Print(L["Taschenfenster: Blizzards Taschenknopf-Vorlage fehlt – es bleiben Blizzards Taschen."])
                     return false
                 end
                 buttons[bag][slot] = b
@@ -918,7 +919,7 @@ local function UpdateHeader()
             free = free + (type(f) == "number" and f or 0)
         end
     end
-    slotsText:SetText((total - free) .. " / " .. total .. " Plätze")
+    slotsText:SetText(L("%d / %d Plätze", total - free, total))
     local money = GetMoney and Public(GetMoney())
     moneyText:SetText(type(money) == "number" and ns.FormatMoney(money) or "")
 end
@@ -1197,7 +1198,7 @@ end
 grip:SetScript("OnMouseDown", function(_, button)
     if button ~= "LeftButton" or sizing or not ns.db or not built then return end
     if not CanLayout() then
-        ns.Print("Größe ändern geht erst nach dem Kampf.")
+        ns.Print(L["Größe ändern geht erst nach dem Kampf."])
         return
     end
     GameTooltip:Hide()
@@ -1219,8 +1220,8 @@ grip:SetScript("OnEnter", function(self)
     self:SetAlpha(1)
     if sizing then return end
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Ziehen: Größe ändern", 1, 1, 1)
-    GameTooltip:AddLine("Breite in ganzen Spalten, Höhe frei. Passt nicht alles hinein, blätterst du mit dem Mausrad.", 0.8, 0.8, 0.8, true)
+    GameTooltip:SetText(L["Ziehen: Größe ändern"], 1, 1, 1)
+    GameTooltip:AddLine(L["Breite in ganzen Spalten, Höhe frei. Passt nicht alles hinein, blätterst du mit dem Mausrad."], 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end)
 grip:SetScript("OnLeave", function(self)
@@ -1257,7 +1258,7 @@ local function Usable()
         if not built then
             if not combatNoted then
                 combatNoted = true
-                ns.Print("Taschenfenster wird nach dem Kampf aufgebaut – bis dahin Blizzards Taschen.")
+                ns.Print(L["Taschenfenster wird nach dem Kampf aufgebaut – bis dahin Blizzards Taschen."])
             end
             pendingBuild = true
             return false
@@ -1439,8 +1440,8 @@ optional:SetScript("OnEvent", function() RequestUpdate(0.1) end)
 
 ns.AddOption(1, "Taschen", {
     key = "bagWindow",
-    label = "Eigenes Taschenfenster",
-    tooltip = "Zeigt alle Taschen in einem Fenster mit Suche und Kategorien (Ausrüstung, Verbrauchbar, Handwerk, Quest, Neu, Angeheftet). B-Taste, Rucksack-Knopf und Händler öffnen dann dieses Fenster statt Blizzards Taschen.\n\nQuestgegenstände stehen nur unter „Quest“, bis die Quest abgegeben ist.\n\nAlt+Rechtsklick auf einen Gegenstand heftet ihn an oder löst ihn. Kopfzeile ziehen verschiebt das Fenster, der Griff unten rechts ändert die Größe. Passt nicht alles hinein, blätterst du mit dem Mausrad. Der Besen neben der Suche sortiert die Taschen.\n\nAusschalten wirkt sofort; ganz sauber wird es nach Neuladen (/reload).",
+    label = L["Eigenes Taschenfenster"],
+    tooltip = L["Zeigt alle Taschen in einem Fenster mit Suche und Kategorien (Ausrüstung, Verbrauchbar, Handwerk, Quest, Neu, Angeheftet). B-Taste, Rucksack-Knopf und Händler öffnen dann dieses Fenster statt Blizzards Taschen.\n\nQuestgegenstände stehen nur unter „Quest“, bis die Quest abgegeben ist.\n\nAlt+Rechtsklick auf einen Gegenstand heftet ihn an oder löst ihn. Kopfzeile ziehen verschiebt das Fenster, der Griff unten rechts ändert die Größe. Passt nicht alles hinein, blätterst du mit dem Mausrad. Der Besen neben der Suche sortiert die Taschen.\n\nAusschalten wirkt sofort; ganz sauber wird es nach Neuladen (/reload)."],
     set = function(value)
         ns.db.bagWindow = value
         if value then
@@ -1454,11 +1455,11 @@ ns.AddOption(1, "Taschen", {
 ns.AddOption(1, "Taschen", {
     key = "bagColumns",
     type = "slider",
-    label = "Spalten im Taschenfenster",
+    label = L["Spalten im Taschenfenster"],
     min = 6, max = 16, step = 1,
-    tooltip = "Wie viele Plätze nebeneinander im stray-Taschenfenster stehen. Ziehst du das Fenster unten rechts breiter oder schmaler, ändert sich dieser Wert mit.",
+    tooltip = L["Wie viele Plätze nebeneinander im stray-Taschenfenster stehen. Ziehst du das Fenster unten rechts breiter oder schmaler, ändert sich dieser Wert mit."],
     isEnabled = function() return ns.db and ns.db.bagWindow and true or false end,
-    disabledHint = "Erst „Eigenes Taschenfenster“ einschalten (weiter oben).",
+    disabledHint = L["Erst „Eigenes Taschenfenster“ einschalten (weiter oben)."],
     set = function(value)
         ns.db.bagColumns = value
         RequestUpdate(0)
@@ -1468,14 +1469,14 @@ ns.AddOption(1, "Taschen", {
 ns.AddOption(1, "Taschen", {
     key = "bagHeightReset",
     type = "button",
-    label = "Höhe des Taschenfensters",
-    buttonText = "Automatisch",
-    tooltip = "Hast du die Höhe unten rechts gezogen, bleibt sie fest. Dieser Knopf stellt wieder auf automatisch: Das Fenster ist dann so hoch wie sein Inhalt (höchstens bildschirmhoch).",
+    label = L["Höhe des Taschenfensters"],
+    buttonText = L["Automatisch"],
+    tooltip = L["Hast du die Höhe unten rechts gezogen, bleibt sie fest. Dieser Knopf stellt wieder auf automatisch: Das Fenster ist dann so hoch wie sein Inhalt (höchstens bildschirmhoch)."],
     isEnabled = function() return ns.db and ns.db.bagWindow and true or false end,
-    disabledHint = "Erst „Eigenes Taschenfenster“ einschalten (weiter oben).",
+    disabledHint = L["Erst „Eigenes Taschenfenster“ einschalten (weiter oben)."],
     onClick = function()
         ns.db.bagHeight = 0
         RequestUpdate(0)
-        ns.Print("Höhe des Taschenfensters ist wieder automatisch.")
+        ns.Print(L["Höhe des Taschenfensters ist wieder automatisch."])
     end,
 })

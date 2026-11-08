@@ -9,6 +9,7 @@
 -- (Bereich „stray-Oberfläche“), hier nur der Umbau (ns.ApplySquareMinimap).
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.squareMinimap = false
 ns.defaults.squareMinimapSize = 200
@@ -141,9 +142,9 @@ button:SetScript("OnEnter", function(self)
     if self.isMoving then return end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddDoubleLine("stray", ns.GetVersion(), 1, 1, 1, 0.5, 0.5, 0.5)
-    GameTooltip:AddLine("Linksklick: Optionen öffnen/schließen", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+    GameTooltip:AddLine(L["Linksklick: Optionen öffnen/schließen"], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
     if not dockParent then
-        GameTooltip:AddLine("Ziehen: am Rand verschieben", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+        GameTooltip:AddLine(L["Ziehen: am Rand verschieben"], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
     end
     GameTooltip:Show()
 end)
@@ -164,8 +165,8 @@ end
 
 ns.AddOption(3, "Kamera & Karte", {
     key = "minimapButton",
-    label = "Minimap-Knopf anzeigen",
-    tooltip = "Runder stray-Knopf am Rand der Minimap. Linksklick öffnet dieses Fenster, mit gedrückter linker Maustaste ziehst du ihn am Rand entlang.\n\n/stray funktioniert weiterhin.",
+    label = L["Minimap-Knopf anzeigen"],
+    tooltip = L["Runder stray-Knopf am Rand der Minimap. Linksklick öffnet dieses Fenster, mit gedrückter linker Maustaste ziehst du ihn am Rand entlang.\n\n/stray funktioniert weiterhin."],
     set = function(value)
         ns.db.minimapButton = value
         Apply()
@@ -351,16 +352,16 @@ header:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     local zone = GetRealZoneText and ns.Public(GetRealZoneText())
     local sub = GetSubZoneText and ns.Public(GetSubZoneText())
-    GameTooltip:AddLine(type(zone) == "string" and zone or "Gebiet")
+    GameTooltip:AddLine(type(zone) == "string" and zone or L["Gebiet"])
     if type(sub) == "string" and sub ~= "" and sub ~= zone then GameTooltip:AddLine(sub, 1, 1, 1) end
-    GameTooltip:AddLine("Linksklick: Weltkarte", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+    GameTooltip:AddLine(L["Linksklick: Weltkarte"], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
     GameTooltip:Show()
 end)
 header:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 mail:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("Neue Post")
+    GameTooltip:AddLine(L["Neue Post"])
     if GetLatestThreeSenders then
         local senders = { pcall(GetLatestThreeSenders) }
         if senders[1] then
@@ -614,7 +615,7 @@ local function ApplySquare()
     if SquareWanted() then
         local ok, err = pcall(BuildSquare)
         if not ok then
-            ns.Print("Eckige Minimap ging nicht: " .. tostring(err))
+            ns.Print(L("Eckige Minimap ging nicht: %s", tostring(err)))
             pcall(RestoreRound)
         end
     elseif squareActive or saved then

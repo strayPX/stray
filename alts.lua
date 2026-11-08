@@ -4,6 +4,7 @@
 -- außerhalb ein Viertel davon, höchstens 150 % einer Stufe).
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.alts = false
 ns.defaults.altData = {} -- ["Name-Realm"] = { name, realm, class, level, money, xp, xpMax, rested, resting, maxLevel, time, played, playedAt }
@@ -119,11 +120,11 @@ local function FormatPlayed(sec)
     local h = math.floor(m / 60)
     if h >= 24 then
         local d = math.floor(h / 24)
-        return ("%d T %d Std"):format(d, h - d * 24)
+        return L("%d T %d Std", d, h - d * 24)
     elseif h > 0 then
-        return ("%d Std %d Min"):format(h, m - h * 60)
+        return L("%d Std %d Min", h, m - h * 60)
     end
-    return ("%d Min"):format(m)
+    return L("%d Min", m)
 end
 
 local function ClassColor(token)
@@ -340,11 +341,11 @@ end
 
 local title = Text(frame, 14, C.accent)
 title:SetPoint("TOPLEFT", PAD, -9)
-title:SetText("Twink-Übersicht")
+title:SetText(L["Twink-Übersicht"])
 
 local subtitle = Text(frame, 11, C.textDim)
 subtitle:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -2)
-subtitle:SetText("Rechtsklick auf eine Zeile entfernt den Eintrag. Ziehen verschiebt das Fenster.")
+subtitle:SetText(L["Rechtsklick auf eine Zeile entfernt den Eintrag. Ziehen verschiebt das Fenster."])
 
 local close = CreateFrame("Button", nil, frame)
 close:SetSize(20, 20)
@@ -383,12 +384,12 @@ local function MakeCells(parent, size, color)
 end
 
 local headerCells = MakeCells(header, 12, C.accent)
-for _, col in ipairs(COLUMNS) do headerCells[col.key]:SetText(col.label) end
+for _, col in ipairs(COLUMNS) do headerCells[col.key]:SetText(L[col.label]) end
 
 local rows = {}
 local emptyText = Text(frame, 12, C.textDim)
 emptyText:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 4, -8)
-emptyText:SetText("Noch keine Twinks erfasst. Schalte „Twinks erfassen“ ein und logge deine Charaktere einmal ein.")
+emptyText:SetText(L["Noch keine Twinks erfasst. Schalte „Twinks erfassen“ ein und logge deine Charaktere einmal ein."])
 emptyText:SetWidth(tableWidth - 8)
 emptyText:SetWordWrap(true)
 emptyText:SetJustifyH("LEFT")
@@ -431,12 +432,12 @@ local function CreateRow(i)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(self.key)
         if self.updated then
-            GameTooltip:AddLine("Stand: " .. date("%d.%m.%Y %H:%M", self.updated), C.textDim[1], C.textDim[2], C.textDim[3])
+            GameTooltip:AddLine(L("Stand: %s", date(L["%d.%m.%Y %H:%M"], self.updated)), C.textDim[1], C.textDim[2], C.textDim[3])
         end
         if self.estimated then
-            GameTooltip:AddLine("Erholte EP seit dem Logout geschätzt (" .. (self.resting and "im Ruhebereich" or "außerhalb eines Ruhebereichs") .. ").", C.textDim[1], C.textDim[2], C.textDim[3], true)
+            GameTooltip:AddLine(L("Erholte EP seit dem Logout geschätzt (%s).", self.resting and L["im Ruhebereich"] or L["außerhalb eines Ruhebereichs"]), C.textDim[1], C.textDim[2], C.textDim[3], true)
         end
-        GameTooltip:AddLine("Rechtsklick: Eintrag entfernen", ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
+        GameTooltip:AddLine(L["Rechtsklick: Eintrag entfernen"], ns.GOLD[1], ns.GOLD[2], ns.GOLD[3])
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -501,7 +502,7 @@ local function Refresh()
             local pct, estimated = RestedPercent(entry, isCurrent)
             row.estimated = estimated
             if pct then
-                cells.rested:SetText((estimated and "ca. " or "") .. Num(pct) .. " %")
+                cells.rested:SetText((estimated and L["ca. "] or "") .. Num(pct) .. " %")
             else
                 cells.rested:SetText("–")
             end
@@ -518,7 +519,7 @@ local function Refresh()
     if #list > shown then
         moreText:ClearAllPoints()
         moreText:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 4, -bodyH)
-        moreText:SetText(("… und %d weitere"):format(#list - shown))
+        moreText:SetText(L("… und %d weitere", #list - shown))
         moreText:Show()
         bodyH = bodyH + ROW_H
     else
@@ -527,7 +528,7 @@ local function Refresh()
 
     footer:ClearAllPoints()
     footer:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -bodyH - 4)
-    footerCells.name:SetText(("Summe (%d)"):format(#list))
+    footerCells.name:SetText(L("Summe (%d)", #list))
     footerCells.level:SetText("")
     footerCells.money:SetText(ns.FormatMoney(totalMoney))
     footerCells.rested:SetText("")
@@ -552,15 +553,15 @@ function ns.ToggleAlts()
 end
 
 StaticPopupDialogs["STRAY_ALT_REMOVE"] = {
-    text = "Twink „%s“ aus der Übersicht entfernen?",
-    button1 = "Entfernen",
-    button2 = CANCEL or "Abbrechen",
+    text = L["Twink „%s“ aus der Übersicht entfernen?"],
+    button1 = L["Entfernen"],
+    button2 = CANCEL or L["Abbrechen"],
     OnAccept = function(self, data)
         local key = data or self.data
         local altData = Data()
         if type(key) ~= "string" or not altData then return end
         if key == PlayerKey() then
-            ns.Print("Der eingeloggte Charakter wird gleich wieder erfasst – bitte von einem anderen Charakter aus entfernen.")
+            ns.Print(L["Der eingeloggte Charakter wird gleich wieder erfasst – bitte von einem anderen Charakter aus entfernen."])
         end
         altData[key] = nil
         ns.RefreshAlts()
@@ -577,8 +578,8 @@ StaticPopupDialogs["STRAY_ALT_REMOVE"] = {
 
 ns.AddOption(3, "Charaktere", {
     key = "alts",
-    label = "Twinks erfassen",
-    tooltip = "Speichert für jeden Charakter Stufe, Gold, erholte EP und Spielzeit, damit du alle in der Twink-Übersicht siehst.\nBeim Einloggen fragt stray einmal die Spielzeit ab, dabei erscheinen die zwei üblichen Zeilen im Chat.",
+    label = L["Twinks erfassen"],
+    tooltip = L["Speichert für jeden Charakter Stufe, Gold, erholte EP und Spielzeit, damit du alle in der Twink-Übersicht siehst.\nBeim Einloggen fragt stray einmal die Spielzeit ab, dabei erscheinen die zwei üblichen Zeilen im Chat."],
     set = function(value)
         ns.db.alts = value
         if value then
@@ -592,8 +593,8 @@ ns.AddOption(3, "Charaktere", {
 ns.AddOption(3, "Charaktere", {
     key = "altsOpen",
     type = "button",
-    label = "Twink-Übersicht öffnen",
-    buttonText = "Öffnen",
-    tooltip = "Zeigt alle erfassten Charaktere mit Stufe, Gold, erholten EP und Spielzeit, darunter die Summen.\nErholte EP von ausgeloggten Charakteren werden geschätzt („ca.“).",
+    label = L["Twink-Übersicht öffnen"],
+    buttonText = L["Öffnen"],
+    tooltip = L["Zeigt alle erfassten Charaktere mit Stufe, Gold, erholten EP und Spielzeit, darunter die Summen.\nErholte EP von ausgeloggten Charakteren werden geschätzt („ca.“)."],
     onClick = function() ns.ToggleAlts() end,
 })

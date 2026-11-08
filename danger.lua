@@ -6,6 +6,7 @@
 -- Quest-Gegner: links daneben). Eigene Rahmen aus einem Pool, nichts wird auf die Plakette geschrieben.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.dangerWarn = false
 ns.defaults.dangerLevels = 3
@@ -14,9 +15,9 @@ local SKULL = "Interface\\TargetingFrame\\UI-TargetingFrame-Skull"
 local REPEAT_DELAY = 10 -- Sekunden bis zum nächsten Hinweis für denselben Namen
 
 local CLASS_LABELS = {
-    elite = "Elite",
-    rareelite = "Seltene Elite",
-    worldboss = "Weltboss",
+    elite = L["Elite"],
+    rareelite = L["Seltene Elite"],
+    worldboss = L["Weltboss"],
 }
 
 local pool = {}    -- freie Symbole
@@ -48,7 +49,7 @@ notice.anim:SetScript("OnFinished", function() notice:Hide() end)
 ns.MakeMovable(notice, "dangerwarn", { "TOP", "TOP", 0, -115 })
 notice:EnableMouse(false) -- fängt sonst Mausklicks in der Spielwelt ab
 
-local SAMPLE = "Gefährlich: Murloc-Orakel (Elite, Stufe 32)"
+local SAMPLE = L["Gefährlich: Murloc-Orakel (Elite, Stufe 32)"]
 local sampleShown = false
 
 local function ShowSample(on)
@@ -206,8 +207,11 @@ local function Evaluate(unit, fresh)
     local now = GetTime()
     if lastWarn[name] and now - lastWarn[name] < REPEAT_DELAY then return end
     lastWarn[name] = now
-    local detail = classLabel and (classLabel .. ", Stufe " .. levelText) or ("Stufe " .. levelText)
-    ShowNotice("Gefährlich: " .. name .. " (" .. detail .. ")")
+    if classLabel then
+        ShowNotice(L("Gefährlich: %s (%s, Stufe %s)", name, classLabel, levelText))
+    else
+        ShowNotice(L("Gefährlich: %s (Stufe %s)", name, levelText))
+    end
 end
 
 local function RefreshAll()
@@ -275,8 +279,8 @@ end)
 
 ns.AddOption(2, "Kampfhilfen", {
     key = "dangerWarn",
-    label = "Gefährliche Gegner warnen",
-    tooltip = "Elite-Gegner und Gegner, deren Stufe deutlich über deiner liegt (auch „??“), bekommen einen Totenkopf an der Namensplakette. Taucht so ein Gegner zum ersten Mal auf, erscheint oben kurz ein Hinweis mit leisem Ton, für denselben Namen höchstens alle 10 Sekunden.\n\nAusgewertet wird außerhalb des Kampfes. In Instanzen gibt es nur den Totenkopf. Gegnerische Namensplaketten müssen eingeschaltet sein (Taste V). Den Hinweis verschiebst du bei offenem stray-Fenster mit Shift + Ziehen.",
+    label = L["Gefährliche Gegner warnen"],
+    tooltip = L["Elite-Gegner und Gegner, deren Stufe deutlich über deiner liegt (auch „??“), bekommen einen Totenkopf an der Namensplakette. Taucht so ein Gegner zum ersten Mal auf, erscheint oben kurz ein Hinweis mit leisem Ton, für denselben Namen höchstens alle 10 Sekunden.\n\nAusgewertet wird außerhalb des Kampfes. In Instanzen gibt es nur den Totenkopf. Gegnerische Namensplaketten müssen eingeschaltet sein (Taste V). Den Hinweis verschiebst du bei offenem stray-Fenster mit Shift + Ziehen."],
     set = function(value)
         ns.db.dangerWarn = value
         if value then
@@ -294,10 +298,10 @@ ns.AddOption(2, "Kampfhilfen", {
     min = 2,
     max = 10,
     step = 1,
-    label = "Warnen ab Stufen darüber",
-    tooltip = "Ab wie vielen Stufen über deiner eigenen ein Gegner als gefährlich gilt. Elite-Gegner und „??“ zählen immer.",
+    label = L["Warnen ab Stufen darüber"],
+    tooltip = L["Ab wie vielen Stufen über deiner eigenen ein Gegner als gefährlich gilt. Elite-Gegner und „??“ zählen immer."],
     isEnabled = function() return ns.db and ns.db.dangerWarn and true or false end,
-    disabledHint = "Erst „Gefährliche Gegner warnen“ einschalten (direkt darüber).",
+    disabledHint = L["Erst „Gefährliche Gegner warnen“ einschalten (direkt darüber)."],
     set = function(value)
         ns.db.dangerLevels = value
         pcall(RefreshAll)

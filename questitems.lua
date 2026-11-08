@@ -4,6 +4,7 @@
 -- und warnt beim Händler, wenn so ein Gegenstand doch verkauft wurde – mit Rückkauf-Knopf.
 
 local _, ns = ...
+local L = ns.L
 
 local IsSecret = ns.IsSecret
 local GetNumSlots = (C_Container and C_Container.GetContainerNumSlots) or GetContainerNumSlots
@@ -236,17 +237,17 @@ local soldQueue = {}
 local ShowNextSold
 
 StaticPopupDialogs["STRAY_QUESTITEM_SOLD"] = {
-    text = "%s gehört zur Quest „%s“.\nZurückkaufen?",
-    button1 = "Zurückkaufen",
-    button2 = "Nein",
+    text = L["%s gehört zur Quest „%s“.\nZurückkaufen?"],
+    button1 = L["Zurückkaufen"],
+    button2 = L["Nein"],
     OnAccept = function(self, data)
         local link = data or self.data
         local index = merchantOpen and link and FindBuyback(link)
         if index then
             BuybackItem(index)
-            ns.Print("Rückkauf von " .. link .. " angefordert.")
+            ns.Print(L("Rückkauf von %s angefordert.", link))
         else
-            ns.Print("Zurückkaufen nicht möglich – ist der Händler noch offen?")
+            ns.Print(L["Zurückkaufen nicht möglich – ist der Händler noch offen?"])
         end
     end,
     OnHide = function() C_Timer.After(0, function() ShowNextSold() end) end,
@@ -336,8 +337,8 @@ end)
 
 ns.AddOption(1, "Taschen", {
     key = "questItemMarks",
-    label = "Questgegenstände markieren",
-    tooltip = "Gegenstände, die du für eine Quest in deinem Questlog brauchst, bekommen in den Taschen einen goldenen Rahmen mit „!“. So verkaufst du sie nicht aus Versehen.\n\nErkannt werden Questziele wie „Leinenstoff: 3/10“ – auch schon erfüllte, weil du sie bei der Abgabe noch brauchst.",
+    label = L["Questgegenstände markieren"],
+    tooltip = L["Gegenstände, die du für eine Quest in deinem Questlog brauchst, bekommen in den Taschen einen goldenen Rahmen mit „!“. So verkaufst du sie nicht aus Versehen.\n\nErkannt werden Questziele wie „Leinenstoff: 3/10“ – auch schon erfüllte, weil du sie bei der Abgabe noch brauchst."],
     set = function(value)
         ns.db.questItemMarks = value
         if value then Refresh() else HideAllMarks() end
@@ -346,8 +347,8 @@ ns.AddOption(1, "Taschen", {
 
 ns.AddOption(1, "Händler", {
     key = "questItemSellWarn",
-    label = "Warnung beim Verkauf",
-    tooltip = "Verkaufst du beim Händler einen Gegenstand, den du für eine Quest brauchst, fragt stray sofort nach: „Zurückkaufen?“ – ein Klick holt ihn zum gleichen Preis zurück.\n\nFunktioniert, solange der Händler offen ist.",
+    label = L["Warnung beim Verkauf"],
+    tooltip = L["Verkaufst du beim Händler einen Gegenstand, den du für eine Quest brauchst, fragt stray sofort nach: „Zurückkaufen?“ – ein Klick holt ihn zum gleichen Preis zurück.\n\nFunktioniert, solange der Händler offen ist."],
     set = function(value)
         ns.db.questItemSellWarn = value
         if value then RequestRefresh() end

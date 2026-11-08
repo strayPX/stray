@@ -1,6 +1,45 @@
-# stray 0.21.0-alpha
+# stray 0.22.0-alpha
 
-Diese Version enthält auch 0.20.0-alpha, das nie einzeln veröffentlicht wurde (siehe unten).
+Diese Version enthält auch 0.21.0-alpha und 0.20.0-alpha, die nie einzeln veröffentlicht wurden (siehe unten).
+
+**Neues stray-Fenster**
+- Ganz neu gestaltet: ruhiges Lila, links die Seiten in drei Gruppen (Alltag, Kampf & Gruppe, Oberfläche) mit eigenen Symbolen und einem Zähler, wie viele Optionen an sind.
+- Oben je Seite ein großer Titel und, wo es passt, der Hauptschalter **„Modul aktiv“**. Die Optionen stehen in Karten in zwei Spalten, lange Erklärungen im Tooltip.
+- **Stichwort-Suche:** findet Optionen auch über Begriffe wie „aggro“, „bags“, „xp“ oder „heal“ – deutsch und englisch.
+- **Ungespeicherte Änderungen** werden unten gezählt. Beim Schließen fragt stray: **Neu laden** (übernehmen) oder **Verwerfen** (alles zurück auf den Stand beim Öffnen).
+- Was du einstellst, siehst du direkt im Spiel an den echten Anzeigen.
+
+**stray-Oberfläche – ein Schalter für alles**
+- Neuer Hauptschalter (Oberfläche → stray-Oberfläche) für eigene Aktionsleisten, Taschenleiste unten, eckige Minimap, Menü per Mittelklick, Minimap-Knopfspalte, Uhr/FPS und Erfahrungsleiste. Jeder Teil lässt sich darunter einzeln abschalten. Aus = alles wieder Blizzard.
+- Deine bisherigen Einstellungen bleiben erhalten.
+- **Mittelklick auf die Minimap** öffnet das Menü, ohne auf der Karte zu pingen.
+
+**Taschen- und Menüleiste unten rechts**
+- Neu gestaltet: Blizzards Menüsymbole frei auf einem dunklen Streifen, der Charakter-Knopf zeigt dein **Porträt**.
+- Rucksack und Taschen sind **ein Knopf** mit Füllbalken (grün, gelb, rot) und Tooltip mit allen Taschen. Der Schlüsselbund ist weg.
+
+**Erfahrung**
+- **EP-Leiste besser lesbar:** größer, klarere Schrift, links Stufe und Prozent, Mitte Erholt, rechts Quest-EP. Breite, Höhe und Schriftgröße einstellbar.
+- **EP-Tracker:** EP pro Stunde, Zeit bis zum Levelaufstieg, Zeit auf der aktuellen Stufe, Gesamtspielzeit und Verlauf je Stufe – an der EP-Leiste, im Tooltip oder als kleine Tabelle.
+
+**Gruppe**
+- **Begleiter am Gruppenrahmen:** Tiere von Jägern und Dämonen von Hexenmeistern erscheinen links neben ihrem Besitzer, mit Lebensbalken und Mouseover-Heilen. Breite und Höhe einstellbar.
+
+**Bearbeitungsmodus** (früher „Anzeigen verschieben“)
+- Klick auf eine Anzeige öffnet ein kleines Fenster: Position X/Y, **Größe in Prozent**, wo möglich Breite und Höhe, mittig ausrichten, Zurücksetzen.
+- **Pfeiltasten** verschieben die gewählte Anzeige um 1 Pixel, mit Shift um 10.
+- Esc hebt erst die Auswahl auf, ein zweites Esc beendet den Modus.
+
+**Vorrat**
+- **Laufender Rand** um die Symbole der Vorrats-Erinnerung, damit Fehlendes sofort auffällt.
+
+**Englisch**
+- stray gibt es jetzt auch auf **Englisch**. Auf einem deutschen Client bleibt alles deutsch, auf allen anderen erscheint stray englisch.
+
+**Kleinigkeiten**
+- Der Profil-Export nimmt jetzt auch neue Einstellungen mit (zweites DMG-Meter, Taschenfenster, Bearbeitungsmodus, Größen je Anzeige, Minimap, Taschenleiste, Hauptschalter, EP-Leiste).
+
+# Aus 0.21.0-alpha
 
 **Taschenfenster**
 - Questgegenstände stehen nur noch unter **„Quest“**, nicht zusätzlich unter Handwerk & Co. Nach der Abgabe wandern sie zurück.

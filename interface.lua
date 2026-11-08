@@ -1,6 +1,7 @@
 -- stray – Interface: rote Fehlermeldungen ausblenden, Haltbarkeit anzeigen
 
 local _, ns = ...
+local L = ns.L
 
 ---------------------------------------------------------------------------
 -- Fehlermeldungen
@@ -33,8 +34,8 @@ end)
 
 ns.AddOption(3, "Interface", {
     key = "hideErrors",
-    label = "Fehlermeldungen ausblenden",
-    tooltip = "Rote Meldungen in der Bildschirmmitte verschwinden, z. B. „Nicht genug Mana“, „Fähigkeit noch nicht bereit“ oder „Außer Reichweite“.\n\n„Taschen voll“ und „Questlog voll“ bleiben sichtbar. Gelbe Questfortschritte sind nicht betroffen.",
+    label = L["Fehlermeldungen ausblenden"],
+    tooltip = L["Rote Meldungen in der Bildschirmmitte verschwinden, z. B. „Nicht genug Mana“, „Fähigkeit noch nicht bereit“ oder „Außer Reichweite“.\n\n„Taschen voll“ und „Questlog voll“ bleiben sichtbar. Gelbe Questfortschritte sind nicht betroffen."],
     set = function(value)
         ns.db.hideErrors = value
         ApplyErrors()
@@ -86,9 +87,9 @@ local function Update()
     if lowest then
         local r, g, b = PercentColor(lowest)
         local hex = ("%02x%02x%02x"):format(math.floor(r * 255), math.floor(g * 255), math.floor(b * 255))
-        text:SetText(("Haltbarkeit |cff%s%d %%|r"):format(hex, math.floor(lowest + 0.5)))
+        text:SetText(L("Haltbarkeit |cff%s%d %%|r", hex, math.floor(lowest + 0.5)))
     else
-        text:SetText("Haltbarkeit –")
+        text:SetText(L["Haltbarkeit –"])
     end
     panel:SetWidth(text:GetStringWidth() + 20)
     panel:Show()
@@ -96,7 +97,7 @@ end
 
 panel:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-    GameTooltip:SetText("Haltbarkeit", 1, 1, 1)
+    GameTooltip:SetText(L["Haltbarkeit"], 1, 1, 1)
     local items = Collect()
     table.sort(items, function(a, b) return a.pct < b.pct end)
     for _, item in ipairs(items) do
@@ -104,9 +105,9 @@ panel:SetScript("OnEnter", function(self)
         GameTooltip:AddDoubleLine(item.link or "?", ("%d %%"):format(math.floor(item.pct + 0.5)), 1, 1, 1, r, g, b)
     end
     if #items == 0 then
-        GameTooltip:AddLine("Keine Ausrüstung mit Haltbarkeit angelegt.", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L["Keine Ausrüstung mit Haltbarkeit angelegt."], 0.7, 0.7, 0.7)
     end
-    GameTooltip:AddLine("Shift + ziehen zum Verschieben", 0.5, 0.5, 0.5)
+    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end)
 panel:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -117,8 +118,8 @@ ns.On("PLAYER_ENTERING_WORLD", Update)
 
 ns.AddOption(3, "Interface", {
     key = "durability",
-    label = "Haltbarkeit anzeigen",
-    tooltip = "Kleine Anzeige am Bildschirm mit der Haltbarkeit deines am stärksten beschädigten Ausrüstungsteils – grün, gelb oder rot. Der Tooltip listet alle Teile.\n\nMit Shift + linker Maustaste verschiebst du die Anzeige.",
+    label = L["Haltbarkeit anzeigen"],
+    tooltip = L["Kleine Anzeige am Bildschirm mit der Haltbarkeit deines am stärksten beschädigten Ausrüstungsteils – grün, gelb oder rot. Der Tooltip listet alle Teile.\n\nMit Shift + linker Maustaste verschiebst du die Anzeige."],
     set = function(value)
         ns.db.durability = value
         Update()

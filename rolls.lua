@@ -11,6 +11,7 @@
 -- Falls der Container geschützt ist, wird er im Kampf nicht umgesetzt, sondern danach.
 
 local _, ns = ...
+local L = ns.L
 
 ns.defaults.rollsMove = false
 
@@ -48,20 +49,20 @@ do
     title:SetFont(FONT, 13, "")
     title:SetTextColor(C.accent[1], C.accent[2], C.accent[3])
     title:SetPoint("TOP", 0, -14)
-    title:SetText("Würfelfenster")
+    title:SetText(L["Würfelfenster"])
     local hint = sample:CreateFontString(nil, "OVERLAY")
     hint:SetFont(FONT, 11, "")
     hint:SetTextColor(C.dim[1], C.dim[2], C.dim[3])
     hint:SetPoint("TOP", title, "BOTTOM", 0, -6)
-    hint:SetText("Bedarf / Gier erscheint hier, weitere darüber")
+    hint:SetText(L["Bedarf / Gier erscheint hier, weitere darüber"])
 end
 sample:Hide()
 holder:SetScript("OnEnter", function(self)
     if not sample:IsShown() then return end
     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-    GameTooltip:SetText("Würfelfenster", 1, 1, 1)
-    GameTooltip:AddLine("Hier erscheinen die Bedarf-/Gier-Fenster.", C.text[1], C.text[2], C.text[3], true)
-    GameTooltip:AddLine("Shift + ziehen zum Verschieben", 0.5, 0.5, 0.5)
+    GameTooltip:SetText(L["Würfelfenster"], 1, 1, 1)
+    GameTooltip:AddLine(L["Hier erscheinen die Bedarf-/Gier-Fenster."], C.text[1], C.text[2], C.text[3], true)
+    GameTooltip:AddLine(L["Shift + ziehen zum Verschieben"], 0.5, 0.5, 0.5)
     GameTooltip:Show()
 end)
 holder:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -133,12 +134,12 @@ ns.OnConfig(function() UpdateHolder() end)
 
 ns.AddOption(3, "Interface", {
     key = "rollsMove",
-    label = "Würfelfenster verschiebbar",
-    tooltip = "Die Bedarf-/Gier-Fenster erscheinen an einer Stelle deiner Wahl statt über den Aktionsleisten. Bei offenem stray-Fenster siehst du einen Platzhalter „Würfelfenster“, den du mit Shift + linker Maustaste oder im Bearbeitungsmodus verschiebst.\n\nAusschalten wirkt ganz nach /reload.",
+    label = L["Würfelfenster verschiebbar"],
+    tooltip = L["Die Bedarf-/Gier-Fenster erscheinen an einer Stelle deiner Wahl statt über den Aktionsleisten. Bei offenem stray-Fenster siehst du einen Platzhalter „Würfelfenster“, den du mit Shift + linker Maustaste oder im Bearbeitungsmodus verschiebst.\n\nAusschalten wirkt ganz nach /reload."],
     set = function(value)
         ns.db.rollsMove = value
         Apply()
-        if not value then ns.Print("Blizzards Würfelfenster-Position kommt spätestens nach /reload zurück.") end
+        if not value then ns.Print(L["Blizzards Würfelfenster-Position kommt spätestens nach /reload zurück."]) end
     end,
 })
 

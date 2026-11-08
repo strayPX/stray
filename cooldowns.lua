@@ -14,6 +14,7 @@
 -- Versiegelte Werte („secret values“) werden nie verglichen oder verrechnet.
 
 local _, ns = ...
+local L = ns.L
 
 local IsSecret = ns.IsSecret
 
@@ -130,7 +131,7 @@ anchor.label = anchor:CreateFontString(nil, "OVERLAY")
 anchor.label:SetFont(STANDARD_TEXT_FONT, 11, "OUTLINE")
 anchor.label:SetTextColor(EDGE[1] + 0.5, EDGE[2] + 0.5, EDGE[3] + 0.4)
 anchor.label:SetPoint("BOTTOM", anchor, "TOP", 0, 2)
-anchor.label:SetText("Abklingzeiten (Shift + Ziehen)")
+anchor.label:SetText(L["Abklingzeiten (Shift + Ziehen)"])
 
 local function SetAnchorVisual(on)
     anchor.bg:SetShown(on)
@@ -498,7 +499,7 @@ end)
 -- Optionen
 ---------------------------------------------------------------------------
 
-local NOT_AVAILABLE = "Diese Spielversion hat Blizzards Cooldown-Manager nicht."
+local NOT_AVAILABLE = L["Diese Spielversion hat Blizzards Cooldown-Manager nicht."]
 
 local function UnavailableReason()
     if not (C_CooldownViewer and C_CooldownViewer.IsCooldownViewerAvailable) then return nil end
@@ -511,23 +512,23 @@ end
 
 ns.AddOption(2, "Abklingzeiten", {
     key = "cdManager",
-    label = "Abklingzeiten über den Leisten",
-    tooltip = "Zeigt über den Aktionsleisten eine Reihe mit deinen wichtigen Fähigkeiten und ihren Abklingzeiten – große Restzeit in der Mitte jedes Symbols.\n\nDafür nutzt stray Blizzards eingebauten Cooldown-Manager und schaltet ihn ein. Welche Fähigkeiten er zeigt (und ob immer oder nur im Kampf), stellst du in Blizzards eigenem Cooldown-Manager-Fenster bzw. im Edit Mode ein (Spielmenü). stray gestaltet ihn nur um (quadratische Symbole, schmaler Rand) und platziert ihn: wichtige Fähigkeiten unten, weitere direkt darüber.\n\nVerschieben mit Shift + Ziehen bei offenem stray-Fenster oder im Bearbeitungsmodus. Position und Größe ändern sich nur außerhalb des Kampfes.\n\nAusschalten: Blizzards eigene Optik und Position kommen erst nach /reload zurück.",
+    label = L["Abklingzeiten über den Leisten"],
+    tooltip = L["Zeigt über den Aktionsleisten eine Reihe mit deinen wichtigen Fähigkeiten und ihren Abklingzeiten – große Restzeit in der Mitte jedes Symbols.\n\nDafür nutzt stray Blizzards eingebauten Cooldown-Manager und schaltet ihn ein. Welche Fähigkeiten er zeigt (und ob immer oder nur im Kampf), stellst du in Blizzards eigenem Cooldown-Manager-Fenster bzw. im Edit Mode ein (Spielmenü). stray gestaltet ihn nur um (quadratische Symbole, schmaler Rand) und platziert ihn: wichtige Fähigkeiten unten, weitere direkt darüber.\n\nVerschieben mit Shift + Ziehen bei offenem stray-Fenster oder im Bearbeitungsmodus. Position und Größe ändern sich nur außerhalb des Kampfes.\n\nAusschalten: Blizzards eigene Optik und Position kommen erst nach /reload zurück."],
     isEnabled = function() return Available() end,
     disabledHint = NOT_AVAILABLE,
     set = function(value)
         ns.db.cdManager = value
         if value then
-            if InCombatLockdown() then ns.Print("Abklingzeiten: Die Änderung gilt nach dem Kampf.") end
+            if InCombatLockdown() then ns.Print(L["Abklingzeiten: Die Änderung gilt nach dem Kampf."]) end
             local reason = UnavailableReason()
-            if reason then ns.Print("Abklingzeiten: " .. reason) end
+            if reason then ns.Print(L("Abklingzeiten: %s", reason)) end
         else
             -- Hat stray Blizzards Cooldown-Manager eingeschaltet, schaltet stray ihn auch wieder aus
             if ns.db.cdCVarByStray and CVarExists() and not InCombatLockdown() then
                 pcall(ns.SetCVarValue, CVAR, "0")
                 ns.db.cdCVarByStray = nil
             end
-            ns.Print("Abklingzeiten: Blizzards eigene Optik kommt nach /reload zurück.")
+            ns.Print(L["Abklingzeiten: Blizzards eigene Optik kommt nach /reload zurück."])
         end
         Schedule(nil, true)
     end,
@@ -536,11 +537,11 @@ ns.AddOption(2, "Abklingzeiten", {
 ns.AddOption(2, "Abklingzeiten", {
     key = "cdSize",
     type = "slider",
-    label = "Symbolgröße",
+    label = L["Symbolgröße"],
     min = 24, max = 56, step = 1,
-    tooltip = "Größe der Abklingzeit-Symbole in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
+    tooltip = L["Größe der Abklingzeit-Symbole in Pixeln. Im Kampf wird die Änderung erst danach übernommen."],
     isEnabled = function() return Enabled() end,
-    disabledHint = "Erst „Abklingzeiten über den Leisten“ einschalten (direkt darüber).",
+    disabledHint = L["Erst „Abklingzeiten über den Leisten“ einschalten (direkt darüber)."],
     set = function(v)
         ns.db.cdSize = v
         if InCombatLockdown() then pendingCombat = true return end
