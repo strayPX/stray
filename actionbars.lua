@@ -757,7 +757,30 @@ local function CreateButton(bar, l, i)
     b:SetScript("OnDragStart", OnDragStart)
     b:SetScript("OnReceiveDrag", OnReceiveDrag)
     -- CheckButton schaltet beim Klick selbst um → echten Zustand danach wieder setzen
-    b:SetScript("PostClick", function(self) pcall(UpdateState, self) end)
+    -- Shift (Aufheben-Taste) + Mausklick bei gesperrten Leisten: nur aufheben, nicht auslösen
+    -- (wie Blizzards Knöpfe). Nur außerhalb des Kampfes und nur für echte Mausklicks, damit
+    -- Tastenbelegungen mit Shift weiter funktionieren.
+    b:SetScript("PreClick", function(self, button, down)
+        if InCombatLockdown() then return end
+        -- Sicherheitsnetz: falls eine frühere Unterdrückung nicht zurückgenommen wurde
+        if self.strayNoUse then
+            self.strayNoUse = nil
+            pcall(self.SetAttribute, self, "type", "action")
+        end
+        if not down then return end
+        if not (IsModifiedClick and IsModifiedClick("PICKUPACTION")) then return end
+        if not ActionBarsLocked() then return end
+        if GetCursorInfo() then return end
+        if not (IsMouseButtonDown and IsMouseButtonDown(button)) then return end
+        if pcall(self.SetAttribute, self, "type", nil) then self.strayNoUse = true end
+    end)
+    b:SetScript("PostClick", function(self)
+        if self.strayNoUse and not InCombatLockdown() then
+            self.strayNoUse = nil
+            pcall(self.SetAttribute, self, "type", "action")
+        end
+        pcall(UpdateState, self)
+    end)
     -- Seitenwechsel (Leiste 1) setzt „action“ neu, auch im Kampf → neu zeichnen
     b:HookScript("OnAttributeChanged", function(self, key, value)
         if key == "action" and type(value) == "number" and not IsSecret(value) then
