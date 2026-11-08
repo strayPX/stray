@@ -101,10 +101,30 @@ local MODE_LABEL = { damage = "Schaden", healing = "Heilung" }
 -- Kleine Bausteine
 ---------------------------------------------------------------------------
 
-local function Border(frame, c)
+-- Stil „forever“ (Forever UI): alles hinter FX.On(); im Stil „stray“ bleibt alles wie bisher.
+-- Fenster 1 entsteht beim Laden der Datei (Einstellungen noch nicht da), daher wird der Stil
+-- dort nachträglich in win.StyleForever (PLAYER_LOGIN) aufgesetzt; spätere Fenster direkt.
+local FX = {}
+
+function FX.On()
+    local S = ns.Style
+    if not (S and S.IsForever) then return false end
+    local ok, v = pcall(S.IsForever)
+    return ok and v == true
+end
+
+function FX.Font()
+    if FX.On() then
+        local ok, f = pcall(ns.Style.Font)
+        if ok and type(f) == "string" then return f end
+    end
+    return FONT_BODY
+end
+
+local function Border(frame, c, layer, sub)
     local lines = {}
     local function Edge(p1, p2, horizontal)
-        local t = frame:CreateTexture(nil, "BORDER")
+        local t = frame:CreateTexture(nil, layer or "BORDER", nil, sub or 0)
         t:SetColorTexture(c[1], c[2], c[3], c[4] or 1)
         t:SetPoint(p1)
         t:SetPoint(p2)
@@ -120,7 +140,7 @@ end
 
 local function Text(parent, size, c, font, flags)
     local fs = parent:CreateFontString(nil, "OVERLAY")
-    fs:SetFont(font or FONT_BODY, size, flags or "")
+    fs:SetFont(font or FX.Font(), size, flags or "")
     fs:SetTextColor(c[1], c[2], c[3], c[4] or 1)
     fs:SetJustifyH("LEFT")
     fs:SetWordWrap(false)
@@ -128,8 +148,8 @@ local function Text(parent, size, c, font, flags)
 end
 
 -- Schrift mit Schatten (wie die Namen der Gruppenrahmen)
-local function ShadowText(parent, size, c)
-    local fs = Text(parent, size, c, FONT_BODY)
+local function ShadowText(parent, size, c, font)
+    local fs = Text(parent, size, c, font or FONT_BODY)
     fs:SetShadowColor(0, 0, 0, 1)
     fs:SetShadowOffset(1, -1)
     return fs
@@ -147,6 +167,7 @@ local function LetterButton(parent, letter)
     local hover = b:CreateTexture(nil, "HIGHLIGHT")
     hover:SetAllPoints()
     hover:SetColorTexture(C.barBg[1], C.barBg[2], C.barBg[3], 1)
+    b.hover = hover
     function b:SetActive(on)
         local c = on and C.accentText or C.textSide
         self.text:SetText(L[letter])
@@ -666,6 +687,25 @@ local function SyncWidths()
     end
 end
 
+-- Forever: Balken auf dunkle Fläche (ns.Style.Fill "bar") mit dünnem Bronzerand; Klassenfarbe der
+-- Füllung bleibt. Gibt true zurück, wenn der Stil aufgesetzt wurde.
+function FX.Row(bar)
+    if bar.fxDone then return true end
+    local ok = pcall(function()
+        local S = ns.Style
+        local fill = S.Fill(bar, "bar")
+        local c = ns.Colors.bronze or ns.Colors.line
+        local rim = Border(bar, { c[1], c[2], c[3], 0.85 }, "OVERLAY", 1)
+        bar.fxFill, bar.fxRim = fill, rim
+        bar.bg:Hide()
+        bar.name:SetFont(S.Font(), 11, "")
+        bar.mark:SetDrawLayer("OVERLAY", 3)
+        bar.mark:SetColorTexture(ns.Colors.accent[1], ns.Colors.accent[2], ns.Colors.accent[3], 1)
+    end)
+    if ok then bar.fxDone = true end
+    return ok
+end
+
 ---------------------------------------------------------------------------
 -- Fabrik: ein Meterfenster mit eigenem Zustand (n = 1–5)
 ---------------------------------------------------------------------------
@@ -687,7 +727,7 @@ local function CreateMeter(n)
     local mainBg = main:CreateTexture(nil, "BACKGROUND")
     mainBg:SetAllPoints()
     mainBg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4])
-    Border(main, C.border)
+    win.lines = Border(main, C.border)
     -- 2-px-lila Kante oben (wie die Bedrohungsliste)
     local topEdge = main:CreateTexture(nil, "ARTWORK")
     topEdge:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 1)
@@ -921,10 +961,11 @@ local function CreateMeter(n)
         bar.value = ShadowText(bar, 11, { 1, 1, 1, 1 })
         bar.value:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
         bar.value:SetJustifyH("RIGHT")
-        bar.name = ShadowText(bar, 11, { 1, 1, 1, 1 })
+        bar.name = ShadowText(bar, 11, { 1, 1, 1, 1 }, FX.Font())
         bar.name:SetPoint("LEFT", bar, "LEFT", 5, 0)
         bar.name:SetPoint("RIGHT", bar.value, "LEFT", -4, 0)
         bar:Hide()
+        if win.forever then FX.Row(bar) end
         rows[i] = bar
         return bar
     end
@@ -1067,7 +1108,7 @@ local function CreateMeter(n)
     local menuBg = menu:CreateTexture(nil, "BACKGROUND")
     menuBg:SetAllPoints()
     menuBg:SetColorTexture(C.menuBg[1], C.menuBg[2], C.menuBg[3], C.menuBg[4])
-    Border(menu, C.border)
+    win.menuLines = Border(menu, C.border)
     if UISpecialFrames then table.insert(UISpecialFrames, menuName) end
 
     local menuItems = {}
@@ -1187,6 +1228,77 @@ local function CreateMeter(n)
     end
     damageButton:SetScript("OnClick", function() SetMode("damage") end)
     healingButton:SetScript("OnClick", function() SetMode("healing") end)
+
+    -----------------------------------------------------------------------
+    -- Stil „forever“ (Entwurf W1): Bronze-Rahmen, Schiefer, Gold-Titel, Balken mit Bronzerand.
+    -- Läuft einmal je Fenster; bei einem Fehler bleibt der Aufbau im Stil „stray“ stehen.
+    -----------------------------------------------------------------------
+
+    function win.StyleForever()
+        if win.forever or not FX.On() then return end
+        local S = ns.Style
+        local made = {}
+        local ok = pcall(function()
+            -- Rahmen liegt 5 px außerhalb (nur ca. 3 px innen), Eckwinkel klein; unter den Knöpfen
+            local deco = CreateFrame("Frame", nil, main)
+            deco:SetPoint("TOPLEFT", main, "TOPLEFT", -5, 5)
+            deco:SetPoint("BOTTOMRIGHT", main, "BOTTOMRIGHT", 5, -5)
+            deco:SetFrameLevel(main:GetFrameLevel())
+            made.deco = deco
+            made.border = S.Border(deco, { size = 8, cornerSize = 16, cornerOffset = 3 })
+            made.fill = S.Fill(main, "window")
+            made.fill:SetAlpha(0.92)
+            -- Auswahlmenü: Schiefer-Fläche, dünner Rahmen ohne Eckwinkel
+            local mdeco = CreateFrame("Frame", nil, menu)
+            mdeco:SetPoint("TOPLEFT", menu, "TOPLEFT", -3, 3)
+            mdeco:SetPoint("BOTTOMRIGHT", menu, "BOTTOMRIGHT", 3, -3)
+            mdeco:SetFrameLevel(menu:GetFrameLevel())
+            made.mdeco = mdeco
+            made.mborder = S.Border(mdeco, { size = 6, corners = false })
+            made.mfill = S.Fill(menu, "panel")
+        end)
+        if not ok then
+            -- Rückfall auf den Aufbau im Stil „stray“
+            if made.deco then made.deco:Hide() end
+            if made.fill then made.fill:Hide() end
+            if made.mdeco then made.mdeco:Hide() end
+            if made.mfill then made.mfill:Hide() end
+            return
+        end
+        win.forever = true
+        mainBg:Hide()
+        topEdge:Hide()
+        for _, t in ipairs(win.lines) do t:Hide() end
+        for _, t in ipairs(win.menuLines) do t:Hide() end
+        menuBg:Hide()
+        local Cs = ns.Colors
+        local bronze = Cs.bronze or Cs.line
+        headerLine:SetColorTexture(bronze[1], bronze[2], bronze[3], 0.9)
+
+        -- Texte und Hover mit der Forever-Palette (beim Laden von Fenster 1 noch Stil-stray-Werte)
+        local dim = Cs.textDim
+        for _, fs in ipairs({ closeButton.text, resetButton.text, plusButton.text, modeSeparator, titleArrow, emptyText }) do
+            fs:SetTextColor(dim[1], dim[2], dim[3], 1)
+        end
+        local h = Cs.hover
+        for _, tex in ipairs({ closeHover, resetHover, plusHover, damageButton.hover, healingButton.hover }) do
+            tex:SetColorTexture(h[1], h[2], h[3], 1)
+        end
+        titleHover:SetColorTexture(h[1], h[2], h[3], 0.6)
+        emptyText:SetFont(S.Font(), 11, "")
+        pcall(function()
+            title:SetFont(S.FontTitle(), 12, "")
+            local g = Cs.gold or Cs.accentText
+            title:SetTextColor(g[1], g[2], g[3], 1)
+            local bl = Cs.bronzeLight or Cs.text
+            for _, tex in ipairs({ grip:GetNormalTexture(), grip:GetPushedTexture() }) do
+                tex:SetVertexColor(bl[1], bl[2], bl[3], 1)
+            end
+            grip:SetAlpha(0.7)
+        end)
+        for i = 1, #rows do FX.Row(rows[i]) end
+    end
+    win.StyleForever()
 
     -----------------------------------------------------------------------
     -- Anzeige
@@ -1797,6 +1909,11 @@ ns.On("PLAYER_LOGIN", function()
     for n = 1, MAX_WINDOWS do
         local win = windows[n]
         if win and IsOpen(n) then win.Restore() end
+    end
+    -- Fenster 1 entstand beim Laden der Datei: Stil „forever“ nachträglich aufsetzen
+    for n = 1, MAX_WINDOWS do
+        local win = windows[n]
+        if win and win.StyleForever then win.StyleForever() end
     end
     ApplyAll()
     RefreshEvents()

@@ -1,3 +1,14 @@
+# Nach 1.0.0 (nächste Version)
+
+**Neu**
+- **Oberflächen-Art „Forever UI“** (System → Allgemein, wirkt nach dem Neuladen): Bronze-Gold-Rahmen, dunkler Schiefer, goldene Überschriften in Friz Quadrata, trapezförmige Reiter, rot-bronzene Hauptknöpfe. Gilt für das stray-Fenster, die DMG-Meter-Fenster, die Bedrohungsliste, die Aktionsleisten-Knöpfe und die Bearbeitungsleiste. Die bisherige Art „stray“ (lila, flach) bleibt Standard und unverändert.
+- **Hinweis im Chat nach einem Update:** stray sagt, ob nach dem Update ein `/reload` reicht oder WoW komplett neu gestartet werden muss (abschaltbar).
+- Aktionsleisten: **Shift+Klick zum Verschieben** löst die Aktion nicht mehr aus (gesperrte Leisten).
+- Der laufende Rand um fehlende Vorrats-Symbole braucht weniger Leistung.
+
+**Entfernt**
+- **stray-Questtracker** samt Berufsreagenzien-Abschnitt und Questgegenstand-Knöpfen. Blizzards Questverfolgung (oder Questie) zeigt wieder die Quests. Die Konfliktwarnung für Questie (Auto-Annehmen/Abgeben) bleibt.
+
 # stray 1.0.0
 
 Erste stabile Version. Enthält alle Änderungen seit 0.19.0-alpha (0.20 bis 0.23), die nie einzeln veröffentlicht wurden.

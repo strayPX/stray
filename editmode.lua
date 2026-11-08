@@ -64,6 +64,34 @@ local C = {
 }
 local ACCENT = C.accent
 
+-- Stil „forever“ (nur Optik, kein Verhalten): Werte erst zur Anzeigezeit lesen, ns.db fehlt beim Laden
+local function Forever()
+    local ok, v = pcall(function() return ns.Style and ns.Style.IsForever() end)
+    return ok and v and true or false
+end
+
+-- Palettenfarbe (gold, bronze …) oder Ersatz
+local function Pal(key, fallback)
+    local c = ns.Colors and ns.Colors[key]
+    if type(c) == "table" then return c end
+    return fallback
+end
+
+-- Bronze-Rahmen mit Schiefer; false, wenn nicht „forever“ (dann zeichnet der Aufrufer wie bisher)
+local function ForeverFrame(frame, size)
+    if not Forever() then return false end
+    local ok = pcall(function()
+        ns.Style.Fill(frame, "window")
+        ns.Style.Border(frame, { size = size, cornerSize = 12, cornerOffset = 2 })
+    end)
+    return ok
+end
+
+-- Knopf- und Feldränder: bei „forever“ Bronze statt der dunklen Linienfarbe
+local function ForeverBorderColor()
+    if Forever() then C.border = Pal("bronze", C.border) end
+end
+
 local overlays = {}
 local bar, grid, panel
 local ticker
@@ -486,13 +514,19 @@ end
 
 -- Gewählte Anzeige: kräftiger lila Umriss (2 px) mit kleinen Eck-Griffen, Fläche dezenter
 local function StyleOverlay(o, isSelected)
+    local fv = Forever()
     if isSelected then
         o.bg:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.12)
-        Recolor(o.edges, ACCENT)
+        Recolor(o.edges, fv and Pal("gold", ACCENT) or ACCENT)
         o.sel:Show()
     else
         o.bg:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.18)
-        Recolor(o.edges, { ACCENT[1], ACCENT[2], ACCENT[3], 0.9 })
+        if fv then
+            local b = Pal("bronzeLight", ACCENT)
+            Recolor(o.edges, { b[1], b[2], b[3], 0.9 })
+        else
+            Recolor(o.edges, { ACCENT[1], ACCENT[2], ACCENT[3], 0.9 })
+        end
         o.sel:Hide()
     end
 end
@@ -528,6 +562,8 @@ local function Select(entry)
 end
 
 local function CreateOverlay(entry)
+    ForeverBorderColor()
+    local selCol = Forever() and Pal("gold", ACCENT) or ACCENT
     local o = CreateFrame("Button", nil, UIParent)
     o:SetFrameStrata("HIGH") -- unter den Popups (DIALOG), damit deren Knöpfe klickbar bleiben
     o:SetFrameLevel(50)
@@ -543,9 +579,9 @@ local function CreateOverlay(entry)
     o.sel = CreateFrame("Frame", nil, o)
     o.sel:SetPoint("TOPLEFT", -1, 1)
     o.sel:SetPoint("BOTTOMRIGHT", 1, -1)
-    Border(o.sel, ACCENT)
+    Border(o.sel, selCol)
     for _, corner in ipairs({ "TOPLEFT", "TOPRIGHT", "BOTTOMLEFT", "BOTTOMRIGHT" }) do
-        local grip = Tex(o.sel, "OVERLAY", ACCENT)
+        local grip = Tex(o.sel, "OVERLAY", selCol)
         grip:SetSize(7, 7)
         grip:SetPoint("CENTER", o.sel, corner, 0, 0)
         local dot = Tex(o.sel, "OVERLAY", { 1, 1, 1, 0.9 })
@@ -555,7 +591,7 @@ local function CreateOverlay(entry)
     end
     StyleOverlay(o, false)
 
-    o.label = Text(o, 12, { 1, 1, 1 }, nil, "OUTLINE")
+    o.label = Text(o, 12, Forever() and Pal("gold", { 1, 1, 1 }) or { 1, 1, 1 }, nil, "OUTLINE")
     o.label:SetPoint("CENTER")
     o.label:SetText(LabelText(entry.label))
 
@@ -915,21 +951,31 @@ local function PlacePanel()
 end
 
 local function CreatePanel()
+    ForeverBorderColor()
     panel = CreateFrame("Frame", "strayEditPanel", UIParent)
     panel:SetWidth(PANEL_W)
     panel:SetFrameStrata("FULLSCREEN_DIALOG")
     panel:SetClampedToScreen(true)
     panel:EnableMouse(true)
-    local bg = panel:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4] or 1)
-    Border(panel, C.border)
+    local pi = 1
+    if ForeverFrame(panel, 6) then
+        pi = 6
+    else
+        local bg = panel:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4] or 1)
+        Border(panel, C.border)
+    end
     -- Lila Kante oben (wie die gewählte Fläche: diese Anzeige ist gemeint)
     local line = Tex(panel, "ARTWORK", ACCENT)
-    line:SetPoint("TOPLEFT", 1, -1); line:SetPoint("TOPRIGHT", -1, -1); line:SetHeight(2)
+    line:SetPoint("TOPLEFT", pi, -pi); line:SetPoint("TOPRIGHT", -pi, -pi); line:SetHeight(2)
 
     -- Kopf: Name der Anzeige, rechts Schließen-Kreuz
-    panel.title = Text(panel, 13, C.text, FONT_BODY)
+    if Forever() then
+        panel.title = Text(panel, 13, Pal("gold", C.text), ns.Style.FontTitle())
+    else
+        panel.title = Text(panel, 13, C.text, FONT_BODY)
+    end
     panel.title:SetPoint("TOPLEFT", PAD, -PAD)
     panel.title:SetPoint("RIGHT", panel, "RIGHT", -PAD - 18, 0)
     panel.title:SetJustifyH("LEFT")
@@ -1235,23 +1281,29 @@ local function CreateBar()
     -- Benannt, damit die Leiste in UISpecialFrames stehen kann (Esc versteckt sie → Modus endet).
     -- Ist eine Anzeige gewählt, fängt das Fenster je Anzeige das Esc vorher ab (hebt nur die Auswahl auf).
     -- Schlank nach Leons Vorlage: Bearbeiten · Zurück · ☐ Raster · ☑ Einrasten · ⟳ · Tasten belegen · Fertig
+    ForeverBorderColor()
     bar = CreateFrame("Frame", "strayEditBar", UIParent)
     bar:SetFrameStrata("FULLSCREEN_DIALOG")
     bar:SetClampedToScreen(true)
     bar:SetMovable(true)
     bar:EnableMouse(true)
     bar:RegisterForDrag("LeftButton")
-    local bg = bar:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4] or 1)
-    Border(bar, C.border)
+    local bi = 1 -- Randstärke der Leiste (Forever 6)
+    if ForeverFrame(bar, 6) then
+        bi = 6
+    else
+        local bg = bar:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints()
+        bg:SetColorTexture(C.bg[1], C.bg[2], C.bg[3], C.bg[4] or 1)
+        Border(bar, C.border)
+    end
 
     -- Hinweiszeile: eigene, leicht abgesetzte Fläche unter der Knopfreihe
     local hintBg = Tex(bar, "BORDER", C.card)
-    hintBg:SetPoint("BOTTOMLEFT", 1, 1); hintBg:SetPoint("BOTTOMRIGHT", -1, 1)
+    hintBg:SetPoint("BOTTOMLEFT", bi, bi); hintBg:SetPoint("BOTTOMRIGHT", -bi, bi)
     hintBg:SetHeight(BAR_HINT_H - 1)
     local hintLine = Tex(bar, "ARTWORK", C.border)
-    hintLine:SetPoint("BOTTOMLEFT", 1, BAR_HINT_H); hintLine:SetPoint("BOTTOMRIGHT", -1, BAR_HINT_H)
+    hintLine:SetPoint("BOTTOMLEFT", bi, BAR_HINT_H); hintLine:SetPoint("BOTTOMRIGHT", -bi, BAR_HINT_H)
     hintLine:SetHeight(1)
     local hint = Text(bar, 11, C.textSide, FONT_BODY)
     hint:SetPoint("CENTER", bar, "BOTTOM", 0, BAR_HINT_H / 2)
@@ -1275,7 +1327,12 @@ local function CreateBar()
     logo:SetTexture(MEDIA .. "logo")
     logo:SetSize(LOGO_SIZE, LOGO_SIZE)
     Place(logo, BAR_PAD)
-    local title = Text(bar, BAR_FONT + 1, C.text, FONT_BODY)
+    local title
+    if Forever() then
+        title = Text(bar, BAR_FONT + 1, Pal("gold", C.text), ns.Style.FontTitle())
+    else
+        title = Text(bar, BAR_FONT + 1, C.text, FONT_BODY)
+    end
     title:SetPoint("LEFT", logo, "RIGHT", 7, 0)
     title:SetText(L["Bearbeiten"])
     local x = BAR_PAD + LOGO_SIZE + 7 + TextWidth(title, L["Bearbeiten"], 8) + 12
@@ -1386,7 +1443,13 @@ local function CreateBar()
     -- Fertig: dunkler Knopf mit lila Rand
     local done = BaseButton(10, nil, BAR_BTN_H)
     Recolor(done.edges, ACCENT)
-    local dtext = Text(done, BAR_FONT, { 1, 1, 1 }, FONT_BODY)
+    if Forever() then
+        -- Hauptknopf: rot-bronze mit hellem Bronzerand
+        local rd, bl = Pal("red", C.card), Pal("bronzeLight", ACCENT)
+        done.bg:SetColorTexture(rd[1], rd[2], rd[3], 1)
+        Recolor(done.edges, bl)
+    end
+    local dtext = Text(done, BAR_FONT, Forever() and Pal("gold", { 1, 1, 1 }) or { 1, 1, 1 }, FONT_BODY)
     dtext:SetPoint("CENTER")
     dtext:SetText(L["Fertig"])
     local doneW = math.max(70, math.floor(TextWidth(dtext, L["Fertig"], 8) + 28 + 0.5))

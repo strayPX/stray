@@ -41,7 +41,6 @@ questitems.lua
 freeslots.lua
 chat.lua
 quests.lua
-questtracker.lua
 gossip.lua
 cinematics.lua
 threat.lua

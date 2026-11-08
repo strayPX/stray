@@ -111,9 +111,6 @@ Rahmen, Prozent und Tank-Warnung brauchen eingeschaltete gegnerische Namensplake
 - **Twink-Übersicht:** Stufe, Gold, erholte EP und Spielzeit aller Charaktere – auch per `/stray alts`.
 - **Interface-Einstellungen für alle Charaktere:** übernimmt charakterbezogene Interface-Einstellungen beim Wechsel.
 
-**Questtracker**
-- **Questliste rechts am Rand:** nach Gebiet gruppiert und einklappbar, Schwierigkeitsfarben, Questgegenstände als Knopf, Größe ziehbar; blendet Blizzards Questverfolgung aus. Läuft Questie mit eigener Liste, weist stray darauf hin.
-
 **Tastenbelegung**
 - **Tasten belegen:** über einen Knopf der stray-Leisten fahren und Taste drücken (mit Shift/Strg/Alt, Maustasten, Mausrad) – `/stray keys`.
 

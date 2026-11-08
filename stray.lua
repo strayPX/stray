@@ -79,8 +79,10 @@ ns.defaults = {
     scales = {},    -- Größe je Anzeige aus dem Bearbeitungsmodus: [Schlüssel] = Faktor (0.5–2), fehlt = 1
 }
 
--- Einstellungen, die es nicht mehr gibt (Flugzeit, entfernt in 0.4.0-alpha)
-local REMOVED_KEYS = { "flightTimer", "flightTimes" }
+-- Einstellungen, die es nicht mehr gibt (Flugzeit 0.4.0-alpha, Questtracker nach 1.0.0)
+local REMOVED_KEYS = { "flightTimer", "flightTimes", "questTracker", "questTrackerAlpha", "questTrackerCollapsed", "questTrackerGroup",
+    "questTrackerHeight", "questTrackerHideBlizzard", "questTrackerRecipes", "questTrackerRecipesCollapsed", "questTrackerShowAll",
+    "questTrackerSort", "questTrackerTop", "questTrackerWidth", "questTrackerZones" }
 
 ns.GOLD = { 1, 0.82, 0 }
 ns.GOLD_DARK = { 0.79, 0.64, 0.29 }

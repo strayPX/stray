@@ -164,16 +164,22 @@ ns.MakeMovable(list, "threat", { "RIGHT", "RIGHT", -60, -60 })
 ns.RegisterMovable(list, "Bedrohungsliste")
 list:Hide()
 
+-- Stil „forever“: die Liste entsteht beim Laden der Datei (Einstellungen noch nicht da), der Stil wird
+-- deshalb bei PLAYER_LOGIN aufgesetzt (FX.Apply). Hier die Teile der stray-Optik merken.
+local FX = { parts = {} }
+
 do
     local bg = list:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     SetColor(bg, COLORS.bg)
+    table.insert(FX.parts, bg)
     local function Edge(p1, p2, horizontal)
         local t = list:CreateTexture(nil, "BORDER")
         SetColor(t, COLORS.line)
         t:SetPoint(p1, list, p1)
         t:SetPoint(p2, list, p2)
         if horizontal then t:SetHeight(1) else t:SetWidth(1) end
+        table.insert(FX.parts, t)
     end
     Edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
     Edge("TOPLEFT", "BOTTOMLEFT", false)
@@ -183,6 +189,7 @@ do
     top:SetPoint("TOPLEFT", list, "TOPLEFT", 0, 0)
     top:SetPoint("TOPRIGHT", list, "TOPRIGHT", 0, 0)
     top:SetHeight(2)
+    table.insert(FX.parts, top)
 end
 
 -- Kopf: „Bedrohung“ in hellem Lila, daneben grau das Ziel bzw. der Beispiel-Hinweis
@@ -212,6 +219,7 @@ for i = 1, MAX_ROWS do
     local bg = bar:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     SetColor(bg, COLORS.hover)
+    bar.bg = bg
 
     bar.name = bar:CreateFontString(nil, "OVERLAY")
     bar.name:SetFont(FONT, 11, "")
@@ -228,6 +236,69 @@ for i = 1, MAX_ROWS do
     bar.pct:SetTextColor(COLORS.text[1], COLORS.text[2], COLORS.text[3])
     bar:Hide()
     rows[i] = bar
+end
+
+-- Forever UI: Bronze-Rahmen, Schiefer, Gold-Titel, Balken auf dunkler Fläche mit Bronzerand.
+-- Balkenfüllung und Namensfarben bleiben (Lesbarkeit). Bei einem Fehler bleibt die stray-Optik.
+function FX.Apply()
+    if FX.done then return end
+    local S = ns.Style
+    if not (S and S.IsForever) then return end
+    local okOn, on = pcall(S.IsForever)
+    if not (okOn and on == true) then return end
+    local made = {}
+    local ok = pcall(function()
+        local deco = CreateFrame("Frame", nil, list)
+        deco:SetPoint("TOPLEFT", list, "TOPLEFT", -5, 5)
+        deco:SetPoint("BOTTOMRIGHT", list, "BOTTOMRIGHT", 5, -5)
+        deco:SetFrameLevel(list:GetFrameLevel())
+        made.deco = deco
+        S.Border(deco, { size = 8, cornerSize = 16, cornerOffset = 3 })
+        made.fill = S.Fill(list, "window")
+        made.fill:SetAlpha(0.92)
+        for _, bar in ipairs(rows) do
+            local fill = S.Fill(bar, "bar")
+            local c = ns.Colors.bronze or ns.Colors.line
+            local rim = {}
+            local function Edge(p1, p2, horizontal)
+                local t = bar:CreateTexture(nil, "OVERLAY", nil, 1)
+                t:SetColorTexture(c[1], c[2], c[3], 0.85)
+                t:SetPoint(p1, bar, p1)
+                t:SetPoint(p2, bar, p2)
+                if horizontal then t:SetHeight(1) else t:SetWidth(1) end
+                rim[#rim + 1] = t
+            end
+            Edge("TOPLEFT", "TOPRIGHT", true)
+            Edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
+            Edge("TOPLEFT", "BOTTOMLEFT", false)
+            Edge("TOPRIGHT", "BOTTOMRIGHT", false)
+            bar.fxFill, bar.fxRim = fill, rim
+            bar.bg:Hide()
+            bar.name:SetFont(S.Font(), 11, "")
+        end
+    end)
+    if not ok then
+        if made.deco then made.deco:Hide() end
+        if made.fill then made.fill:Hide() end
+        for _, bar in ipairs(rows) do
+            if bar.fxFill then bar.fxFill:Hide() end
+            for _, t in ipairs(bar.fxRim or {}) do t:Hide() end
+            bar.bg:Show()
+        end
+        return
+    end
+    FX.done = true
+    for _, t in ipairs(FX.parts) do t:Hide() end
+    local g = ns.Colors.gold or ns.Colors.accentText
+    pcall(function()
+        header:SetFont(S.FontTitle(), 12, "")
+        header:SetTextColor(g[1], g[2], g[3])
+        subtitle:SetFont(S.Font(), 10, "")
+    end)
+    -- Farben, die beim Laden der Datei kopiert wurden, jetzt aus der Forever-Palette
+    local d, t = ns.Colors.textDim, ns.Colors.text
+    subtitle:SetTextColor(d[1], d[2], d[3])
+    for _, bar in ipairs(rows) do bar.pct:SetTextColor(t[1], t[2], t[3]) end
 end
 
 list:SetScript("OnEnter", function(self)
@@ -789,6 +860,7 @@ end
 ns.OnConfig(function() pcall(UpdateList) end)
 
 ns.On("PLAYER_LOGIN", function()
+    FX.Apply()
     ns.RestorePosition(list)
     ns.RestorePosition(tankWarning)
     ns.RestorePosition(aggroWarning)

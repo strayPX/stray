@@ -13,7 +13,7 @@
 --   ns.ConfirmOption(key, newValue, apply, onCancel) → apply() sofort, sonst Dialog
 --       „Trotzdem einschalten / Abbrechen“ + „Nicht mehr fragen“ (ns.db.conflictIgnore[key] = true).
 --       onCancel ist optional (z. B. Schalter in der Oberfläche zurückdrehen).
--- Andere Dateien (z. B. questtracker.lua) tragen eigene Einträge mit ns.Conflicts = ns.Conflicts or {} ein.
+-- Andere Dateien tragen eigene Einträge mit ns.Conflicts = ns.Conflicts or {} ein.
 
 local _, ns = ...
 local L = ns.L

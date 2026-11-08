@@ -49,6 +49,19 @@ local BORDER_COLOR = { 0, 0, 0, 1 }
 local BORDER_EQUIPPED = { 0.1, 0.6, 0.1, 1 }
 local GLOW_COLOR = { 1, 0.82, 0, 1 }
 
+-- Stil „forever“: Knopfrand fein bronze statt schwarz, leere Plätze dunkles Schieferfeld.
+-- Zugriff erst zur Anzeigezeit (ns.db ist beim Laden der Datei noch nicht da).
+local function Forever()
+    local ok, v = pcall(function() return ns.Style and ns.Style.IsForever() end)
+    return ok and v and true or false
+end
+
+-- Randfarbe der Knöpfe (stray: schwarz wie bisher)
+local function BorderColor()
+    if Forever() and ns.Colors and ns.Colors.line then return ns.Colors.line end
+    return BORDER_COLOR
+end
+
 local bars = {}      -- [l] = Leistenrahmen
 local buttons = {}   -- alle Knöpfe
 local built = false
@@ -346,8 +359,8 @@ local function UpdateState(b)
     -- Randfarbe nur bei belegten Plätzen; leere (auch halbtransparente) regelt UpdateVisibility
     if not b.hasAction then return end
     local equipped = Bool("IsEquippedAction", b.action)
-    local c = equipped and BORDER_EQUIPPED or BORDER_COLOR
-    b.border:SetVertexColor(c[1], c[2], c[3], c[4])
+    local c = equipped and BORDER_EQUIPPED or BorderColor()
+    b.border:SetVertexColor(c[1], c[2], c[3], c[4] or 1)
 end
 
 local function SpellOverlayed(spellID)
@@ -541,10 +554,12 @@ local function UpdateVisibility(b)
     local ghost = not show and ShowEmptyOn()
     if ghost then
         local a = EmptyAlpha()
-        b.border:SetVertexColor(0, 0, 0, a)
-        b.emptyEdge:SetColor(0, 0, 0, math.min(1, a * 2))
+        local gc = Forever() and BorderColor() or { 0, 0, 0 }
+        b.border:SetVertexColor(gc[1], gc[2], gc[3], a)
+        b.emptyEdge:SetColor(gc[1], gc[2], gc[3], math.min(1, a * 2))
     elseif not b.hasAction then
-        b.border:SetVertexColor(BORDER_COLOR[1], BORDER_COLOR[2], BORDER_COLOR[3], BORDER_COLOR[4])
+        local c = BorderColor()
+        b.border:SetVertexColor(c[1], c[2], c[3], c[4] or 1)
     end
     b.emptyEdge:SetShown(ghost)
     b.border:SetShown(show or ghost)
@@ -666,12 +681,17 @@ local function CreateButton(bar, l, i)
     b.border = b:CreateTexture(nil, "BACKGROUND", nil, 0)
     b.border:SetAllPoints()
     b.border:SetColorTexture(1, 1, 1, 1)
-    b.border:SetVertexColor(BORDER_COLOR[1], BORDER_COLOR[2], BORDER_COLOR[3], BORDER_COLOR[4])
+    local bc = BorderColor()
+    b.border:SetVertexColor(bc[1], bc[2], bc[3], bc[4] or 1)
 
     b.empty = b:CreateTexture(nil, "BACKGROUND", nil, 1)
     b.empty:SetPoint("TOPLEFT", 1, -1)
     b.empty:SetPoint("BOTTOMRIGHT", -1, 1)
     b.empty:SetColorTexture(0.094, 0.094, 0.118, 0.6) -- ns.Colors.card
+    if Forever() then
+        local ok, r, g, bl = pcall(ns.Style.FillColor, "inset")
+        if ok and r then b.empty:SetColorTexture(r, g, bl, 0.85) end
+    end
 
     -- Dünner Rand für dauerhaft gezeigte leere Plätze („Leere Plätze immer zeigen“)
     b.emptyEdge = MakeEdges(b, "BACKGROUND", 2)

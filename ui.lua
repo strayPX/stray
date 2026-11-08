@@ -21,6 +21,8 @@
 --   ns.ConfirmOption / ns.ConflictHint (conflicts.lua): Nachfrage beim Einschalten, Hinweis-Kasten.
 --   ns.EditSelected / ns.OnEditSelect (editmode.lua): „Im Spiel ausgewählt“, Sprung zur Seite.
 --   ns.slashCommands[befehl] = fn: eigene Unterbefehle für /stray (z. B. „keys“).
+-- Stil „forever“ (style.lua): Rahmen, Schiefer, Gold, Reiter, Knöpfe, Eingabefelder. Das Fenster baut sich erst
+-- in ns.OnLoaded auf (Build-Teile), weil der Stil aus ns.db kommt; im Stil „stray“ bleibt alles wie bisher.
 -- Symbole in media/icons: Tabler Icons (MIT-Lizenz, tabler.io); „meditation“ ist eigenes stray-Symbol
 -- im gleichen Stil. media/logo: stray-Siegel.
 
@@ -73,6 +75,69 @@ local C = {
     amberBg  = { 0.961, 0.682, 0.290, 0.08 },
     white    = { 1, 1, 1, 1 },
 }
+C.hi = C.white            -- hervorgehobener Text (Titel, gewählte Einträge); Forever: Gold
+C.hint = C.text           -- Text im Hinweis-Kasten
+C.num = C.text            -- Text im Zahlenfeld
+C.navSel = C.hover        -- Fläche des gewählten Seiteneintrags
+C.rest = C.grey           -- Ruhefarbe kleiner Symbole (Schließen, Pfeile, Griff)
+
+---------------------------------------------------------------------------
+-- Stil „forever“ (style.lua)
+-- ns.db und damit der Stil sind erst ab ADDON_LOADED bekannt. Alles, was das Fenster aufbaut, läuft
+-- deshalb in Build()-Teilen, die ns.OnLoaded der Reihe nach ausführt. Im Stil „stray“ bleibt alles wie
+-- bisher; die Forever-Werte gelten erst nach SetupStyle().
+---------------------------------------------------------------------------
+
+local FOREVER = false  -- Stil „forever“ aktiv
+local P = 0            -- Abstand der Fensterteile zum Rahmen (Forever: Rahmenstärke)
+local FSCALE = 1       -- Schriftgröße relativ (Friz Quadrata ist breiter als Arial Narrow)
+local FONT_NUM = FONT  -- Schrift für Zahlen
+local BUILD = {}       -- aufgeschobene Aufbau-Teile
+
+local function Build(fn) table.insert(BUILD, fn) end
+
+-- Schriftgröße im aktuellen Stil
+local function FS(size)
+    if FSCALE == 1 then return size end
+    return math.max(10, math.floor(size * FSCALE + 0.5))
+end
+
+-- ns.Style-Aufruf ohne Fehler zu verschlucken: bei Fehler melden und nil zurückgeben; der Aufrufer
+-- baut dann im Stil „stray“ (Aufruf im Stil „stray“ liefert ebenfalls nil)
+local function FX(name, ...)
+    local fn = FOREVER and ns.Style and ns.Style[name]
+    if not fn then return nil end
+    local ok, res = pcall(fn, ...)
+    if not ok then
+        geterrorhandler()(res)
+        return nil
+    end
+    return res
+end
+
+local function SetupStyle()
+    FOREVER = ns.Style and ns.Style.IsForever and ns.Style.IsForever() or false
+    if not FOREVER then return end
+    local NC = ns.Colors
+    P = 10
+    FSCALE = 0.92
+    FONT = ns.Style.Font()
+    FONT_NUM = ns.Style.FontNumbers()
+    M.TOP_H = M.TOP_H + P
+    M.SIDE_W = 220
+    M.DROP_W = 200
+    -- Palette: Gold für Hervorhebungen, warme Neutraltöne, gelbbrauner Hinweis; Lila bleibt Akzent
+    C.hi = NC.gold
+    C.num = NC.gold
+    C.hint = { 0.894, 0.812, 0.541, 1 }
+    C.navText = NC.text
+    C.navSel = { C.accent[1], C.accent[2], C.accent[3], 0.20 }
+    C.rest = NC.goldDim
+    C.faint = { 0.478, 0.447, 0.388, 1 }  -- besser lesbar auf dem Schiefer als textFaint
+    C.off = { 0.043, 0.043, 0.051, 1 }
+    C.amber = { 0.851, 0.722, 0.290, 1 }
+    C.amberBg = { 0.165, 0.137, 0.051, 1 }
+end
 
 ---------------------------------------------------------------------------
 -- Seiten, Reiter und Zuordnung
@@ -118,7 +183,6 @@ local PAGES = {
         { name = "Händler", sections = { "Händler" } },
         { name = "NPCs", sections = { "NPCs" } },
         { name = "Quests", sections = { "Quests" } },
-        { name = "Questtracker", sections = { "Questtracker" }, master = "first" },
         { name = "Filmsequenzen", sections = { "Filmsequenzen" } },
         { name = "Chat", sections = { "Chat" } },
         { name = "Sozial", sections = { "Sozial" } },
@@ -154,7 +218,6 @@ local MOVABLE_TABS = {
     { "Swing", "Kampf & Anzeigen", "Swing" },
     { "EP-Tracker", "Kampf & Anzeigen", "EP-Tracker" },
     { "Flugzeit", "Kampf & Anzeigen", "Flugzeit" },
-    { "Quest", "Komfort", "Questtracker" },
     { "Haltbarkeit", "Sprache & System", "Interface" },
     { "Würfelfenster", "Sprache & System", "Interface" },
 }
@@ -164,7 +227,7 @@ local HOME = {
     { label = "OBERFLÄCHE", keys = { "strayUI", "abEnabled", "bottomBar", "cdManager", "partyFrames", "bagWindow",
         "squareMinimap", "hudXPBar" } },
     { label = "SPIELHILFEN", keys = { "threatList", "dmShow", "swingTimer", "xpTracker", "flightBar", "dangerWarn",
-        "@Questtracker", "supplies", "questAccept", "autoSell", "playerNotes", "alts" } },
+        "supplies", "questAccept", "autoSell", "playerNotes", "alts" } },
 }
 
 -- Beim Einschalten zuerst auch diesen Schalter einschalten (eigene Leisten gehören zur stray-Oberfläche)
@@ -301,7 +364,6 @@ local SECTION_KEYWORDS = {
     ["Taschen"] = { "bags", "bag", "inventar", "inventory" },
     ["Vorrat"] = { "supplies", "reagents", "reagenzien" },
     ["Quests"] = { "quest", "quests" },
-    ["Questtracker"] = { "quest", "quests", "tracker", "questie" },
     ["Bedrohung"] = { "aggro", "threat" },
     ["DMG-Meter"] = { "dps", "damage", "meter", "schaden", "heal", "heilung" },
     ["Kampfhilfen"] = { "combat", "kampf" },
@@ -327,7 +389,7 @@ local SECTION_KEYWORDS = {
 
 local function Text(parent, size, c, layer)
     local fs = parent:CreateFontString(nil, layer or "OVERLAY")
-    fs:SetFont(FONT, size, "")
+    fs:SetFont(FONT, FS(size), "")
     fs:SetTextColor(c[1], c[2], c[3], c[4] or 1)
     fs:SetJustifyH("LEFT")
     return fs
@@ -356,6 +418,19 @@ end
 local function RoundRect(parent, radius, c, layer, sub, inset)
     inset = inset or 0
     local rr = { parts = {} }
+    if FOREVER then
+        -- Forever: eckig, eine einzelne Farbfläche
+        local t = parent:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0)
+        t:SetPoint("TOPLEFT", inset, -inset)
+        t:SetPoint("BOTTOMRIGHT", -inset, inset)
+        table.insert(rr.parts, t)
+        function rr:SetColor(col)
+            t:SetColorTexture(col[1], col[2], col[3], col[4] or 1)
+        end
+        function rr:SetShown(shown) t:SetShown(shown) end
+        rr:SetColor(c)
+        return rr
+    end
     local function Part(isRound)
         local t = parent:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0)
         if isRound then t:SetTexture(MEDIA .. "round") else t:SetColorTexture(1, 1, 1, 1) end
@@ -391,6 +466,35 @@ local function Panel(frame, radius, fill, border, layer)
     return inner, outer
 end
 
+-- Eingabefeld-Hintergrund: Forever schwarz mit Bronzerand (style.lua), sonst wie Panel.
+-- Gibt (Fläche, Rand) mit SetColor(c) zurück.
+local function InputBox(frame, radius)
+    local fx = FX("EditBox", frame)
+    if fx then
+        local fill, border = {}, {}
+        function fill:SetColor(c)
+            if c == C.hover then
+                fx.bg:SetColorTexture(0.075, 0.072, 0.068, 1)
+            else
+                fx.bg:SetColorTexture(0.043, 0.043, 0.051, 1)
+            end
+        end
+        function border:SetColor(c)
+            if c == C.line then c = ns.Colors.bronze end
+            for _, t in ipairs(fx.border) do t:SetColorTexture(c[1], c[2], c[3], c[4] or 1) end
+        end
+        return fill, border
+    end
+    return Panel(frame, radius, C.card, C.line, "BACKGROUND")
+end
+
+-- Fenster, Menü oder Dialog mit Rand: Forever Schiefer + Bronze-Rahmen (style.lua), sonst Panel
+local function Boxed(frame, radius, size, corners)
+    local fill = FX("Fill", frame, "window")
+    local border = FX("Border", frame, { size = size, corners = corners })
+    if not (fill and border) then Panel(frame, radius, C.card, C.line, "BACKGROUND") end
+end
+
 -- Flacher Knopf mit runden Ecken; style "primary" (lila gefüllt), "outline" (lila Rand) oder "dark"
 local BUTTON_STYLE = {
     primary = { fill = C.accent, hover = C.accentHi, border = C.accent, text = C.white },
@@ -401,8 +505,15 @@ local function MakeButton(parent, label, style, height)
     local b = CreateFrame("Button", nil, parent)
     b:SetHeight(height or 30)
     b.style = BUTTON_STYLE[style or "dark"] or BUTTON_STYLE.dark
-    b.fill, b.border = Panel(b, 6, b.style.fill, b.style.border, "BACKGROUND")
-    b.text = Text(b, 13, b.style.text)
+    -- Forever: rot-bronzer Hauptknopf bzw. grau-bronzer Nebenknopf aus style.lua
+    local fx = FX("Button", b, (style == "primary" or style == "outline") and "primary" or "secondary")
+    if fx then
+        b.fx = fx
+        b.fill = { SetColor = function() end }
+    else
+        b.fill, b.border = Panel(b, 6, b.style.fill, b.style.border, "BACKGROUND")
+    end
+    b.text = Text(b, 13, fx and fx.textColor or b.style.text)
     b.text:SetPoint("CENTER")
     function b:SetLabel(text, minWidth)
         self.text:SetText(text)
@@ -442,6 +553,32 @@ end
 local function MakeSwitch(parent)
     local s = CreateFrame("Button", nil, parent)
     s:SetSize(34, 18)
+    -- Forever: schwarze Spur mit Bronzerand, rechteckiger Schieber; an = Lila
+    local fx = FX("EditBox", s)
+    if fx then
+        s:SetSize(40, 20)
+        s.knobEdge = s:CreateTexture(nil, "ARTWORK", nil, 1)
+        s.knobEdge:SetSize(18, 16)
+        s.knobEdge:SetColorTexture(0.04, 0.03, 0.02, 1)
+        s.knob = s:CreateTexture(nil, "OVERLAY")
+        s.knob:SetSize(16, 14)
+        function s:SetState(on, enabled)
+            self.knobEdge:ClearAllPoints()
+            self.knob:ClearAllPoints()
+            if on then
+                fx.bg:SetColorTexture(0.24, 0.20, 0.52, 1)
+                self.knobEdge:SetPoint("RIGHT", -2, 0)
+                self.knob:SetColorTexture(0.88, 0.84, 0.73, 1)
+            else
+                fx.bg:SetColorTexture(0.043, 0.043, 0.051, 1)
+                self.knobEdge:SetPoint("LEFT", 2, 0)
+                self.knob:SetColorTexture(0.43, 0.40, 0.34, 1)
+            end
+            self.knob:SetPoint("CENTER", self.knobEdge, "CENTER")
+            self:SetAlpha(enabled and 1 or 0.4)
+        end
+        return s
+    end
     s.track = s:CreateTexture(nil, "ARTWORK")
     s.track:SetAllPoints()
     s.track:SetTexture(MEDIA .. "pill")
@@ -468,6 +605,21 @@ end
 local function MakeCheck(parent)
     local b = CreateFrame("Button", nil, parent)
     b:SetSize(16, 16)
+    local fx = FX("EditBox", b)
+    if fx then
+        -- Forever: schwarzes Kästchen mit Bronzerand; an = lila Fläche und Gold-Rand
+        b.mark = Icon(b, "check", 12, C.white, "OVERLAY")
+        b.mark:SetPoint("CENTER")
+        function b:SetState(on, enabled)
+            local r, g, bl = 0.541, 0.416, 0.204
+            if on then r, g, bl = ns.Colors.goldDim[1], ns.Colors.goldDim[2], ns.Colors.goldDim[3] end
+            for _, t in ipairs(fx.border) do t:SetColorTexture(r, g, bl, 1) end
+            if on then fx.bg:SetColorTexture(0.24, 0.20, 0.52, 1) else fx.bg:SetColorTexture(0.043, 0.043, 0.051, 1) end
+            self.mark:SetShown(on and true or false)
+            self:SetAlpha(enabled == false and 0.4 or 1)
+        end
+        return b
+    end
     b.fill, b.border = Panel(b, 4, C.card, C.grey, "ARTWORK")
     b.mark = Icon(b, "check", 12, C.white, "OVERLAY")
     b.mark:SetPoint("CENTER")
@@ -532,7 +684,12 @@ frame:EnableMouse(true)
 frame:RegisterForDrag("LeftButton")
 frame:Hide()
 
-Panel(frame, 12, C.window, C.line, "BACKGROUND")
+-- Fenstergrund und Rahmen: Forever Schiefer + Bronze-Rahmen, sonst wie bisher
+Build(function()
+    local fill = FX("Fill", frame, "window")
+    local border = FX("Border", frame, { size = P })
+    if not (fill and border) then Panel(frame, 12, C.window, C.line, "BACKGROUND") end
+end)
 
 local function SavePoint(self)
     local point, _, relPoint, x, y = self:GetPoint()
@@ -551,35 +708,54 @@ local Refresh, Changed -- weiter unten
 -- Kopf: Logo, Suche, Bearbeitungsmodus, Schließen
 ---------------------------------------------------------------------------
 
-do
+Build(function()
+    -- Forever: Titelleiste als bronzebraunes Band (zwei Hälften), darunter eine Bronze-Linie
+    if FOREVER then
+        local function Strip(top, height, r, g, b)
+            local t = frame:CreateTexture(nil, "BACKGROUND", nil, -5)
+            t:SetPoint("TOPLEFT", frame, "TOPLEFT", P, -top)
+            t:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -P, -top)
+            t:SetHeight(height)
+            t:SetColorTexture(r, g, b, 1)
+        end
+        local half = math.floor((M.TOP_H - P) / 2)
+        Strip(P, half, 0.231, 0.184, 0.102)
+        Strip(P + half, M.TOP_H - P - half, 0.137, 0.106, 0.055)
+    end
+    local pad = FOREVER and P or 1 -- Abstand der Linien zum Fensterrand
+    local lineColor = FOREVER and ns.Colors.bronze or C.line
+    local lineSize = FOREVER and 2 or 1
+
     local logo = frame:CreateTexture(nil, "ARTWORK")
     logo:SetSize(30, 30)
-    logo:SetPoint("TOPLEFT", 16, -(M.TOP_H - 30) / 2)
+    logo:SetPoint("TOPLEFT", 16 + P, -(M.TOP_H - 30) / 2 - P / 2)
     logo:SetTexture(MEDIA .. "logo")
 
-    local name = Text(frame, 18, C.white)
+    local name = Text(frame, 18, C.hi)
     name:SetPoint("LEFT", logo, "RIGHT", 9, 1)
     name:SetText("stray")
-    W.version = Text(frame, 10, C.faint)
+    W.version = Text(frame, 10, FOREVER and C.grey or C.faint)
     W.version:SetPoint("BOTTOMLEFT", name, "BOTTOMRIGHT", 6, 2)
 
-    local headLine = Line(frame, C.line)
-    headLine:SetPoint("TOPLEFT", 1, -M.TOP_H)
-    headLine:SetPoint("TOPRIGHT", -1, -M.TOP_H)
-    headLine:SetHeight(1)
+    local headLine = Line(frame, lineColor)
+    headLine:SetPoint("TOPLEFT", pad, -M.TOP_H)
+    headLine:SetPoint("TOPRIGHT", -pad, -M.TOP_H)
+    headLine:SetHeight(lineSize)
 
-    local sideLine = Line(frame, C.line)
+    local sideLine = Line(frame, lineColor)
     sideLine:SetPoint("TOPLEFT", M.SIDE_W, -M.TOP_H - 1)
-    sideLine:SetPoint("BOTTOMLEFT", M.SIDE_W, 1)
-    sideLine:SetWidth(1)
+    sideLine:SetPoint("BOTTOMLEFT", M.SIDE_W, pad)
+    sideLine:SetWidth(lineSize)
 
     -- Schließen
     local close = CreateFrame("Button", nil, frame)
     close:SetSize(26, 26)
-    close:SetPoint("TOPRIGHT", -14, -(M.TOP_H - 26) / 2)
-    local closeHover = RoundRect(close, 6, C.hover, "BACKGROUND")
+    close:SetPoint("TOPRIGHT", -14 - P, -(M.TOP_H - 26) / 2 - P / 2)
+    local closeFx = FX("Button", close, "primary") -- Forever: rot-bronzer Knopf
+    local closeHover = closeFx and { SetShown = function() end } or RoundRect(close, 6, C.hover, "BACKGROUND")
     closeHover:SetShown(false)
-    local closeIcon = Icon(close, "x", 14, C.grey)
+    local closeRest = closeFx and closeFx.textColor or C.grey
+    local closeIcon = Icon(close, "x", 14, closeRest)
     closeIcon:SetPoint("CENTER")
     close:SetScript("OnEnter", function()
         closeHover:SetShown(true)
@@ -587,7 +763,7 @@ do
     end)
     close:SetScript("OnLeave", function()
         closeHover:SetShown(false)
-        closeIcon:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1)
+        closeIcon:SetVertexColor(closeRest[1], closeRest[2], closeRest[3], 1)
     end)
     W.close = close
 
@@ -598,13 +774,13 @@ do
     -- Breites Suchfeld zwischen Logo und Knöpfen
     local search = CreateFrame("EditBox", nil, frame)
     search:SetHeight(32)
-    search:SetPoint("LEFT", frame, "TOPLEFT", M.SIDE_W + 16, -M.TOP_H / 2)
+    search:SetPoint("LEFT", frame, "TOPLEFT", M.SIDE_W + 16, -M.TOP_H / 2 - P / 2)
     search:SetPoint("RIGHT", W.editButton, "LEFT", -24, 0)
     search:SetAutoFocus(false)
-    search:SetFont(FONT, 13, "")
+    search:SetFont(FONT, FS(13), "")
     search:SetTextColor(C.text[1], C.text[2], C.text[3])
     search:SetTextInsets(32, 10, 0, 0)
-    local searchFill, searchBorder = Panel(search, 7, C.card, C.line, "BACKGROUND")
+    local searchFill, searchBorder = InputBox(search, 7)
     local searchIcon = Icon(search, "search", 15, C.grey)
     searchIcon:SetPoint("LEFT", 11, 0)
     W.placeholder = Text(search, 13, C.faint)
@@ -618,21 +794,21 @@ do
         searchBorder:SetColor(C.line)
     end)
     W.search = search
-end
+end)
 
 ---------------------------------------------------------------------------
 -- Inhalt rechts: Titel, „Aktiv“, Reiter, Scrollbereich
 ---------------------------------------------------------------------------
 
 local content = CreateFrame("Frame", nil, frame)
-content:SetPoint("TOPLEFT", M.SIDE_W + 1, -M.TOP_H - 1)
-content:SetPoint("BOTTOMRIGHT", 0, 0)
-
 local scroll = CreateFrame("ScrollFrame", nil, content)
 local scrollChild = CreateFrame("Frame", nil, scroll)
 
-do
-    W.title = Text(content, 22, C.white)
+Build(function()
+    content:SetPoint("TOPLEFT", M.SIDE_W + 1, -M.TOP_H - 1)
+    content:SetPoint("BOTTOMRIGHT", -P, P)
+
+    W.title = Text(content, 22, C.hi)
     W.title:SetPoint("TOPLEFT", M.CL, -18)
     W.title:SetPoint("RIGHT", content, "RIGHT", -150, 0)
     W.title:SetWordWrap(false)
@@ -658,10 +834,10 @@ do
     W.tabBar:SetPoint("TOPLEFT", M.CL, -54)
     W.tabBar:SetPoint("RIGHT", content, "RIGHT", -M.CR, 0)
     W.tabBar:SetHeight(M.TAB_H)
-    local tabLine = Line(W.tabBar, C.line)
+    local tabLine = Line(W.tabBar, FOREVER and ns.Colors.bronze or C.line)
     tabLine:SetPoint("BOTTOMLEFT")
     tabLine:SetPoint("BOTTOMRIGHT")
-    tabLine:SetHeight(1)
+    tabLine:SetHeight(FOREVER and 2 or 1)
     W.tabs = {}
 
     scroll:SetPoint("BOTTOMRIGHT", -M.CR, M.FOOT_H + 6)
@@ -673,7 +849,7 @@ do
     W.emptyText:SetPoint("TOPLEFT", 4, -6)
     W.emptyText:SetPoint("RIGHT", scrollChild, "RIGHT", -4, 0)
     W.emptyText:SetWordWrap(true)
-end
+end)
 
 ---------------------------------------------------------------------------
 -- Scrollbalken: Mausrad, Daumen ziehen oder in die Spur klicken
@@ -708,7 +884,7 @@ local function SetScroll(value)
     UpdateScrollBar()
 end
 
-do
+Build(function()
     local track = CreateFrame("Button", nil, content)
     track:SetPoint("TOPRIGHT", scroll, "TOPRIGHT", 18, 0)
     track:SetPoint("BOTTOMRIGHT", scroll, "BOTTOMRIGHT", 18, 0)
@@ -764,7 +940,7 @@ do
         local pos = top - CursorY() - (thumb:GetHeight() or 0) / 2
         SetScroll(math.max(0, math.min(free, pos)) / free * MaxScroll())
     end)
-end
+end)
 
 -- Hält die Scrollposition im gültigen Bereich (ohne Vorschau und Menü zu schließen)
 local function ClampScroll()
@@ -777,13 +953,13 @@ end
 -- Vorschau-Bild und Auswahlmenü (Dropdown)
 ---------------------------------------------------------------------------
 
-do
+Build(function()
     local preview = CreateFrame("Frame", nil, content)
     preview:SetSize(272, 150)
     preview:SetFrameLevel(content:GetFrameLevel() + 30)
     preview:EnableMouse(true)
     preview:SetScript("OnMouseUp", function(self) self:Hide() end)
-    Panel(preview, 8, C.card, C.line, "BACKGROUND")
+    Boxed(preview, 8, 4, false)
     preview.image = preview:CreateTexture(nil, "ARTWORK")
     preview.image:SetSize(256, 128)
     preview.image:SetPoint("TOP", 0, -8)
@@ -804,7 +980,7 @@ do
     menu:SetFrameLevel(frame:GetFrameLevel() + 60)
     menu:EnableMouse(true)
     menu:SetClampedToScreen(true)
-    Panel(menu, 6, C.card, C.line, "BACKGROUND")
+    Boxed(menu, 6, 4, false)
     menu.buttons = {}
     menu:SetScript("OnHide", function() catcher:Hide() end)
     menu:Hide()
@@ -818,7 +994,8 @@ do
         end
         GameTooltip:Hide()
         menu.owner = owner
-        local y, width = 4, owner:GetWidth() or 120
+        local e = FOREVER and 4 or 0 -- Forever: Platz für den Rahmen
+        local y, width = 4 + e, owner:GetWidth() or 120
         for i, item in ipairs(items) do
             local b = menu.buttons[i]
             if not b then
@@ -845,8 +1022,8 @@ do
             b.mark:SetShown(not b.isSep and current ~= nil and item.value == current)
             b:SetHeight(b.isSep and 9 or 24)
             b:ClearAllPoints()
-            b:SetPoint("TOPLEFT", 1, -y)
-            b:SetPoint("TOPRIGHT", -1, -y)
+            b:SetPoint("TOPLEFT", 1 + e, -y)
+            b:SetPoint("TOPRIGHT", -1 - e, -y)
             b:SetScript("OnClick", function()
                 if b.isSep then return end
                 CloseMenu()
@@ -858,7 +1035,7 @@ do
             width = math.max(width, math.floor((b.text:GetStringWidth() or 0) + 44))
         end
         for i = #items + 1, #menu.buttons do menu.buttons[i]:Hide() end
-        menu:SetSize(width, y + 4)
+        menu:SetSize(width + 2 * e, y + 4 + e)
         menu:ClearAllPoints()
         local bottom = owner:GetBottom()
         if bottom and bottom - y - 8 < 4 then
@@ -869,18 +1046,18 @@ do
         catcher:Show()
         menu:Show()
     end
-end
+end)
 
 -- Dropdown-Knopf: zeigt den aktuellen Wert; Klick öffnet das Menü
 local function MakeDropdown(parent)
     local d = CreateFrame("Button", nil, parent)
     d:SetSize(M.DROP_W, 28)
-    d.fill, d.border = Panel(d, 5, C.card, C.line, "BACKGROUND")
+    d.fill, d.border = InputBox(d, 5)
     d.text = Text(d, 13, C.text)
     d.text:SetPoint("LEFT", 10, 0)
     d.text:SetPoint("RIGHT", -26, 0)
     d.text:SetWordWrap(false)
-    d.arrow = Icon(d, "chevron-down", 13, C.grey)
+    d.arrow = Icon(d, "chevron-down", 13, C.rest)
     d.arrow:SetPoint("RIGHT", -9, 0)
     d:SetScript("OnEnter", function(self)
         if not self.inactive then self.border:SetColor(C.accent) end
@@ -913,13 +1090,13 @@ end
 local function MakeNumberField(parent, width)
     local box = CreateFrame("Frame", nil, parent)
     box:SetSize(width or M.NUM_W, 28)
-    box.fill, box.border = Panel(box, 5, C.card, C.line, "BACKGROUND")
+    box.fill, box.border = InputBox(box, 5)
     local eb = CreateFrame("EditBox", nil, box)
     eb:SetPoint("TOPLEFT", 1, -1)
     eb:SetPoint("BOTTOMRIGHT", -18, 1)
     eb:SetAutoFocus(false)
-    eb:SetFont(FONT, 13, "")
-    eb:SetTextColor(C.text[1], C.text[2], C.text[3])
+    eb:SetFont(FONT_NUM, FOREVER and 14 or 13, "")
+    eb:SetTextColor(C.num[1], C.num[2], C.num[3])
     eb:SetTextInsets(9, 2, 0, 0)
     eb:SetMaxLetters(10)
     box.eb = eb
@@ -947,10 +1124,10 @@ local function MakeNumberField(parent, width)
     local function Arrow(name, dir)
         local b = CreateFrame("Button", nil, box)
         b:SetSize(16, 12)
-        b.icon = Icon(b, name, 10, C.grey)
+        b.icon = Icon(b, name, 10, C.rest)
         b.icon:SetPoint("CENTER")
         b:SetScript("OnEnter", function(self) if not box.inactive then self.icon:SetVertexColor(1, 1, 1, 1) end end)
-        b:SetScript("OnLeave", function(self) self.icon:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1) end)
+        b:SetScript("OnLeave", function(self) self.icon:SetVertexColor(C.rest[1], C.rest[2], C.rest[3], 1) end)
         b:SetScript("OnClick", function()
             local v = Value()
             if type(v) ~= "number" then return end
@@ -1007,11 +1184,19 @@ end
 -- Fußzeile
 ---------------------------------------------------------------------------
 
-do
-    local footLine = Line(content, C.line)
+Build(function()
+    if FOREVER then
+        -- Forever: dunkles Band für die Fußzeile
+        local band = content:CreateTexture(nil, "BACKGROUND", nil, -5)
+        band:SetPoint("BOTTOMLEFT", 0, 0)
+        band:SetPoint("BOTTOMRIGHT", 0, 0)
+        band:SetHeight(M.FOOT_H)
+        band:SetColorTexture(0.075, 0.068, 0.06, 0.9)
+    end
+    local footLine = Line(content, FOREVER and ns.Colors.bronze or C.line)
     footLine:SetPoint("BOTTOMLEFT", 0, M.FOOT_H)
-    footLine:SetPoint("BOTTOMRIGHT", -1, M.FOOT_H)
-    footLine:SetHeight(1)
+    footLine:SetPoint("BOTTOMRIGHT", FOREVER and 0 or -1, M.FOOT_H)
+    footLine:SetHeight(FOREVER and 2 or 1)
 
     W.footDot = content:CreateTexture(nil, "ARTWORK")
     W.footDot:SetSize(8, 8)
@@ -1027,7 +1212,7 @@ do
     W.discardButton = MakeButton(content, L["Verwerfen"], "dark", 30)
     W.discardButton:SetPoint("RIGHT", W.applyButton, "LEFT", -10, 0)
     W.footText:SetPoint("RIGHT", W.discardButton, "LEFT", -12, 0)
-end
+end)
 
 ---------------------------------------------------------------------------
 -- Größe ziehen: Griff unten rechts
@@ -1042,7 +1227,7 @@ local function ScreenSize()
 end
 
 local function MinHeight()
-    return math.max(M.MIN_H, math.ceil((S.navBottom or 0) + M.PROFILE_H + 12))
+    return math.max(M.MIN_H, math.ceil((S.navBottom or 0) + M.PROFILE_H + 12 + P))
 end
 
 local function UpdateResizeBounds()
@@ -1064,16 +1249,16 @@ local function ApplySize(w, h)
     frame:SetSize(math.floor(w + 0.5), math.floor(h + 0.5))
 end
 
-do
+Build(function()
     local grip = CreateFrame("Button", nil, frame)
     grip:SetSize(16, 16)
-    grip:SetPoint("BOTTOMRIGHT", -3, 3)
+    grip:SetPoint("BOTTOMRIGHT", FOREVER and -(P + 8) or -3, FOREVER and P + 8 or 3)
     grip:SetFrameLevel(frame:GetFrameLevel() + 20)
     grip:RegisterForClicks("LeftButtonUp")
     local gripTex = grip:CreateTexture(nil, "OVERLAY")
     gripTex:SetAllPoints()
     gripTex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    gripTex:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1)
+    gripTex:SetVertexColor(C.rest[1], C.rest[2], C.rest[3], 1)
     grip:SetScript("OnEnter", function(self)
         gripTex:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -1082,7 +1267,7 @@ do
         GameTooltip:Show()
     end)
     grip:SetScript("OnLeave", function(self)
-        if not self.sizing then gripTex:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1) end
+        if not self.sizing then gripTex:SetVertexColor(C.rest[1], C.rest[2], C.rest[3], 1) end
         GameTooltip:Hide()
     end)
     grip:SetScript("OnMouseDown", function(self, button)
@@ -1097,7 +1282,7 @@ do
         if not self.sizing then return end
         self.sizing = false
         frame:StopMovingOrSizing()
-        if not self:IsMouseOver() then gripTex:SetVertexColor(C.grey[1], C.grey[2], C.grey[3], 1) end
+        if not self:IsMouseOver() then gripTex:SetVertexColor(C.rest[1], C.rest[2], C.rest[3], 1) end
         if ns.db then
             ns.db.uiSize = { math.floor(frame:GetWidth() + 0.5), math.floor(frame:GetHeight() + 0.5) }
         end
@@ -1113,7 +1298,7 @@ do
             SavePoint(frame)
         end)
     end)
-end
+end)
 
 ---------------------------------------------------------------------------
 -- Optionen aus dem Register sammeln und auf Seiten/Reiter verteilen
@@ -1284,7 +1469,7 @@ local PER_ENTRY = { positions = true, scales = true }
 local DEFER_SECTIONS = {
     ["Aktionsleisten"] = true, ["Abklingzeiten"] = true, ["Gruppenrahmen"] = true, ["Tastenbelegung"] = true,
     ["stray-Oberfläche"] = true, ["Leisten & Minimap"] = true, ["Erfahrung"] = true,
-    ["Kamera & Karte"] = true, ["Zaubern"] = true, ["Taschen"] = true, ["Questtracker"] = true,
+    ["Kamera & Karte"] = true, ["Zaubern"] = true, ["Taschen"] = true,
 }
 
 local function DeepCopy(value)
@@ -1643,31 +1828,56 @@ local function CreateOptionRow()
     row.switch:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     row.previewButton = MakeButton(row, L["Vorschau"], "dark", 22)
-    row.previewButton.text:SetFont(FONT, 11, "")
+    row.previewButton.text:SetFont(FONT, FS(11), "")
     row.previewButton:SetLabel(L["Vorschau"])
     row.previewButton:SetPoint("RIGHT", row.switch, "LEFT", -10, 0)
     row.previewButton:SetScript("OnClick", function() if row.option then ShowPreview(row.option, row) end end)
 
     -- Regler mit Zahlenfeld
+    -- Forever: schwarze Spur mit Bronzerand als eigener Rahmen unter dem Regler
+    local holder, trackFx
+    if FOREVER then
+        holder = CreateFrame("Frame", nil, row)
+        holder:SetHeight(8)
+        trackFx = FX("EditBox", holder)
+    end
     local slider = CreateFrame("Slider", nil, row)
     slider:SetOrientation("HORIZONTAL")
     slider:SetHeight(16)
     slider:EnableMouseWheel(true)
-    slider.track = slider:CreateTexture(nil, "ARTWORK")
-    slider.track:SetPoint("LEFT"); slider.track:SetPoint("RIGHT"); slider.track:SetHeight(4)
-    slider.track:SetTexture(MEDIA .. "pill")
-    slider.track:SetVertexColor(C.off[1], C.off[2], C.off[3], 1)
     local thumb = slider:CreateTexture(nil, "OVERLAY")
-    thumb:SetSize(14, 14)
-    thumb:SetTexture(MEDIA .. "dot")
-    thumb:SetVertexColor(1, 1, 1, 1)
     slider:SetThumbTexture(thumb)
     slider.fill = slider:CreateTexture(nil, "ARTWORK", nil, 1)
-    slider.fill:SetHeight(4)
-    slider.fill:SetPoint("LEFT", slider.track, "LEFT")
-    slider.fill:SetPoint("RIGHT", thumb, "CENTER")
-    slider.fill:SetTexture(MEDIA .. "pill")
-    slider.fill:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)
+    if trackFx then
+        holder:SetPoint("LEFT", slider, "LEFT")
+        holder:SetPoint("RIGHT", slider, "RIGHT")
+        slider.holder = holder
+        -- Schieber: schmaler Bronze-Griff mit dunklem Rand; Füllung Lila
+        local edge = slider:CreateTexture(nil, "OVERLAY", nil, -1)
+        edge:SetPoint("TOPLEFT", thumb, "TOPLEFT", -1, 1)
+        edge:SetPoint("BOTTOMRIGHT", thumb, "BOTTOMRIGHT", 1, -1)
+        edge:SetColorTexture(0.04, 0.03, 0.02, 1)
+        thumb:SetSize(10, 18)
+        thumb:SetColorTexture(0.84, 0.76, 0.54, 1)
+        slider.fill:SetHeight(6)
+        slider.fill:SetPoint("LEFT", holder, "LEFT", 1, 0)
+        slider.fill:SetPoint("RIGHT", thumb, "CENTER")
+        slider.fill:SetColorTexture(C.accent[1] * 0.75, C.accent[2] * 0.75, C.accent[3] * 0.85, 1)
+    else
+        if holder then holder:Hide() end
+        slider.track = slider:CreateTexture(nil, "ARTWORK")
+        slider.track:SetPoint("LEFT"); slider.track:SetPoint("RIGHT"); slider.track:SetHeight(4)
+        slider.track:SetTexture(MEDIA .. "pill")
+        slider.track:SetVertexColor(C.off[1], C.off[2], C.off[3], 1)
+        thumb:SetSize(14, 14)
+        thumb:SetTexture(MEDIA .. "dot")
+        thumb:SetVertexColor(1, 1, 1, 1)
+        slider.fill:SetHeight(4)
+        slider.fill:SetPoint("LEFT", slider.track, "LEFT")
+        slider.fill:SetPoint("RIGHT", thumb, "CENTER")
+        slider.fill:SetTexture(MEDIA .. "pill")
+        slider.fill:SetVertexColor(C.accent[1], C.accent[2], C.accent[3], 1)
+    end
     if slider.SetObeyStepOnDrag then slider:SetObeyStepOnDrag(true) end
     slider:SetScript("OnValueChanged", function(self, value)
         if self.updating then return end
@@ -1758,6 +1968,7 @@ local function FillOptionRow(row, option, width, item)
     row.switch:SetShown(isSwitch)
     row.previewButton:SetShown(isSwitch and option.preview ~= nil)
     row.slider:SetShown(kind == "slider")
+    if row.slider.holder then row.slider.holder:SetShown(kind == "slider") end
     row.num:SetShown(kind == "slider")
     row.drop:SetShown(kind == "choice")
     row.action:SetShown(kind == "button")
@@ -1777,6 +1988,7 @@ local function FillOptionRow(row, option, width, item)
         slider.updating = false
         slider:EnableMouse(enabled)
         slider:SetAlpha(enabled and 1 or 0.4)
+        if slider.holder then slider.holder:SetAlpha(enabled and 1 or 0.4) end
         local unit = SliderUnit(option)
         row.num.step = option.step or 1
         row.num.fmt = function(v)
@@ -1789,7 +2001,8 @@ local function FillOptionRow(row, option, width, item)
         row.num:SetActive(enabled)
         row.num:Refresh()
         -- Name · Regler · Zahlenfeld
-        local nameW = math.floor(math.min(240, math.max(130, width * 0.36)))
+        local wide = FOREVER and 1.25 or 1 -- Friz Quadrata braucht mehr Platz
+        local nameW = math.floor(math.min(240 * wide, math.max(130 * wide, width * 0.36 * wide)))
         row.label:SetWidth(nameW)
         slider:ClearAllPoints()
         slider:SetPoint("LEFT", row, "LEFT", 12 + nameW + 12, 0)
@@ -1810,7 +2023,7 @@ local function FillOptionRow(row, option, width, item)
         controlW = M.DROP_W
     else
         row.switch:SetState(SafeGet(option) and true or false, enabled)
-        controlW = 34 + (option.preview and (row.previewButton:GetWidth() + 10) or 0)
+        controlW = row.switch:GetWidth() + (option.preview and (row.previewButton:GetWidth() + 10) or 0)
     end
     if item.sub then
         row.sub:SetPoint("RIGHT", row, "RIGHT", -(12 + controlW + 16), 0)
@@ -1824,24 +2037,24 @@ end
 -- Abschnitts-Überschrift: Großbuchstaben, feine Linie bis zum Rand
 local function CreateHeading()
     local h = CreateFrame("Frame", nil, scrollChild)
-    h.text = Text(h, 11, C.grey)
+    h.text = Text(h, FOREVER and 13 or 11, FOREVER and C.gold or C.grey)
     h.text:SetPoint("BOTTOMLEFT", 12, 8)
-    h.line = Line(h, C.line)
+    h.line = Line(h, FOREVER and { ns.Colors.bronze[1], ns.Colors.bronze[2], ns.Colors.bronze[3], 0.8 } or C.line)
     h.line:SetPoint("LEFT", h.text, "RIGHT", 12, 0)
     h.line:SetPoint("RIGHT", h, "RIGHT", -4, 0)
-    h.line:SetHeight(1)
+    h.line:SetHeight(FOREVER and 2 or 1)
     return h
 end
 
 -- Hinweis-Kasten (z. B. Konflikt mit einem anderen Addon)
 local function CreateHint()
     local h = CreateFrame("Frame", nil, scrollChild)
-    h.fill, h.border = Panel(h, 6, C.amberBg, { C.amber[1], C.amber[2], C.amber[3], 0.45 }, "BACKGROUND")
+    h.fill, h.border = Panel(h, 6, C.amberBg, { C.amber[1], C.amber[2], C.amber[3], FOREVER and 0.8 or 0.45 }, "BACKGROUND")
     h.bar = Line(h, C.amber, "ARTWORK")
     h.bar:SetPoint("TOPLEFT", 1, -6)
     h.bar:SetPoint("BOTTOMLEFT", 1, 6)
     h.bar:SetWidth(2)
-    h.text = Text(h, 12, C.text)
+    h.text = Text(h, 12, C.hint)
     h.text:SetPoint("TOPLEFT", 14, -9)
     h.text:SetWordWrap(true)
     h.text:SetJustifyV("TOP")
@@ -2025,7 +2238,7 @@ end
 ---------------------------------------------------------------------------
 
 local function UpdateMetrics()
-    local w = (frame:GetWidth() or M.WIDTH) - M.SIDE_W - 1 - M.CL - M.CR
+    local w = (frame:GetWidth() or M.WIDTH) - M.SIDE_W - 1 - M.CL - M.CR - P
     M.SCROLL_W = math.max(300, math.floor(w))
     scrollChild:SetWidth(M.SCROLL_W)
 end
@@ -2227,16 +2440,18 @@ local function SearchResults(query)
     return blocks, count
 end
 
-W.search:SetScript("OnTextChanged", function(self)
-    W.placeholder:SetShown(self:GetText() == "")
-    SetScroll(0)
-    if Refresh then Refresh() end
+Build(function()
+    W.search:SetScript("OnTextChanged", function(self)
+        W.placeholder:SetShown(self:GetText() == "")
+        SetScroll(0)
+        if Refresh then Refresh() end
+    end)
+    W.search:SetScript("OnEscapePressed", function(self)
+        self:SetText("")
+        self:ClearFocus()
+    end)
+    W.search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 end)
-W.search:SetScript("OnEscapePressed", function(self)
-    self:SetText("")
-    self:ClearFocus()
-end)
-W.search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 
 ---------------------------------------------------------------------------
 -- Navigation links und Profil-Auswahl
@@ -2265,23 +2480,24 @@ end
 
 local function BuildNav()
     local side = CreateFrame("Frame", nil, frame)
-    side:SetPoint("TOPLEFT", 0, -M.TOP_H - 1)
-    side:SetPoint("BOTTOMLEFT", 0, 0)
-    side:SetWidth(M.SIDE_W)
+    side:SetPoint("TOPLEFT", P, -M.TOP_H - 1)
+    side:SetPoint("BOTTOMLEFT", P, P)
+    side:SetWidth(M.SIDE_W - P)
+    FX("Fill", side, "inset") -- Forever: dunkler Schiefer hinter der Navigation
 
     local y = -12
     local lastGroup
     for _, page in ipairs(R.pages) do
         if page.group and page.group ~= lastGroup then
             y = y - 10
-            local g = Text(side, 11, C.faint)
+            local g = Text(side, 11, FOREVER and C.rest or C.faint)
             g:SetPoint("TOPLEFT", 22, y - 4)
             g:SetText(L[page.group])
             y = y - 24
             lastGroup = page.group
         end
         local b = CreateFrame("Button", nil, side)
-        b:SetSize(M.SIDE_W - 16, M.NAV_H)
+        b:SetSize(M.SIDE_W - 16 - P, M.NAV_H)
         b:SetPoint("TOPLEFT", 8, y)
         b.page = page
         b.bg = RoundRect(b, 6, C.hover, "BACKGROUND")
@@ -2312,7 +2528,7 @@ local function BuildNav()
     S.navBottom = -y + M.TOP_H
 
     -- Profil-Auswahl unten links
-    local line = Line(side, C.line)
+    local line = Line(side, FOREVER and ns.Colors.bronze or C.line)
     line:SetPoint("BOTTOMLEFT", 1, M.PROFILE_H)
     line:SetPoint("BOTTOMRIGHT", -1, M.PROFILE_H)
     line:SetHeight(1)
@@ -2371,7 +2587,7 @@ local function UpdateProfile()
             Changed()
         end
     end)
-    drop.text:SetText(L["Profil:"] .. "  |cffffffff" .. label .. "|r")
+    drop.text:SetText(L["Profil:"] .. "  |cff" .. (FOREVER and "e3c27a" or "ffffff") .. label .. "|r")
 end
 
 local function EnsureBuilt()
@@ -2441,11 +2657,12 @@ local function UpdateNav(searching)
         local isSelected = b.page.name == S.selected and not searching
         b.isSelected = isSelected
         b.text:SetText(L[b.page.name])
-        b.bg:SetColor(C.hover)
+        b.bg:SetColor(C.navSel)
         b.bg:SetShown(isSelected)
         b.bar:SetShown(isSelected)
-        b.icon:SetVertexColor(isSelected and 1 or C.grey[1], isSelected and 1 or C.grey[2], isSelected and 1 or C.grey[3], 1)
-        SetTextColor(b.text, isSelected and C.white or C.navText)
+        local ic = isSelected and (FOREVER and C.accentT or C.white) or C.grey
+        b.icon:SetVertexColor(ic[1], ic[2], ic[3], 1)
+        SetTextColor(b.text, isSelected and C.hi or C.navText)
     end
 end
 
@@ -2460,12 +2677,15 @@ local function UpdateTabs(page, current)
         if not b then
             b = CreateFrame("Button", nil, bar)
             b:SetHeight(M.TAB_H)
+            b.fx = FX("Tab", b, false) -- Forever: Trapez-Reiter mit lila Oberkante (gewählt)
             b.text = Text(b, 14, C.grey)
             b.text:SetPoint("CENTER", 0, 1)
-            b.line = Line(b, C.accent, "ARTWORK")
-            b.line:SetPoint("BOTTOMLEFT", 2, 0)
-            b.line:SetPoint("BOTTOMRIGHT", -2, 0)
-            b.line:SetHeight(2)
+            if not b.fx then
+                b.line = Line(b, C.accent, "ARTWORK")
+                b.line:SetPoint("BOTTOMLEFT", 2, 0)
+                b.line:SetPoint("BOTTOMRIGHT", -2, 0)
+                b.line:SetHeight(2)
+            end
             b:SetScript("OnEnter", function(self) if not self.isSelected then SetTextColor(self.text, C.text) end end)
             b:SetScript("OnLeave", function(self) if not self.isSelected then SetTextColor(self.text, C.grey) end end)
             b:SetScript("OnClick", function(self)
@@ -2479,9 +2699,9 @@ local function UpdateTabs(page, current)
         b.pageName, b.index = page.name, i
         b.isSelected = i == current
         b.text:SetText(L[tab.name])
-        SetTextColor(b.text, b.isSelected and C.white or C.grey)
-        b.line:SetShown(b.isSelected)
-        local w = math.floor((b.text:GetStringWidth() or 40) + 26)
+        SetTextColor(b.text, b.isSelected and C.hi or C.grey)
+        if b.fx then b.fx:SetSelected(b.isSelected) else b.line:SetShown(b.isSelected) end
+        local w = math.floor((b.text:GetStringWidth() or 40) + (b.fx and 38 or 26))
         if x > 0 and x + w > width then
             x = 0
             rows = rows + 1
@@ -2490,7 +2710,7 @@ local function UpdateTabs(page, current)
         b:ClearAllPoints()
         b:SetPoint("TOPLEFT", bar, "TOPLEFT", x, -(rows - 1) * M.TAB_H)
         b:Show()
-        x = x + w + 6
+        x = x + w + (b.fx and 2 or 6)
     end
     for i = #page.tabs + 1, #W.tabs do W.tabs[i]:Hide() end
     local h = rows * M.TAB_H
@@ -2659,26 +2879,28 @@ function Refresh()
     UpdateFooter()
 end
 
-W.active:SetScript("OnClick", function(self)
-    local option = self.option
-    if not option or not OptionEnabled(option) then return end
-    local value = not SafeGet(option)
-    ns.Sound(value and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
-    -- Immer über die set-Funktionen der Optionen, damit die Module ihr Apply ausführen
-    SetOptionValue(option, value)
+Build(function()
+    W.active:SetScript("OnClick", function(self)
+        local option = self.option
+        if not option or not OptionEnabled(option) then return end
+        local value = not SafeGet(option)
+        ns.Sound(value and SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_ON or SOUNDKIT.IG_MAINMENU_OPTION_CHECKBOX_OFF)
+        -- Immer über die set-Funktionen der Optionen, damit die Module ihr Apply ausführen
+        SetOptionValue(option, value)
+    end)
+    W.active:SetScript("OnEnter", function(self)
+        local option = self.option
+        if not option then return end
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:SetText(T(option.label), 1, 1, 1)
+        if option.tooltip then GameTooltip:AddLine(T(option.tooltip), ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true) end
+        if not OptionEnabled(option) and option.disabledHint then
+            GameTooltip:AddLine(T(option.disabledHint), 1, 0.3, 0.3, true)
+        end
+        GameTooltip:Show()
+    end)
+    W.active:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end)
-W.active:SetScript("OnEnter", function(self)
-    local option = self.option
-    if not option then return end
-    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-    GameTooltip:SetText(T(option.label), 1, 1, 1)
-    if option.tooltip then GameTooltip:AddLine(T(option.tooltip), ns.GOLD[1], ns.GOLD[2], ns.GOLD[3], true) end
-    if not OptionEnabled(option) and option.disabledHint then
-        GameTooltip:AddLine(T(option.disabledHint), 1, 0.3, 0.3, true)
-    end
-    GameTooltip:Show()
-end)
-W.active:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 ---------------------------------------------------------------------------
 -- Schließen mit Nachfrage
@@ -2724,7 +2946,9 @@ escCatcher:SetScript("OnHide", function(self)
     end)
 end)
 
-W.close:SetScript("OnClick", function() RequestClose() end)
+Build(function()
+    W.close:SetScript("OnClick", function() RequestClose() end)
+end)
 
 -- Dialog in stray-Optik über dem Fenster
 local shade = CreateFrame("Frame", nil, frame)
@@ -2733,7 +2957,9 @@ shade:SetFrameLevel(frame:GetFrameLevel() + 40)
 shade:EnableMouse(true)
 shade:EnableMouseWheel(true)
 shade:SetScript("OnMouseWheel", function() end)
-RoundRect(shade, 12, { 0, 0, 0, 0.55 }, "BACKGROUND")
+Build(function()
+    RoundRect(shade, 12, { 0, 0, 0, 0.55 }, "BACKGROUND", nil, P) -- Forever: innerhalb des Rahmens
+end)
 shade:Hide()
 
 dialog = CreateFrame("Frame", nil, shade)
@@ -2741,10 +2967,10 @@ dialog:SetSize(420, 190)
 dialog:SetPoint("CENTER", frame, "CENTER", 0, 20)
 dialog:SetFrameLevel(shade:GetFrameLevel() + 5)
 dialog:EnableMouse(true)
-Panel(dialog, 12, C.card, C.line, "BACKGROUND")
 
-do
-    dialog.title = Text(dialog, 16, C.white)
+Build(function()
+    Boxed(dialog, 12, 8, true)
+    dialog.title = Text(dialog, 16, C.hi)
     dialog.title:SetPoint("TOPLEFT", 20, -20)
     dialog.text = Text(dialog, 13, C.grey)
     dialog.text:SetPoint("TOPLEFT", dialog.title, "BOTTOMLEFT", 0, -10)
@@ -2757,7 +2983,7 @@ do
     dialog.discard:SetPoint("RIGHT", dialog.apply, "LEFT", -8, 0)
     dialog.back = MakeButton(dialog, L["Zurück"], "dark")
     dialog.back:SetPoint("RIGHT", dialog.discard, "LEFT", -8, 0)
-end
+end)
 
 function dialog:Update(n)
     local text = (n == 1 and L["Du hast 1 Einstellung geändert."] or L("Du hast %d Einstellungen geändert.", n))
@@ -2783,6 +3009,7 @@ end
 dialog:SetScript("OnHide", function() shade:Hide() end)
 shade:SetScript("OnHide", function() dialog:Hide() end)
 
+Build(function()
 dialog.back:SetScript("OnClick", function() dialog:Hide() end)
 dialog.discard:SetScript("OnClick", function()
     Revert()
@@ -2829,6 +3056,7 @@ W.editButton:SetScript("OnClick", function(self)
     if ns.EnterEditMode then ns.EnterEditMode() end
 end)
 ButtonTooltip(W.editButton, "Bearbeitungsmodus", "Schließt dieses Fenster und blendet alle eingeschalteten stray-Anzeigen zum Verschieben ein. „Fertig“ oder Esc beendet den Modus. Auch per /stray edit.")
+end)
 
 ns.On("PLAYER_REGEN_DISABLED", function() if frame:IsShown() then UpdateFooter() end end)
 ns.On("PLAYER_REGEN_ENABLED", function() if frame:IsShown() then UpdateFooter() end end)
@@ -2950,6 +3178,12 @@ do
 end
 
 function ns.OnLoaded()
+    -- Stil festlegen (ns.db ist jetzt da) und das Fenster aufbauen
+    SetupStyle()
+    for _, fn in ipairs(BUILD) do
+        local ok, err = pcall(fn)
+        if not ok then geterrorhandler()(err) end
+    end
     SetStaticTexts()
     W.version:SetText((ns.GetVersion() or ""):upper())
     if type(ns.db.uiSize) == "table" then
