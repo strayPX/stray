@@ -1008,6 +1008,11 @@ search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 -- Aktualisieren
 ---------------------------------------------------------------------------
 
+-- Für Module: Fenster neu zeichnen, wenn sich ein Wert von außen geändert hat (z. B. Spalten per Ziehen)
+function ns.RefreshConfig()
+    if frame:IsShown() and Refresh then Refresh() end
+end
+
 function Refresh()
     if not ns.db then return end
 

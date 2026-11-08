@@ -1,7 +1,9 @@
--- stray – Oberfläche: Minimap-Knopfspalte (Freunde, stray, Addon-Tasche, Kartenmenü),
--- Uhrzeit und FPS unter der Minimap, Erfahrungsleiste oben, Taschen- und Menüleiste.
+-- stray – Oberfläche: Minimap-Knopfspalte (Freunde, stray, Addon-Tasche), Menü auf der Minimap
+-- (mittlere Maustaste und Kartenmenü-Knopf), Uhrzeit und FPS unter der Minimap, Erfahrungsleiste
+-- oben, Taschen- und Menüleiste unten rechts (gehört zu „Eigene Aktionsleisten“).
 -- Alles defensiv: Blizzard-Rahmen können im Client anders heißen oder fehlen.
 -- Sichere/geschützte Rahmen nur außerhalb des Kampfes anfassen, sonst nach Kampfende nachholen.
+-- Keine Felder auf Blizzard-Frames: Merker stehen in lokalen Tabellen mit dem Frame als Schlüssel.
 
 local _, ns = ...
 
@@ -23,6 +25,9 @@ local C = {
 }
 
 ns.defaults.questXPBar = false
+ns.defaults.minimapMiddleMenu = false
+ns.defaults.bottomMicroButtons = false
+ns.defaults.bottomBarSize = 28
 
 local CELL = 24
 local CELL_GAP = 4
@@ -546,30 +551,16 @@ bagCell:HookScript("OnEnter", function(self)
 end)
 bagCell:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
--- Kartenmenü (oben links in der Minimap) -----------------------------------
-
-local mapButton = CreateFrame("Button", "strayMapMenuButton", Minimap)
-mapButton:SetSize(18, 18)
-mapButton:SetFrameStrata("MEDIUM")
-mapButton:SetFrameLevel(12)
-mapButton:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 2, -2)
-mapButton:SetAlpha(0.75)
-Style(mapButton)
-mapButton.icon = mapButton:CreateTexture(nil, "ARTWORK")
-mapButton.icon:SetPoint("CENTER")
-mapButton.icon:SetSize(12, 12)
-if not SetFirstTexture(mapButton.icon, { "Interface\\Icons\\INV_Misc_Map_01", "Interface\\Icons\\INV_Misc_Map02" }) then
-    mapButton.icon:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.6)
-end
-mapButton.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-mapButton:Hide()
-
-local mapMenu = CreateFrame("Frame", "strayMapMenu", mapButton)
-mapMenu:SetFrameStrata("HIGH")
-mapMenu:SetPoint("TOPLEFT", mapButton, "BOTTOMLEFT", 0, -2)
-mapMenu:SetClampedToScreen(true)
-Style(mapMenu)
-mapMenu:Hide()
+---------------------------------------------------------------------------
+-- Menü: Kartenmenü-Knopf (oben links in der Minimap) und mittlere Maustaste
+--
+-- Blizzard-Fenster (Charakter, Zauberbuch, Talente, Berufe, Questlog, Gilde, Gruppensuche) öffnet
+-- stray nie aus eigenem Code: Das würde diese Fenster bis zum Ende der Sitzung verseuchen (Taint).
+-- Stattdessen sind die Zeilen sichere Klick-Knöpfe (SecureActionButtonTemplate, type „click“),
+-- die Blizzards eigenen Mikroknopf anklicken. Dessen OnClick läuft dann unverseucht.
+-- Die Mikroknöpfe sind auf Forever nicht geschützt; Click() wirkt auch, wenn sie in
+-- „Taschen- und Menüleiste“ versteckt geparkt sind (nur nicht, wenn Blizzard sie abschaltet).
+---------------------------------------------------------------------------
 
 local function TrackingButton()
     local cluster = MinimapCluster
@@ -604,6 +595,65 @@ local function OpenTracking(anchor)
     return false
 end
 
+-- Verfolgung als Liste mit Häkchen (wie Blizzards Liste, ohne versteckte Einträge)
+local function TrackingList()
+    if not (C_Minimap and C_Minimap.GetNumTrackingTypes and C_Minimap.GetTrackingInfo and C_Minimap.SetTracking) then
+        return nil
+    end
+    local ok, n = pcall(C_Minimap.GetNumTrackingTypes)
+    n = ok and Number(n) or 0
+    local optional = type(MinimapConstants) == "table" and MinimapConstants.OPTIONAL_FILTERS
+    local list = {}
+    for i = 1, n do
+        local okInfo, info = pcall(C_Minimap.GetTrackingInfo, i)
+        info = okInfo and ns.Public(info)
+        local name = type(info) == "table" and String(info.name)
+        local show = name ~= nil
+        if show and C_Minimap.GetTrackingFilter then
+            local okF, filter = pcall(C_Minimap.GetTrackingFilter, i)
+            filter = okF and ns.Public(filter)
+            if type(filter) == "table" then
+                local fid = ns.Public(filter.filterID)
+                show = (ns.Public(filter.spellID) ~= nil) or (type(optional) == "table" and fid ~= nil and optional[fid] and true or false)
+            else
+                show = false
+            end
+        end
+        if show then
+            local index = i
+            local function isActive()
+                local okA, inf = pcall(C_Minimap.GetTrackingInfo, index)
+                inf = okA and ns.Public(inf)
+                return type(inf) == "table" and ns.Public(inf.active) and true or false
+            end
+            table.insert(list, {
+                name = name,
+                isSelected = isActive,
+                toggle = function() pcall(C_Minimap.SetTracking, index, not isActive()) end,
+            })
+        end
+    end
+    return list
+end
+
+-- Untermenü „Verfolgung“ über Blizzards Kontextmenü (MenuUtil), sonst Blizzards Verfolgungsknopf
+local function OpenTrackingMenu(owner)
+    local list = TrackingList()
+    if list and #list > 0 and MenuUtil and MenuUtil.CreateContextMenu then
+        local ok = pcall(MenuUtil.CreateContextMenu, owner or Minimap, function(_, root)
+            root:CreateTitle("Verfolgung")
+            for _, t in ipairs(list) do
+                local cb = root:CreateCheckbox(t.name, t.isSelected, t.toggle)
+                if cb and cb.SetResponse and MenuResponse and MenuResponse.Refresh then
+                    cb:SetResponse(MenuResponse.Refresh)
+                end
+            end
+        end)
+        if ok then return true end
+    end
+    return OpenTracking(owner)
+end
+
 local function OpenCalendar()
     if ToggleCalendar then
         if pcall(ToggleCalendar) then return end
@@ -621,54 +671,293 @@ local function OpenWorldMap()
     if WorldMapFrame then pcall(WorldMapFrame.SetShown, WorldMapFrame, not WorldMapFrame:IsShown()) end
 end
 
-local MAP_ENTRIES = {
-    { label = "Verfolgung", available = function() return TrackingButton() ~= nil or _G.MiniMapTrackingDropDown ~= nil end, run = OpenTracking },
-    { label = "Kalender", available = function() return ToggleCalendar ~= nil or GameTimeFrame ~= nil end, run = OpenCalendar },
-    { label = "Weltkarte", available = function() return ToggleWorldMap ~= nil or WorldMapFrame ~= nil end, run = OpenWorldMap },
-    { label = "Twinks", available = function() return ns.ToggleAlts ~= nil and ns.db and ns.db.alts and true or false end, run = function() ns.ToggleAlts() end },
+-- secure: Blizzards Mikroknöpfe in Wunschreihenfolge (erster vorhandener gewinnt) → sicherer Klick-Knopf.
+-- Forever: getrennte SpellbookMicroButton/TalentMicroButton; PlayerSpellsMicroButton gibt es dort
+-- auch, er öffnet aber den zuletzt gezeigten Reiter (nur Ersatz für Clients ohne getrennte Knöpfe).
+-- has: gibt es einen normalen Eintrag in diesem Client? frame: im Kampf nur, wenn der Rahmen
+-- schon geladen und nicht geschützt ist (nur für normale Knöpfe der unteren Leiste).
+-- micro: erscheint auch als Knopf in der Taschen- und Menüleiste.
+local MENU_ENTRIES = {
+    { key = "char", label = "Charakter", micro = true, secure = { "CharacterMicroButton" },
+        icons = { "Interface\\Icons\\INV_Chest_Cloth_17" } },
+    { key = "spell", label = "Zauberbuch", micro = true, secure = { "SpellbookMicroButton", "PlayerSpellsMicroButton" },
+        icons = { "Interface\\Icons\\INV_Misc_Book_09" } },
+    { key = "talent", label = "Talente", micro = true, secure = { "TalentMicroButton" },
+        icons = { "Interface\\Icons\\Ability_Marksmanship" } },
+    { key = "prof", label = "Berufe", micro = true, secure = { "ProfessionMicroButton" },
+        icons = { "Interface\\Icons\\INV_Pick_02", "Interface\\Icons\\Trade_Engineering" } },
+    { key = "quest", label = "Questlog", micro = true, secure = { "QuestLogMicroButton" },
+        icons = { "Interface\\Icons\\INV_Misc_Book_08" } },
+    { key = "friends", label = "Freunde", micro = true, icons = { "Interface\\Icons\\INV_Misc_GroupNeedMore" },
+        has = function() return ToggleFriendsFrame ~= nil end,
+        frame = function() return _G.FriendsFrame end,
+        run = function() ToggleFriendsFrame(FRIEND_TAB_FRIENDS or 1) end },
+    { key = "guild", label = "Gilde", micro = true, secure = { "GuildMicroButton" },
+        icons = { "Interface\\Icons\\INV_Shirt_GuildTabard_01" } },
+    { key = "lfg", label = "Gruppensuche", micro = true, secure = { "LFDMicroButton", "LFGMicroButton" },
+        icons = { "Interface\\Icons\\INV_Misc_GroupLooking" } },
+    { divider = true },
+    { key = "calendar", label = "Kalender",
+        has = function() return ToggleCalendar ~= nil or GameTimeFrame ~= nil end,
+        frame = function() return _G.CalendarFrame end,
+        run = OpenCalendar },
+    { key = "tracking", label = "Verfolgung",
+        has = function()
+            return (C_Minimap and C_Minimap.GetNumTrackingTypes) ~= nil
+                or TrackingButton() ~= nil or _G.MiniMapTrackingDropDown ~= nil
+        end,
+        run = OpenTrackingMenu },
+    { key = "worldmap", label = "Weltkarte",
+        has = function() return ToggleWorldMap ~= nil or WorldMapFrame ~= nil end,
+        frame = function() return _G.WorldMapFrame end,
+        run = OpenWorldMap },
+    { key = "alts", label = "Twinks",
+        has = function() return ns.ToggleAlts ~= nil and ns.db and ns.db.alts and true or false end,
+        run = function() ns.ToggleAlts() end },
 }
 
-local mapRows = {}
-
-local function BuildMapMenu()
-    local y = -3
-    local width = 96
-    for i, entry in ipairs(MAP_ENTRIES) do
-        local row = mapRows[i]
-        if not row then
-            row = CreateFrame("Button", nil, mapMenu)
-            row:SetSize(width - 6, 18)
-            row.text = Text(row, 11)
-            row.text:SetPoint("LEFT", 6, 0)
-            row.text:SetText(entry.label)
-            local hl = row:CreateTexture(nil, "HIGHLIGHT")
-            hl:SetAllPoints()
-            hl:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.18)
-            row:SetScript("OnClick", function(self)
-                mapMenu:Hide()
-                pcall(entry.run, mapButton)
-            end)
-            mapRows[i] = row
-        end
-        local ok, available = pcall(entry.available)
-        if ok and available then
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", mapMenu, "TOPLEFT", 3, y)
-            row:Show()
-            y = y - 18
-        else
-            row:Hide()
+-- Blizzards Mikroknopf zu einem sicheren Eintrag (oder nil)
+local function MicroFor(entry)
+    if not entry.secure then return nil end
+    for _, name in ipairs(entry.secure) do
+        local b = _G[name]
+        if type(b) == "table" and b.IsObjectType then
+            local ok, isButton = pcall(b.IsObjectType, b, "Button")
+            if ok and isButton then return b end
         end
     end
-    mapMenu:SetSize(width, -y + 3)
+    return nil
 end
 
-mapButton:SetScript("OnClick", function()
-    if mapMenu:IsShown() then
-        mapMenu:Hide()
+-- Blizzard schaltet Mikroknöpfe ab (z. B. Talente unter Stufe 10): Click() bewirkt dann nichts
+local function MicroUsable(entry)
+    local b = MicroFor(entry)
+    if not b then return false end
+    local ok, enabled = pcall(b.IsEnabled, b)
+    if not ok then return true end
+    return ns.Public(enabled) and true or false
+end
+
+local function Has(entry)
+    if entry.divider then return false end
+    if entry.secure then return MicroFor(entry) ~= nil end
+    local ok, has = pcall(entry.has)
+    return ok and has and true or false
+end
+
+-- Normaler Eintrag im Kampf gesperrt? (geschützte oder noch nicht geladene Fenster)
+local function BlockedNow(entry)
+    if entry.secure or not InCombat() then return false end
+    if entry.frame then
+        local ok, f = pcall(entry.frame)
+        if not ok or type(f) ~= "table" then return true end
+        return IsProtectedFrame(f)
+    end
+    return false
+end
+
+local function RunEntry(entry, anchor)
+    if entry.secure or not entry.run then return end
+    if BlockedNow(entry) then
+        if UIErrorsFrame then UIErrorsFrame:AddMessage(ERR_NOT_IN_COMBAT or "Im Kampf nicht möglich.", 1, 0.3, 0.3) end
+        return
+    end
+    pcall(entry.run, anchor)
+end
+
+-- Sicherer Klick-Knopf auf einen Blizzard-Mikroknopf. Nur außerhalb des Kampfes bauen; kein
+-- SetScript("OnClick") darauf, sonst ist der Klick nicht mehr sicher.
+local function MakeSecureClick(name, parent, target)
+    if InCombat() then return nil end
+    local b = CreateFrame("Button", name, parent, "SecureActionButtonTemplate")
+    b:RegisterForClicks("LeftButtonUp")
+    b:SetAttribute("type", "click")
+    b:SetAttribute("clickbutton", target)
+    -- Sonst reagiert der Knopf je nach CVar ActionButtonUseKeyDown nur beim Drücken
+    b:SetAttribute("useOnKeyDown", false)
+    return b
+end
+
+-- Kartenmenü-Knopf -------------------------------------------------------------
+
+local mapButton = CreateFrame("Button", "strayMapMenuButton", Minimap)
+mapButton:SetSize(18, 18)
+mapButton:SetFrameStrata("MEDIUM")
+mapButton:SetFrameLevel(12)
+mapButton:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 2, -2)
+mapButton:SetAlpha(0.75)
+Style(mapButton)
+mapButton.icon = mapButton:CreateTexture(nil, "ARTWORK")
+mapButton.icon:SetPoint("CENTER")
+mapButton.icon:SetSize(12, 12)
+if not SetFirstTexture(mapButton.icon, { "Interface\\Icons\\INV_Misc_Map_01", "Interface\\Icons\\INV_Misc_Map02" }) then
+    mapButton.icon:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.6)
+end
+mapButton.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+mapButton:Hide()
+
+-- stray-Klappmenü -------------------------------------------------------------------
+-- Mit sicheren Zeilen ist der Rahmen selbst geschützt: Öffnen, Umbau und Schließen nur außerhalb
+-- des Kampfes. Kein Ankern an Minimap oder Knopf (sonst würden die mit geschützt), nur an UIParent.
+
+local MENU_NAME = "strayMinimapMenu"
+local MENU_W = 130
+local ROW_H = 18
+
+local menu = CreateFrame("Frame", MENU_NAME, UIParent)
+menu:SetFrameStrata("DIALOG")
+menu:SetClampedToScreen(true)
+menu:EnableMouse(true)
+menu:SetSize(MENU_W, 40)
+Style(menu)
+menu:Hide()
+
+-- Esc schließt das Menü
+if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, MENU_NAME) end
+
+local menuItems = {}   -- { entry, row } bzw. { divider = Textur } in Reihenfolge
+local menuBuilt = false
+local menuOwner = nil
+
+local function CloseMenu()
+    if menu:IsShown() and not InCombat() then menu:Hide() end
+end
+
+local function RowText(row)
+    row.text = Text(row, 11)
+    row.text:SetPoint("LEFT", 8, 0)
+    row.text:SetPoint("RIGHT", -6, 0)
+    row.text:SetJustifyH("LEFT")
+    local hl = row:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetAllPoints()
+    hl:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.18)
+end
+
+local function BuildMenu()
+    if menuBuilt then return true end
+    if InCombat() then return false end
+    menuBuilt = true
+    for _, entry in ipairs(MENU_ENTRIES) do
+        if entry.divider then
+            local line = menu:CreateTexture(nil, "ARTWORK")
+            line:SetColorTexture(C.border[1], C.border[2], C.border[3], 1)
+            line:SetHeight(1)
+            line:Hide()
+            table.insert(menuItems, { divider = line })
+        else
+            local row
+            if entry.secure then
+                local target = MicroFor(entry)
+                if target then
+                    row = MakeSecureClick("strayMinimapMenu_" .. entry.key, menu, target)
+                    -- Nach dem sicheren Klick (unverseucht) das Menü schließen
+                    if row then row:SetScript("PostClick", function() CloseMenu() end) end
+                end
+            else
+                row = CreateFrame("Button", nil, menu)
+                row:RegisterForClicks("LeftButtonUp")
+                row:SetScript("OnClick", function(self)
+                    local owner = menuOwner
+                    CloseMenu()
+                    RunEntry(self.entry, owner or mapButton)
+                end)
+            end
+            if row then
+                row.entry = entry
+                row:SetSize(MENU_W - 2, ROW_H)
+                RowText(row)
+                row.text:SetText(entry.label)
+                row:Hide()
+                table.insert(menuItems, { entry = entry, row = row })
+            end
+        end
+    end
+    return true
+end
+
+-- Zeilen nach Verfügbarkeit ein-/ausblenden; Trennlinie nur zwischen zwei sichtbaren Gruppen
+local function LayoutMenu()
+    local visible = {}
+    for _, item in ipairs(menuItems) do
+        if item.divider then
+            item.divider:Hide()
+            if #visible > 0 and not visible[#visible].divider then table.insert(visible, item) end
+        else
+            item.row:Hide()
+            if Has(item.entry) then table.insert(visible, item) end
+        end
+    end
+    if #visible > 0 and visible[#visible].divider then table.remove(visible) end
+    local y = -4
+    for _, item in ipairs(visible) do
+        if item.divider then
+            item.divider:ClearAllPoints()
+            item.divider:SetPoint("TOPLEFT", menu, "TOPLEFT", 6, y - 3)
+            item.divider:SetPoint("TOPRIGHT", menu, "TOPRIGHT", -6, y - 3)
+            item.divider:Show()
+            y = y - 7
+        else
+            local row = item.row
+            local usable = not item.entry.secure or MicroUsable(item.entry)
+            local c = usable and C.text or C.textDim
+            row.text:SetTextColor(c[1], c[2], c[3])
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", menu, "TOPLEFT", 1, y)
+            row:Show()
+            y = y - ROW_H
+        end
+    end
+    menu:SetSize(MENU_W, -y + 4)
+end
+
+-- Bildschirmpunkt (UIParent-Koordinaten) für das Menü
+local function MenuPoint(owner)
+    local ui = UIParent:GetEffectiveScale()
+    if owner == mapButton and mapButton:IsVisible() then
+        local left, bottom = mapButton:GetLeft(), mapButton:GetBottom()
+        if left and bottom then
+            local s = mapButton:GetEffectiveScale() / ui
+            return left * s, bottom * s - 2
+        end
+    end
+    local x, y = GetCursorPosition()
+    return x / ui + 2, y / ui - 2
+end
+
+local function OpenMenu(owner)
+    if InCombat() then
+        ns.Print("Menü geht erst nach dem Kampf.")
+        return
+    end
+    if not BuildMenu() then return end
+    menuOwner = owner
+    LayoutMenu()
+    local x, y = MenuPoint(owner)
+    menu:ClearAllPoints()
+    menu:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+    menu:Show()
+end
+
+ns.OpenStrayMinimapMenu = function() OpenMenu(Minimap) end
+
+-- Klick daneben schließt (Knopf und Karte selbst regeln ihr Auf/Zu im Klick)
+SafeOn("GLOBAL_MOUSE_DOWN", function()
+    if not menu:IsShown() or InCombat() then return end
+    if menu:IsMouseOver() then return end
+    if menuOwner == mapButton and mapButton:IsMouseOver() then return end
+    menu:Hide()
+end)
+
+-- Kampfbeginn: Das Ereignis kommt kurz vor der Sperre, das Menü lässt sich dann meist noch schließen
+SafeOn("PLAYER_REGEN_DISABLED", function()
+    if menu:IsShown() and not InCombatLockdown() then menu:Hide() end
+end)
+
+mapButton:SetScript("OnClick", function(self)
+    if menu:IsShown() and menuOwner == self then
+        CloseMenu()
     else
-        BuildMapMenu()
-        mapMenu:Show()
+        OpenMenu(self)
     end
 end)
 mapButton:SetScript("OnEnter", function(self)
@@ -676,7 +965,8 @@ mapButton:SetScript("OnEnter", function(self)
     SetBorder(self, C.accent)
     GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
     GameTooltip:AddLine("Kartenmenü")
-    GoldLine("Linksklick: Verfolgung, Kalender, Weltkarte")
+    GoldLine("Linksklick: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte")
+    GameTooltip:AddLine("Geht nur außerhalb des Kampfes.", C.textDim[1], C.textDim[2], C.textDim[3], true)
     GameTooltip:Show()
 end)
 mapButton:SetScript("OnLeave", function(self)
@@ -685,15 +975,19 @@ mapButton:SetScript("OnLeave", function(self)
     GameTooltip:Hide()
 end)
 
--- Menü schließt sich, wenn die Maus eine Weile weg ist
-local mapIdle = 0
-mapMenu:SetScript("OnShow", function() mapIdle = 0 end)
-mapMenu:SetScript("OnUpdate", function(self, elapsed)
-    if self:IsMouseOver() or mapButton:IsMouseOver() then
-        mapIdle = 0
-    else
-        mapIdle = mapIdle + elapsed
-        if mapIdle > 2 then self:Hide() end
+-- Kartenmenü-Knopf mit der Knopfspalte, bei eckiger Karte immer (dort fehlen Blizzards
+-- Verfolgungs- und Kalenderknopf)
+local function UpdateMapButton()
+    local want = ns.db and (ns.db.hudMinimapColumn or (ns.IsSquareMinimap and ns.IsSquareMinimap())) and true or false
+    mapButton:SetShown(want)
+    if not want and menuOwner == mapButton then CloseMenu() end
+end
+
+-- Mittlere Maustaste auf der Minimap. Blizzard pingt bei jeder Maustaste im Innenkreis der Karte,
+-- also auch hier; Mausrad: camera.lua
+Minimap:HookScript("OnMouseUp", function(self, mouseButton)
+    if mouseButton == "MiddleButton" and ns.db and ns.db.minimapMiddleMenu then
+        OpenMenu(self)
     end
 end)
 
@@ -712,13 +1006,21 @@ end
 
 local function LayoutColumn()
     if not (ns.db and ns.db.hudMinimapColumn) then return end
-    local side = ScreenSide()
-    columnSide = side
+    -- Eckige Minimap (minimap.lua): Spalte links bündig am Block aus Gebietsname und Karte
+    local top = ns.SquareMinimapTop and ns.SquareMinimapTop()
+    local gap = CELL_GAP
     column:ClearAllPoints()
-    if side == "RIGHT" then
-        column:SetPoint("TOPLEFT", Minimap, "TOPRIGHT", CELL_GAP, 0)
+    if top then
+        columnSide = "LEFT"
+        gap = 2
+        column:SetPoint("TOPRIGHT", top, "TOPLEFT", 1, 0)
     else
-        column:SetPoint("TOPRIGHT", Minimap, "TOPLEFT", -CELL_GAP, 0)
+        columnSide = ScreenSide()
+        if columnSide == "RIGHT" then
+            column:SetPoint("TOPLEFT", Minimap, "TOPRIGHT", CELL_GAP, 0)
+        else
+            column:SetPoint("TOPRIGHT", Minimap, "TOPLEFT", -CELL_GAP, 0)
+        end
     end
 
     local cells = { friendsCell }
@@ -734,16 +1036,17 @@ local function LayoutColumn()
 
     for i, cell in ipairs(cells) do
         cell:ClearAllPoints()
-        cell:SetPoint("TOP", column, "TOP", 0, -(i - 1) * (CELL + CELL_GAP))
+        cell:SetPoint("TOP", column, "TOP", 0, -(i - 1) * (CELL + gap))
         cell:Show()
     end
-    column:SetSize(CELL, #cells * (CELL + CELL_GAP) - CELL_GAP)
+    column:SetSize(CELL, #cells * (CELL + gap) - gap)
 
+    -- Die Tasche klappt von der Karte weg auf
     addonBag:ClearAllPoints()
-    if side == "RIGHT" then
+    if columnSide == "RIGHT" then
         addonBag:SetPoint("TOPRIGHT", bagCell, "BOTTOMRIGHT", 0, -CELL_GAP)
     else
-        addonBag:SetPoint("TOPLEFT", bagCell, "BOTTOMLEFT", 0, -CELL_GAP)
+        addonBag:SetPoint("TOPRIGHT", bagCell, "TOPLEFT", -CELL_GAP, 0)
     end
 end
 
@@ -755,14 +1058,13 @@ local function ApplyColumn(toggled)
     if ns.db.hudMinimapColumn then
         LayoutColumn()
         column:Show()
-        mapButton:Show()
+        UpdateMapButton()
         pcall(UpdateFriendCount)
         if C_FriendList and C_FriendList.ShowFriends then pcall(C_FriendList.ShowFriends) end
         CollectButtons()
     else
         column:Hide()
-        mapButton:Hide()
-        mapMenu:Hide()
+        UpdateMapButton()
         if ns.MinimapButtonUndock then ns.MinimapButtonUndock() end
         if toggled and #collectedList > 0 then
             ReleaseButtons()
@@ -793,10 +1095,47 @@ clock.text = Text(clock, 12, FONT_BODY, "OUTLINE")
 clock.text:SetPoint("CENTER")
 clock:Hide()
 
+-- Blizzards Koordinaten (Edit Mode „Spielerkoordinaten“, CVar minimapShowPlayerCoords) stehen
+-- bei der runden Karte 8–18 px unter der Minimap: die Uhr rückt dann darunter.
+local function BlizzardCoordsOn()
+    local ok, on = pcall(ns.GetCVarOn, "minimapShowPlayerCoords")
+    return ok and on and true or false
+end
+
+local clockLayoutKey = nil
+
+local function LayoutClock(force)
+    local square = ns.IsSquareMinimap and ns.IsSquareMinimap() or false
+    local clockOn = ns.db and ns.db.hudClock and true or false
+    local coordsOn = (not square) and BlizzardCoordsOn()
+    local key = (square and "s" or "r") .. (coordsOn and "c" or "") .. (clockOn and "u" or "")
+    if not force and key == clockLayoutKey then return end
+    clockLayoutKey = key
+    clock:ClearAllPoints()
+    if square then
+        clock:SetPoint("TOP", Minimap, "BOTTOM", 0, -3)
+    elseif coordsOn then
+        clock:SetPoint("TOP", Minimap, "BOTTOM", 0, -20)
+    else
+        clock:SetPoint("TOP", Minimap, "BOTTOM", 0, -4)
+    end
+    -- Eckig: stray-Koordinaten (minimap.lua) unter der Uhr, sonst direkt unter der Karte
+    local coords = ns.SquareMinimapCoords
+    if square and coords then
+        coords:ClearAllPoints()
+        if clockOn then
+            coords:SetPoint("TOP", clock, "BOTTOM", 0, 1)
+        else
+            coords:SetPoint("TOP", Minimap, "BOTTOM", 0, -3)
+        end
+    end
+end
+
 local function UpdateClock()
     local fps = GetFramerate and Number(GetFramerate())
     local fpsText = fps and tostring(math.floor(fps + 0.5)) or "?"
     clock.text:SetText(string.format("|cff5aa8ff%s|r FPS   %s", fpsText, date("%H:%M")))
+    LayoutClock(false)
 end
 
 clock:SetScript("OnEnter", function(self)
@@ -829,13 +1168,14 @@ clock:SetScript("OnClick", function()
 end)
 
 local clockTicker
+local hookedClock = {} -- Blizzard-Uhrknöpfe mit OnShow-Hook (keine Felder auf Blizzard-Frames)
 
 local function HideBlizzardClock()
     local b = _G.TimeManagerClockButton
     if not b then return end
     pcall(b.Hide, b)
-    if not b.strayHooked then
-        b.strayHooked = true
+    if not hookedClock[b] then
+        hookedClock[b] = true
         pcall(b.HookScript, b, "OnShow", function(self)
             if ns.db and ns.db.hudClock then pcall(self.Hide, self) end
         end)
@@ -843,6 +1183,7 @@ local function HideBlizzardClock()
 end
 
 local function ApplyClock(toggled)
+    LayoutClock(true)
     if ns.db.hudClock then
         UpdateClock()
         clock:Show()
@@ -856,6 +1197,14 @@ local function ApplyClock(toggled)
         if toggled and _G.TimeManagerClockButton then pcall(_G.TimeManagerClockButton.Show, _G.TimeManagerClockButton) end
     end
 end
+
+-- minimap.lua meldet, wenn die Karte eckig/rund wird oder die Größe wechselt
+ns.HudLayoutAroundMap = function()
+    pcall(UpdateMapButton)
+    if ns.db and ns.db.hudMinimapColumn then pcall(LayoutColumn) end
+    pcall(LayoutClock, true)
+end
+
 
 ---------------------------------------------------------------------------
 -- 3) Erfahrungsleiste oben
@@ -1146,36 +1495,39 @@ SafeOn("QUEST_LOG_UPDATE", function()
 end)
 
 ---------------------------------------------------------------------------
--- 4) Taschen- und Menüleiste
+-- 4) Taschen- und Menüleiste unten rechts
+-- Erscheint mit „Eigene Aktionsleisten“ (ns.db.abEnabled). Eigene, flache stray-Knöpfe;
+-- Blizzards Taschen- und Menüknöpfe werden außerhalb des Kampfes in einen versteckten
+-- eigenen Rahmen umgehängt (kein Umsetzen von Edit-Mode-Systemen, keine Felder auf Blizzard-Frames).
+-- Die Menüknöpfe sind sichere Klick-Knöpfe auf Blizzards Mikroknöpfe. Sobald es sie gibt, ist
+-- die Leiste selbst geschützt: Aufbau, Größe, Position und Ein-/Ausblenden nur außerhalb des Kampfes.
 ---------------------------------------------------------------------------
 
+local BLIZZARD_BAGS = {
+    "MainMenuBarBackpackButton", "CharacterBag0Slot", "CharacterBag1Slot", "CharacterBag2Slot",
+    "CharacterBag3Slot", "CharacterReagentBag0Slot", "KeyRingButton", "BagBarExpandToggle", "BagSlotCluster",
+}
+-- Forever (Camelot) plus ältere Namen; was es im Client nicht gibt, wird übersprungen
 local MICRO_FALLBACK = {
-    "CharacterMicroButton", "SpellbookMicroButton", "TalentMicroButton", "QuestLogMicroButton",
-    "SocialsMicroButton", "GuildMicroButton", "WorldMapMicroButton", "LFGMicroButton",
-    "PVPMicroButton", "MainMenuMicroButton", "HelpMicroButton",
+    "CharacterMicroButton", "ProfessionMicroButton", "PlayerSpellsMicroButton", "SpellbookMicroButton",
+    "TalentMicroButton", "AchievementMicroButton", "LegacyMicroButton", "QuestLogMicroButton",
+    "HousingMicroButton", "SocialsMicroButton", "GuildMicroButton", "LFDMicroButton", "LFGMicroButton",
+    "WorldMapMicroButton", "PVPMicroButton", "CollectionsMicroButton", "EJMicroButton",
+    "HelpMicroButton", "StoreMicroButton", "MainMenuMicroButton",
 }
-local BAG_BUTTONS = {
-    "KeyRingButton", "CharacterBag3Slot", "CharacterBag2Slot", "CharacterBag1Slot", "CharacterBag0Slot",
-    "MainMenuBarBackpackButton",
-}
-local MICRO_PAD = 3
-local GROUP_GAP = 8
 
-local microBar = CreateFrame("Frame", "strayMicroBar", UIParent)
-microBar:SetSize(200, 40)
-microBar:SetFrameStrata("MEDIUM")
-Style(microBar, { C.bg[1], C.bg[2], C.bg[3], 0.6 })
-microBar:Hide()
+local BAR_PAD = 3
+local BAR_GAP = 2
+local GROUP_GAP = 6
 
-ns.MakeMovable(microBar, "microbar", { "BOTTOMRIGHT", "BOTTOMRIGHT", -4, 4 })
--- Die Leiste enthält Blizzard-Knöpfe: im Kampf nicht ziehen
-local dragStart = microBar:GetScript("OnDragStart")
-microBar:SetScript("OnDragStart", function(self, ...)
-    if InCombat() then return end
-    if dragStart then dragStart(self, ...) end
-end)
+local function BottomActive()
+    return ns.db and ns.db.abEnabled and true or false
+end
 
-local microTaken = false
+local function BarButtonSize()
+    local v = tonumber(ns.db and ns.db.bottomBarSize) or 28
+    return math.max(20, math.min(40, math.floor(v + 0.5)))
+end
 
 local function MicroNames()
     local list, seen = {}, {}
@@ -1198,60 +1550,85 @@ local function MicroNames()
     return list
 end
 
-local ScheduleMicro -- unten definiert
-
-local function HookButton(b)
-    if b.strayMicroHooked then return end
-    b.strayMicroHooked = true
-    pcall(b.HookScript, b, "OnShow", function() ScheduleMicro() end)
-    pcall(b.HookScript, b, "OnHide", function() ScheduleMicro() end)
-end
-
-local function PlaceRow(names, x, yOffset, gapFor)
-    local maxH = 0
-    local any = false
-    for _, name in ipairs(names) do
-        local b = _G[name]
-        if type(b) == "table" and b.SetParent and b.GetWidth then
-            if b:GetParent() ~= microBar then pcall(b.SetParent, b, microBar) end
-            HookButton(b)
-            if b:IsShown() then
-                local w, h = b:GetWidth() or 0, b:GetHeight() or 0
-                b:ClearAllPoints()
-                b:SetPoint("BOTTOMLEFT", microBar, "BOTTOMLEFT", x, MICRO_PAD + yOffset)
-                x = x + w + gapFor(w, h)
-                if h + yOffset > maxH then maxH = h + yOffset end
-                any = true
-            end
-        end
+-- Alte Einstellung „hudMicroBar“ (bis 0.20) einmalig übernehmen
+local function MigrateOldMicroBar()
+    if not ns.db then return end
+    if ns.db.hudMicroBar ~= nil then
+        if ns.db.hudMicroBar then ns.db.bottomMicroButtons = true end
+        ns.db.hudMicroBar = nil
     end
-    return x, maxH, any
 end
 
-local function LayoutMicro()
-    if not (ns.db and ns.db.hudMicroBar) then return end
+-- Blizzard-Knöpfe parken ------------------------------------------------------
+
+local parking = CreateFrame("Frame", "strayBlizzardBarParking", UIParent)
+parking:Hide()
+
+-- [Blizzard-Knopf] = { parent = alter Parent, points = alte Punkte } (lokal, keine Felder auf Blizzard-Frames)
+local parked = {}
+local bagsBarFaded = false
+
+local function ParkBlizzard()
+    if not BottomActive() then return end
     if InCombat() then
-        Defer("micro", LayoutMicro)
+        Defer("bottomPark", ParkBlizzard)
         return
     end
-    -- Klassische Mikroknöpfe sind hoch mit leerem oberem Teil und überlappen bei Blizzard leicht
-    local function microGap(w, h) return (w > 0 and h / w > 1.6) and -3 or 2 end
-    local function bagGap() return 2 end
-    local x, microH, anyMicro = PlaceRow(MicroNames(), MICRO_PAD, 0, microGap)
-    if anyMicro then x = x + GROUP_GAP end
-    local bagX, bagH, anyBag = PlaceRow(BAG_BUTTONS, x, 1, bagGap)
-    if anyBag then x = bagX end
-    microBar:SetSize(math.max(x + MICRO_PAD, 40), math.max(microH, bagH, 20) + 2 * MICRO_PAD)
-    microTaken = true
+    local function park(name)
+        local b = _G[name]
+        if type(b) ~= "table" or not b.SetParent or not b.GetParent then return end
+        if b:GetParent() == parking or IsProtectedFrame(b) then return end
+        if not parked[b] then
+            local info = { parent = b:GetParent(), points = {} }
+            for i = 1, (b:GetNumPoints() or 0) do info.points[i] = { b:GetPoint(i) } end
+            parked[b] = info
+        end
+        pcall(b.SetParent, b, parking)
+    end
+    for _, name in ipairs(BLIZZARD_BAGS) do park(name) end
+    for _, name in ipairs(MicroNames()) do park(name) end
+    -- Trennstriche der Taschenleiste sind Kinder von BagsBar und hängen an den Taschenknöpfen
+    local bagsBar = _G.BagsBar
+    if type(bagsBar) == "table" and bagsBar.SetAlpha then
+        pcall(bagsBar.SetAlpha, bagsBar, 0)
+        bagsBarFaded = true
+    end
 end
 
-local microScheduled = false
-function ScheduleMicro()
-    if microScheduled or not (ns.db and ns.db.hudMicroBar and microTaken) then return end
-    microScheduled = true
+-- „Eigene Aktionsleisten“ aus: Blizzards Taschen- und Menüknöpfe zurückhängen.
+-- Die Punkte bleiben beim Parken unverändert (Blizzard setzt sie beim Layout ggf. neu);
+-- die gemerkten Punkte gelten nur, wenn ein Knopf gar keinen Punkt mehr hat.
+local function UnparkBlizzard()
+    if InCombat() then
+        Defer("bottomUnpark", UnparkBlizzard)
+        return
+    end
+    pending.bottomPark = nil
+    for b, info in pairs(parked) do
+        pcall(function()
+            if b:GetParent() == parking then b:SetParent(info.parent or UIParent) end
+            if (b:GetNumPoints() or 0) == 0 then
+                for _, p in ipairs(info.points) do b:SetPoint(p[1], p[2], p[3], p[4], p[5]) end
+            end
+        end)
+        parked[b] = nil
+    end
+    local bagsBar = _G.BagsBar
+    if bagsBarFaded and type(bagsBar) == "table" and bagsBar.SetAlpha then
+        pcall(bagsBar.SetAlpha, bagsBar, 1)
+    end
+    bagsBarFaded = false
+    -- Leistenkunst von MicroMenu/BagsBar blendet actionbars.lua aus und wieder ein
+    if ns.ShowBlizzardBarArt then pcall(ns.ShowBlizzardBarArt) end
+end
+
+local parkScheduled = false
+local function SchedulePark()
+    if parkScheduled or not BottomActive() then return end
+    parkScheduled = true
     C_Timer.After(0, function()
-        microScheduled = false
-        pcall(LayoutMicro)
+        parkScheduled = false
+        pcall(ParkBlizzard)
     end)
 end
 
@@ -1262,33 +1639,321 @@ local function HookBlizzardMicro()
     microHooksDone = true
     for _, fname in ipairs({ "UpdateMicroButtonsParent", "MoveMicroButtons", "MainMenuBarVehicleLeaveButton_Update" }) do
         if type(_G[fname]) == "function" then
-            pcall(hooksecurefunc, fname, function() ScheduleMicro() end)
+            pcall(hooksecurefunc, fname, function() SchedulePark() end)
         end
     end
     for _, holder in ipairs({ "MicroMenu", "MicroMenuContainer", "BagsBar", "MicroButtonAndBagsBar" }) do
         local f = _G[holder]
         if type(f) == "table" and type(f.Layout) == "function" then
-            pcall(hooksecurefunc, f, "Layout", function() ScheduleMicro() end)
+            pcall(hooksecurefunc, f, "Layout", function() SchedulePark() end)
         end
     end
 end
 
-local function ApplyMicro(toggled)
-    if ns.db.hudMicroBar then
-        if InCombat() then
-            Defer("microApply", function() ApplyMicro(toggled) end)
-            return
+-- Eigene Leiste ------------------------------------------------------------------
+
+local bottomBar = CreateFrame("Frame", "strayMicroBar", UIParent)
+bottomBar:SetSize(200, 34)
+bottomBar:SetFrameStrata("MEDIUM")
+Style(bottomBar, { C.bg[1], C.bg[2], C.bg[3], 0.6 })
+bottomBar:Hide()
+
+-- Schlüssel „microbar“ wie bisher: eine schon verschobene Leiste bleibt, wo sie war
+ns.MakeMovable(bottomBar, "microbar", { "BOTTOMRIGHT", "BOTTOMRIGHT", -4, 4 })
+ns.RegisterMovable(bottomBar, "Taschen und Menü", nil)
+-- Mit sicheren Kindern ist die Leiste geschützt: im Kampf nicht ziehen
+bottomBar:SetScript("OnDragStart", function(self)
+    if IsShiftKeyDown() and not InCombat() then self:StartMoving() end
+end)
+
+-- secureTarget: Blizzards Mikroknopf → sicherer Klick-Knopf, sonst normaler Knopf
+local function MakeBarButton(secureTarget, name)
+    local b
+    if secureTarget then
+        b = MakeSecureClick(name, bottomBar, secureTarget)
+    else
+        b = CreateFrame("Button", name, bottomBar)
+        b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    end
+    Style(b)
+    b.icon = b:CreateTexture(nil, "ARTWORK")
+    b.icon:SetPoint("TOPLEFT", 1, -1)
+    b.icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+    hl:SetPoint("TOPLEFT", 1, -1)
+    hl:SetPoint("BOTTOMRIGHT", -1, 1)
+    hl:SetColorTexture(1, 1, 1, 0.12)
+    b.count = Text(b, 10, FONT_BODY, "OUTLINE")
+    b.count:SetPoint("BOTTOMRIGHT", b, "BOTTOMRIGHT", -2, 2)
+    b:HookScript("OnEnter", function(self) SetBorder(self, C.accent) end)
+    b:HookScript("OnLeave", function(self)
+        SetBorder(self, C.border)
+        GameTooltip:Hide()
+    end)
+    b:Hide()
+    return b
+end
+
+-- Menüknöpfe (dieselben Einträge wie das Minimap-Menü), erst bei Bedarf außerhalb des Kampfes gebaut
+local microButtons = {}
+local microBuilt = false
+
+local function BuildMicroButtons()
+    if microBuilt then return true end
+    if InCombat() then return false end
+    microBuilt = true
+    for _, entry in ipairs(MENU_ENTRIES) do
+        if entry.micro and Has(entry) then
+            local target = entry.secure and MicroFor(entry) or nil
+            local ok, b = pcall(MakeBarButton, target, "strayBottomMenu_" .. entry.key)
+            if ok and b then
+                b.entry = entry
+                if not SetFirstTexture(b.icon, entry.icons) then
+                    b.icon:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.6)
+                end
+                if not entry.secure then
+                    b:SetScript("OnClick", function(self) RunEntry(self.entry, self) end)
+                end
+                b:HookScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                    GameTooltip:AddLine(self.entry.label)
+                    if self.entry.secure then
+                        if not MicroUsable(self.entry) then
+                            GameTooltip:AddLine("Gerade nicht verfügbar", C.textDim[1], C.textDim[2], C.textDim[3])
+                        end
+                    elseif BlockedNow(self.entry) then
+                        GameTooltip:AddLine("Im Kampf gesperrt", 1, 0.3, 0.3)
+                    end
+                    GameTooltip:Show()
+                end)
+                table.insert(microButtons, b)
+            end
         end
-        ns.RestorePosition(microBar)
-        microBar:Show()
+    end
+    return true
+end
+
+-- Nur Texturen: geht auch im Kampf
+local function UpdateMicroState()
+    for _, b in ipairs(microButtons) do
+        local off
+        if b.entry.secure then
+            off = not MicroUsable(b.entry)
+        else
+            off = BlockedNow(b.entry)
+        end
+        pcall(b.icon.SetDesaturated, b.icon, off)
+        b.icon:SetAlpha(off and 0.5 or 1)
+    end
+end
+
+-- Taschen
+local function ContainerCall(name, ...)
+    local fn = (C_Container and C_Container[name]) or _G[name]
+    if type(fn) ~= "function" then return nil end
+    local ok, v = pcall(fn, ...)
+    return ok and Number(v) or nil
+end
+
+local function BagInvID(bag)
+    return ContainerCall("ContainerIDToInventoryID", bag)
+end
+
+-- Freie Plätze in allen Taschen: Blizzards Summe, sonst selbst zählen
+local function TotalFreeSlots()
+    local total = ContainerCall("CalculateTotalNumberOfFreeBagSlots")
+    if total then return total end
+    local sum = 0
+    for i = 0, 4 do sum = sum + (ContainerCall("GetContainerNumFreeSlots", i) or 0) end
+    return sum
+end
+
+local function KeyringShown()
+    if type(KEYRING_CONTAINER) ~= "number" then return false end
+    if C_ActionBar and C_ActionBar.ShouldShowKeyring then
+        local ok, show = pcall(C_ActionBar.ShouldShowKeyring)
+        return ok and ns.Public(show) and true or false
+    end
+    return false
+end
+
+local function PutIntoBag(bag)
+    if not (CursorHasItem and CursorHasItem()) then return false end
+    if bag == 0 then
+        if PutItemInBackpack then pcall(PutItemInBackpack) end
+    elseif bag == KEYRING_CONTAINER then
+        if PutKeyInKeyRing then pcall(PutKeyInKeyRing) end
+    else
+        local inv = BagInvID(bag)
+        if inv and PutItemInBag then pcall(PutItemInBag, inv) end
+    end
+    return true
+end
+
+local bagButtons = {}
+
+local function MakeBagButton(bag, keyring)
+    local b = MakeBarButton(nil, nil)
+    b.bag = bag
+    b.keyring = keyring
+    b:RegisterForDrag("LeftButton")
+    b:SetScript("OnClick", function(self)
+        if PutIntoBag(self.bag) then return end
+        if self.bag == 0 then
+            if IsModifiedClick and IsModifiedClick("OPENALLBAGS") and ToggleAllBags then
+                pcall(ToggleAllBags)
+            elseif ToggleBackpack then
+                pcall(ToggleBackpack)
+            end
+        elseif ToggleBag then
+            pcall(ToggleBag, self.bag)
+        end
+    end)
+    b:SetScript("OnReceiveDrag", function(self) PutIntoBag(self.bag) end)
+    b:SetScript("OnDragStart", function(self)
+        if self.bag == 0 or self.keyring then return end
+        local inv = BagInvID(self.bag)
+        if inv and PickupBagFromSlot then pcall(PickupBagFromSlot, inv) end
+    end)
+    b:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        if self.keyring then
+            GameTooltip:AddLine(KEYRING or "Schlüsselbund")
+        elseif self.bag == 0 then
+            GameTooltip:AddLine("Rucksack")
+        else
+            local inv = BagInvID(self.bag)
+            local hasItem = false
+            if inv then
+                local ok, has = pcall(GameTooltip.SetInventoryItem, GameTooltip, "player", inv)
+                hasItem = ok and ns.Public(has) and true or false
+            end
+            if not hasItem then GameTooltip:AddLine("Leerer Taschenplatz") end
+        end
+        if not self.keyring then
+            local free, total = ContainerCall("GetContainerNumFreeSlots", self.bag), ContainerCall("GetContainerNumSlots", self.bag)
+            if free and total and total > 0 then
+                GameTooltip:AddLine("Frei: " .. free .. " von " .. total, C.text[1], C.text[2], C.text[3])
+            end
+            if self.bag == 0 then
+                GameTooltip:AddLine("Frei in allen Taschen: " .. TotalFreeSlots(), C.text[1], C.text[2], C.text[3])
+            end
+        end
+        GoldLine("Linksklick: öffnen")
+        GameTooltip:Show()
+    end)
+    return b
+end
+
+for bag = 0, 4 do bagButtons[#bagButtons + 1] = MakeBagButton(bag, false) end
+local keyringButton = MakeBagButton(type(KEYRING_CONTAINER) == "number" and KEYRING_CONTAINER or -2, true)
+
+local BAG_EMPTY = "Interface\\PaperDoll\\UI-PaperDoll-Slot-Bag"
+
+local function UpdateBags()
+    for _, b in ipairs(bagButtons) do
+        local tex
+        if b.bag == 0 then
+            tex = "Interface\\Buttons\\Button-Backpack-Up"
+        else
+            local inv = BagInvID(b.bag)
+            if inv and GetInventoryItemTexture then
+                local ok, t = pcall(GetInventoryItemTexture, "player", inv)
+                tex = ok and ns.Public(t) or nil
+            end
+        end
+        b.icon:SetTexture(tex or BAG_EMPTY)
+        local total = ContainerCall("GetContainerNumSlots", b.bag) or 0
+        local free = ContainerCall("GetContainerNumFreeSlots", b.bag)
+        b.count:SetText((total > 0 and free) and tostring(free) or "")
+        pcall(b.icon.SetDesaturated, b.icon, total == 0)
+    end
+    keyringButton.icon:SetTexture("Interface\\Icons\\INV_Misc_Key_14")
+    keyringButton.count:SetText("")
+end
+
+local function LayoutBottom()
+    if not BottomActive() then return end
+    -- Sichere Knöpfe bauen bzw. die geschützte Leiste umbauen: nur außerhalb des Kampfes
+    if InCombat() and (microBuilt or ns.db.bottomMicroButtons) then
+        Defer("bottomLayout", LayoutBottom)
+        return
+    end
+    if ns.db.bottomMicroButtons then BuildMicroButtons() end
+    local size = BarButtonSize()
+    local font = math.max(8, math.floor(size * 0.38))
+    local x = BAR_PAD
+    local function place(b)
+        b:SetSize(size, size)
+        pcall(b.count.SetFont, b.count, FONT_BODY, font, "OUTLINE")
+        b:ClearAllPoints()
+        b:SetPoint("BOTTOMLEFT", bottomBar, "BOTTOMLEFT", x, BAR_PAD)
+        b:Show()
+        x = x + size + BAR_GAP
+    end
+    local anyMicro = false
+    for _, b in ipairs(microButtons) do
+        if ns.db.bottomMicroButtons and Has(b.entry) then
+            place(b)
+            anyMicro = true
+        else
+            b:Hide()
+        end
+    end
+    if anyMicro then x = x + GROUP_GAP - BAR_GAP end
+    -- Rechts außen der Rucksack, links davon die Taschen 4 bis 1 (wie bei Blizzard)
+    if KeyringShown() then place(keyringButton) else keyringButton:Hide() end
+    for i = #bagButtons, 1, -1 do place(bagButtons[i]) end
+    bottomBar:SetSize(x - BAR_GAP + BAR_PAD, size + 2 * BAR_PAD)
+    UpdateMicroState()
+end
+
+local bagTimer = false
+local function ScheduleBags()
+    if bagTimer or not BottomActive() then return end
+    bagTimer = true
+    C_Timer.After(0.2, function()
+        bagTimer = false
+        pcall(UpdateBags)
+    end)
+end
+
+for _, event in ipairs({ "BAG_UPDATE", "BAG_UPDATE_DELAYED", "BAG_CONTAINER_UPDATE", "PLAYER_EQUIPMENT_CHANGED" }) do
+    SafeOn(event, ScheduleBags)
+end
+SafeOn("PLAYER_REGEN_DISABLED", function() if BottomActive() then pcall(UpdateMicroState) end end)
+SafeOn("PLAYER_REGEN_ENABLED", function() if BottomActive() then pcall(UpdateMicroState) end end)
+-- Blizzard schaltet Mikroknöpfe an/aus (Stufe, Gilde …): Graustufe nachziehen
+if type(UpdateMicroButtons) == "function" then
+    pcall(hooksecurefunc, "UpdateMicroButtons", function()
+        if BottomActive() and #microButtons > 0 then pcall(UpdateMicroState) end
+    end)
+end
+
+-- Von actionbars.lua beim Umschalten von „Eigene Aktionsleisten“ und nach dem Login aufgerufen
+function ns.HudUpdateBottomBar()
+    if not ns.db then return end
+    MigrateOldMicroBar()
+    -- Mit sicheren Menüknöpfen ist die Leiste geschützt
+    if InCombat() and microBuilt then
+        Defer("bottomUpdate", ns.HudUpdateBottomBar)
+        return
+    end
+    if BottomActive() then
+        pending.bottomUnpark = nil
+        ns.RestorePosition(bottomBar)
+        LayoutBottom()
+        UpdateBags()
+        bottomBar:Show()
         HookBlizzardMicro()
-        LayoutMicro()
-    elseif toggled then
-        ns.Print("Menü- und Taschenknöpfe kehren nach /reload an ihren Platz zurück.")
+        ParkBlizzard()
+    else
+        bottomBar:Hide()
+        -- Blizzards Taschen- und Menüknöpfe zurück (im Kampf danach)
+        UnparkBlizzard()
     end
 end
-
-ns.RegisterMovable(microBar, "Taschen und Menü", nil)
 
 ---------------------------------------------------------------------------
 -- Optionen
@@ -1301,8 +1966,9 @@ ns.AddOption(3, SECTION, {
         .. "Freunde: Zahl der Freunde online, Liste im Tooltip, Linksklick öffnet die Freundesliste.\n"
         .. "Addon-Tasche: sammelt die Minimap-Knöpfe anderer Addons und klappt sie per Klick auf "
         .. "(verträgt sich nicht mit Leatrix „Hide addon buttons“).\n"
-        .. "Oben links in der Minimap sitzt ein kleines Kartenmenü (Verfolgung, Kalender, Weltkarte).\n\n"
-        .. "Die Spalte steht rechts neben der Minimap, am rechten Bildschirmrand links davon.",
+        .. "Oben links in der Minimap sitzt ein kleines Kartenmenü (Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche, Kalender, Verfolgung, Weltkarte). Bei der eckigen Minimap ist es immer da, auch ohne diese Spalte.\n\n"
+        .. "Die Spalte steht rechts neben der Minimap, am rechten Bildschirmrand links davon. "
+        .. "Bei der eckigen Minimap sitzt sie links bündig daran.",
     set = function(value)
         ns.db.hudMinimapColumn = value
         ApplyColumn(true)
@@ -1313,7 +1979,8 @@ ns.AddOption(3, SECTION, {
     key = "hudClock",
     label = "Uhrzeit und FPS",
     tooltip = "Kleine Zeile unter der Minimap mit Bildern pro Sekunde und Uhrzeit.\n\n"
-        .. "Im Tooltip stehen Latenz und Serverzeit. Blizzards Uhr wird solange ausgeblendet.",
+        .. "Im Tooltip stehen Latenz und Serverzeit. Blizzards Uhr wird solange ausgeblendet. "
+        .. "Sind Blizzards Spielerkoordinaten an, rückt die Zeile darunter.",
     set = function(value)
         ns.db.hudClock = value
         ApplyClock(true)
@@ -1332,27 +1999,60 @@ ns.AddOption(3, SECTION, {
     end,
 })
 
-ns.AddOption(2, "Quests", {
+ns.AddOption(3, SECTION, {
     key = "questXPBar",
     label = "Quest-EP auf der EP-Leiste",
-    tooltip = "Zeigt auf der stray-Erfahrungsleiste einen goldenen Bereich: so viele EP bringen alle abgeschlossenen Quests, die du noch nicht abgegeben hast. Er beginnt am aktuellen EP-Stand, die Summe steht in der Leiste und im Tooltip.\n\nBraucht die Option „Erfahrungsleiste oben“ (Leisten & Minimap).",
+    tooltip = "Zeigt auf der stray-Erfahrungsleiste einen goldenen Bereich: so viele EP bringen alle abgeschlossenen Quests, die du noch nicht abgegeben hast. Er beginnt am aktuellen EP-Stand, die Summe steht in der Leiste und im Tooltip.\n\nBraucht die Option „Erfahrungsleiste oben“ (direkt darüber).",
     isEnabled = function() return ns.db and ns.db.hudXPBar and true or false end,
-    disabledHint = "Erst „Erfahrungsleiste oben“ unter Leisten & Minimap einschalten.",
+    disabledHint = "Erst „Erfahrungsleiste oben“ einschalten (direkt darüber).",
     set = function(value)
         ns.db.questXPBar = value
         if ns.db.hudXPBar then pcall(UpdateXP) end
     end,
 })
 
+local BOTTOM_HINT = "Erst „Eigene Aktionsleisten“ einschalten (Aktionsleisten → Aktionsleisten)."
+
 ns.AddOption(3, SECTION, {
-    key = "hudMicroBar",
-    label = "Taschen- und Menüleiste",
-    tooltip = "Menü- und Taschenknöpfe als schlanke Reihe, anfangs unten rechts.\n\n"
-        .. "Shift + Ziehen am Rand verschiebt sie (nicht im Kampf). "
-        .. "Ausschalten wirkt erst nach /reload (Neuladen nötig).",
+    key = "bottomMicroButtons",
+    label = "Menüknöpfe unten anzeigen",
+    tooltip = "Die Taschenleiste unten rechts erscheint mit „Eigene Aktionsleisten“ und zeigt Rucksack und Taschen mit der Zahl freier Plätze.\n\n"
+        .. "Mit dieser Option kommen links davon die Menüknöpfe dazu: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde und Gruppensuche. "
+        .. "Sie klicken Blizzards eigene Menüknöpfe an und gehen deshalb auch im Kampf. Grau heißt: Blizzard hat den Knopf gerade abgeschaltet (z. B. Talente unter Stufe 10). "
+        .. "Das Spielmenü öffnest du wie gewohnt mit Esc.\n\n"
+        .. "Shift + Ziehen am Rand verschiebt die Leiste (nicht im Kampf). Ein- und Umbau im Kampf geschieht erst danach.",
+    isEnabled = BottomActive,
+    disabledHint = BOTTOM_HINT,
     set = function(value)
-        ns.db.hudMicroBar = value
-        ApplyMicro(true)
+        ns.db.bottomMicroButtons = value
+        if BottomActive() then pcall(LayoutBottom) end
+    end,
+})
+
+ns.AddOption(3, SECTION, {
+    key = "bottomBarSize",
+    type = "slider",
+    label = "Größe Taschenleiste",
+    min = 20, max = 40, step = 1,
+    tooltip = "Kantenlänge der Knöpfe in der Taschen- und Menüleiste in Pixeln.",
+    isEnabled = BottomActive,
+    disabledHint = BOTTOM_HINT,
+    set = function(v)
+        ns.db.bottomBarSize = math.max(20, math.min(40, math.floor((tonumber(v) or 28) + 0.5)))
+        if BottomActive() then pcall(LayoutBottom) end
+    end,
+})
+
+ns.AddOption(3, "Kamera & Karte", {
+    key = "minimapMiddleMenu",
+    label = "Menü auf der mittleren Maustaste",
+    tooltip = "Mittlere Maustaste auf der Minimap öffnet an der Maus ein kleines stray-Menü: Charakter, Zauberbuch, Talente, Berufe, Questlog, Freunde, Gilde, Gruppensuche sowie Kalender, Verfolgung, Weltkarte und, falls eingeschaltet, Twinks. "
+        .. "Dasselbe Menü öffnet der Kartenmenü-Knopf oben links in der Karte.\n\n"
+        .. "Im Kampf geht es nicht auf, dann kommt ein Hinweis im Chat. Schließen per Klick daneben oder Esc.\n\n"
+        .. "Hinweis: Blizzard pingt bei jeder Maustaste innerhalb des runden Innenbereichs der Karte, also auch bei der mittleren. "
+        .. "Ohne Ping geht es nah am Rand (bei eckiger Karte in einer Ecke). Mausrad bleibt wie gewohnt.",
+    set = function(value)
+        ns.db.minimapMiddleMenu = value
     end,
 })
 
@@ -1370,24 +2070,30 @@ end)
 
 SafeOn("PLAYER_LOGIN", function()
     if not ns.db then return end
+    MigrateOldMicroBar()
     pcall(ApplyClock, false)
     pcall(ApplyXP, false)
-    pcall(ApplyMicro, false)
+    pcall(ns.HudUpdateBottomBar)
     -- Minimap-Form und andere Addon-Knöpfe stehen oft erst kurz nach dem Login fest
     C_Timer.After(1, function()
+        pcall(UpdateMapButton)
         if ns.db.hudMinimapColumn then pcall(ApplyColumn, false) end
+        pcall(LayoutClock, true)
     end)
     C_Timer.After(5, function()
         if ns.db.hudMinimapColumn then
             pcall(CollectButtons)
             pcall(LayoutColumn)
         end
-        if ns.db.hudMicroBar then ScheduleMicro() end
+        if BottomActive() then SchedulePark() end
     end)
 end)
 
 SafeOn("PLAYER_ENTERING_WORLD", function()
     if not ns.db then return end
     if ns.db.hudXPBar then ScheduleXP() HideBlizzardXP() end
-    if ns.db.hudMicroBar then ScheduleMicro() end
+    if BottomActive() then
+        SchedulePark()
+        ScheduleBags()
+    end
 end)

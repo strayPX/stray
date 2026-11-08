@@ -15,7 +15,7 @@ ns.AddOption(1, "Beute", {
     label = "Schnell plündern",
     tooltip = "Nimmt die Beute sofort, ohne auf das Beutefenster zu warten. Gegenstände mit Bestätigung fragt WoW weiterhin ab.",
     isEnabled = function() return ns.GetCVarOn("autoLootDefault") end,
-    disabledHint = "Erst „Automatisch plündern“ aktivieren.",
+    disabledHint = "Erst „Automatisch plündern“ einschalten (direkt darüber).",
 })
 
 local lastLoot = 0

@@ -540,7 +540,7 @@ ns.AddOption(2, "Abklingzeiten", {
     min = 24, max = 56, step = 1,
     tooltip = "Größe der Abklingzeit-Symbole in Pixeln. Im Kampf wird die Änderung erst danach übernommen.",
     isEnabled = function() return Enabled() end,
-    disabledHint = "Erst „Abklingzeiten über den Leisten“ einschalten.",
+    disabledHint = "Erst „Abklingzeiten über den Leisten“ einschalten (direkt darüber).",
     set = function(v)
         ns.db.cdSize = v
         if InCombatLockdown() then pendingCombat = true return end

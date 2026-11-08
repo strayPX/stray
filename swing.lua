@@ -540,7 +540,7 @@ ns.AddOption(2, "Kampfhilfen", {
     min = MIN_W, max = MAX_W, step = 10,
     tooltip = "Breite der Swing-Timer-Leisten in Pixeln.",
     isEnabled = IsOn,
-    disabledHint = HAS_API and "Erst „Swing-Timer“ einschalten." or NO_API,
+    disabledHint = HAS_API and "Erst „Swing-Timer“ einschalten (weiter oben)." or NO_API,
     set = function(v)
         ns.db.swingWidth = Clamp(v, MIN_W, MAX_W, 200)
         if Enabled() then Layout() end
@@ -552,7 +552,7 @@ ns.AddOption(2, "Kampfhilfen", {
     label = "Fernkampf-Leiste",
     tooltip = "Zeigt zusätzlich eine Leiste für Fernkampfschüsse (Automatischer Schuss der Jäger, Zauberstab), sobald eine Fernkampfwaffe angelegt ist.",
     isEnabled = IsOn,
-    disabledHint = HAS_API and "Erst „Swing-Timer“ einschalten." or NO_API,
+    disabledHint = HAS_API and "Erst „Swing-Timer“ einschalten (weiter oben)." or NO_API,
     set = function(value)
         ns.db.swingRanged = value
         if Enabled() then WeaponsChanged() end

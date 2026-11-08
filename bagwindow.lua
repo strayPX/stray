@@ -5,8 +5,12 @@
 -- Elternrahmen, deren ID die Taschennummer ist – so verhalten sie sich wie Blizzards
 -- Taschenplätze (benutzen, verkaufen, anlegen, ziehen, verlinken, Tooltip).
 -- Blizzard-Tabellen werden nicht verändert: nur hooksecurefunc und Hide() auf die Taschenrahmen.
+-- Größe unten rechts ziehen: Breite rastet auf Spalten ein (bagColumns), Höhe ist frei (bagHeight).
+-- Passt nicht alles hinein, wird zeilenweise geblättert (Knöpfe neu setzen statt ScrollFrame).
 
 local _, ns = ...
+
+ns.defaults.bagHeight = 0 -- 0 = Höhe automatisch nach Inhalt
 
 local IsSecret = ns.IsSecret
 
@@ -40,6 +44,13 @@ local HEAD = 40
 local FOOT = 28
 local CAT_H = 22
 local MIN_W = 440
+local BAR_W = 6 -- zusätzlicher Rand rechts für den Scrollbalken
+local MIN_COLS, MAX_COLS = 6, 16
+local MAX_H = 900
+local GRIP_UP = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up"
+local GRIP_DOWN = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down"
+local GRIP_HIGHLIGHT = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight"
+local SORT_ATLAS = "bags-button-autosort-up"
 
 local FIRST_BAG = 0
 local LAST_BAG = (type(NUM_BAG_SLOTS) == "number" and NUM_BAG_SLOTS) or 4
@@ -174,8 +185,52 @@ end
 local function Columns()
     local n = ns.db and tonumber(ns.db.bagColumns) or 10
     n = math.floor(n + 0.5)
-    if n < 6 then n = 6 elseif n > 16 then n = 16 end
+    if n < MIN_COLS then n = MIN_COLS elseif n > MAX_COLS then n = MAX_COLS end
     return n
+end
+
+---------------------------------------------------------------------------
+-- Größen: Breite folgt den Spalten, Höhe automatisch oder fest (bagHeight)
+---------------------------------------------------------------------------
+
+local CAT_TOTAL = #CATEGORIES * CAT_H
+local MIN_H = HEAD + PAD + CAT_TOTAL + PAD + FOOT
+
+local function GridSize(n)
+    if n < 1 then return 0 end
+    return n * SLOT + (n - 1) * GAP
+end
+
+local function WidthFor(cols)
+    return math.max(MIN_W, SIDE_W + PAD * 2 + BAR_W + GridSize(cols))
+end
+
+local MAX_W = WidthFor(MAX_COLS)
+
+local function MaxHeight()
+    local h = UIParent and UIParent:GetHeight()
+    if type(h) ~= "number" or IsSecret(h) or h <= MIN_H then return MAX_H end
+    return math.max(MIN_H, math.min(MAX_H, math.floor(h - 20)))
+end
+
+-- Wie viele ganze Spalten passen in diese Fensterbreite?
+local function ColumnsForWidth(w)
+    local n = math.floor((w - SIDE_W - PAD * 2 - BAR_W + GAP) / (SLOT + GAP))
+    if n < MIN_COLS then n = MIN_COLS elseif n > MAX_COLS then n = MAX_COLS end
+    return n
+end
+
+-- Wie viele ganze Reihen passen in diese Fensterhöhe?
+local function RowsForHeight(h)
+    local n = math.floor((h - HEAD - PAD * 2 - FOOT + GAP) / (SLOT + GAP))
+    return math.max(1, n)
+end
+
+-- Gespeicherte feste Höhe oder nil (= automatisch)
+local function FixedHeight()
+    local h = ns.db and tonumber(ns.db.bagHeight)
+    if not h or h <= 0 then return nil end
+    return math.max(MIN_H, math.min(MaxHeight(), math.floor(h + 0.5)))
 end
 
 ---------------------------------------------------------------------------
@@ -223,14 +278,17 @@ Border(frame, C.border)
 ns.MakeMovable(frame, "bagwindow", { "BOTTOMRIGHT", "BOTTOMRIGHT", -16, 96 })
 
 -- Position immer als rechte untere Ecke speichern, damit das Fenster nach oben wächst
-local function SavePosition()
-    local right, bottom = frame:GetRight(), frame:GetBottom()
+local function SavePosition(right, bottom)
+    if not (right and bottom) then right, bottom = frame:GetRight(), frame:GetBottom() end
     local uiRight = UIParent:GetRight()
     if not (right and bottom and uiRight) or not ns.db then return end
     ns.db.positions.bagwindow = { "BOTTOMRIGHT", "BOTTOMRIGHT", right - uiRight, bottom }
 end
 
+local sizing = false -- Größe wird gerade gezogen (Verschieben und Ziehen schließen sich aus)
+
 frame:SetScript("OnDragStop", function(self)
+    if sizing then return end
     self:StopMovingOrSizing()
     SavePosition()
 end)
@@ -249,8 +307,9 @@ head:SetPoint("TOPRIGHT", -1, -1)
 head:SetHeight(HEAD - 1)
 head:EnableMouse(true)
 head:RegisterForDrag("LeftButton")
-head:SetScript("OnDragStart", function() frame:StartMoving() end)
+head:SetScript("OnDragStart", function() if not sizing then frame:StartMoving() end end)
 head:SetScript("OnDragStop", function()
+    if sizing then return end
     frame:StopMovingOrSizing()
     SavePosition()
 end)
@@ -295,6 +354,57 @@ search:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
 search:SetScript("OnEditFocusGained", function() placeholder:Hide() end)
 search:SetScript("OnEditFocusLost", function(self) placeholder:SetShown(self:GetText() == "") end)
 
+-- „Sortieren“ links neben der Suche (Besen wie bei Blizzards Taschen)
+local sortButton = CreateFrame("Button", nil, head)
+sortButton:SetSize(22, 22)
+sortButton:SetPoint("RIGHT", search, "LEFT", -6, 0)
+Tex(sortButton, "BACKGROUND", { 0.039, 0.059, 0.090, 1 }):SetAllPoints()
+Border(sortButton, C.border)
+local sortIcon = sortButton:CreateTexture(nil, "ARTWORK")
+sortIcon:SetPoint("TOPLEFT", 2, -2)
+sortIcon:SetPoint("BOTTOMRIGHT", -2, 2)
+local sortAtlasOk = false
+if sortIcon.SetAtlas then
+    local okSet, result = pcall(sortIcon.SetAtlas, sortIcon, SORT_ATLAS)
+    sortAtlasOk = okSet and result ~= false
+end
+if sortAtlasOk and sortIcon.GetAtlas then
+    local okGet, atlas = pcall(sortIcon.GetAtlas, sortIcon)
+    sortAtlasOk = okGet and atlas ~= nil
+end
+if not sortAtlasOk then
+    -- Ersatz, falls es den Atlas nicht gibt: Buchstabe statt Besen
+    sortIcon:Hide()
+    local sortText = Text(sortButton, 12, C.textDim, FONT_BODY)
+    sortText:SetPoint("CENTER", 1, 0)
+    sortText:SetText("S")
+end
+local sortHover = sortButton:CreateTexture(nil, "HIGHLIGHT")
+sortHover:SetAllPoints()
+sortHover:SetColorTexture(1, 1, 1, 0.10)
+sortButton:SetScript("OnMouseDown", function() sortIcon:SetVertexColor(0.7, 0.7, 0.7) end)
+sortButton:SetScript("OnMouseUp", function() sortIcon:SetVertexColor(1, 1, 1) end)
+sortButton:SetScript("OnEnter", function(self)
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Taschen sortieren")
+    GameTooltip:Show()
+end)
+sortButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+sortButton:SetScript("OnClick", function()
+    if InCombatLockdown() then
+        ns.Print("Sortieren geht erst nach dem Kampf.")
+        return
+    end
+    if not (C_Container and C_Container.SortBags) then
+        ns.Print("Sortieren gibt es in diesem Client nicht.")
+        return
+    end
+    if SOUNDKIT and SOUNDKIT.UI_BAG_SORTING_01 then pcall(PlaySound, SOUNDKIT.UI_BAG_SORTING_01) end
+    local ok = pcall(C_Container.SortBags)
+    if not ok then ns.Print("Sortieren hat nicht geklappt.") end
+    -- Neu gezeichnet wird über BAG_UPDATE_DELAYED, sobald WoW die Gegenstände verschoben hat
+end)
+
 -- Seitenleiste
 local sideBg = Tex(frame, "BACKGROUND", C.side, 1)
 sideBg:SetPoint("TOPLEFT", 1, -HEAD - 1)
@@ -315,6 +425,48 @@ emptyText:SetPoint("TOPLEFT", grid, "TOPLEFT", 2, -4)
 emptyText:SetText("Keine Gegenstände.")
 emptyText:Hide()
 
+-- Scrollbalken rechts neben dem Raster (Stil wie ui.lua). Die Klickfläche ist breiter
+-- als die sichtbare Linie, damit man sie gut trifft.
+local scrollTrack = CreateFrame("Button", nil, frame)
+scrollTrack:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -3, -HEAD - PAD)
+scrollTrack:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, FOOT + PAD)
+scrollTrack:SetWidth(10)
+scrollTrack:SetFrameLevel(frame:GetFrameLevel() + 20)
+scrollTrack:EnableMouseWheel(true)
+local trackLine = scrollTrack:CreateTexture(nil, "ARTWORK")
+trackLine:SetPoint("TOP")
+trackLine:SetPoint("BOTTOM")
+trackLine:SetWidth(4)
+trackLine:SetColorTexture(C.line[1], C.line[2], C.line[3], 0.6)
+scrollTrack:Hide()
+
+local scrollThumb = CreateFrame("Button", nil, scrollTrack)
+scrollThumb:SetWidth(10)
+scrollThumb:SetFrameLevel(scrollTrack:GetFrameLevel() + 2)
+local thumbLine = scrollThumb:CreateTexture(nil, "OVERLAY")
+thumbLine:SetPoint("TOP")
+thumbLine:SetPoint("BOTTOM")
+thumbLine:SetWidth(4)
+thumbLine:SetColorTexture(C.accent[1], C.accent[2], C.accent[3], 0.9)
+scrollThumb:SetScript("OnEnter", function() thumbLine:SetWidth(6) end)
+scrollThumb:SetScript("OnLeave", function(self) if not self.dragging then thumbLine:SetWidth(4) end end)
+
+-- Ziehgriff unten rechts (wie beim DMG-Meter)
+local grip = CreateFrame("Button", nil, frame)
+grip:SetSize(16, 16)
+grip:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
+grip:SetFrameLevel(frame:GetFrameLevel() + 30)
+grip:SetNormalTexture(GRIP_UP)
+grip:SetPushedTexture(GRIP_DOWN)
+grip:SetHighlightTexture(GRIP_HIGHLIGHT)
+grip:SetAlpha(0.5)
+
+frame:SetResizable(true)
+if not pcall(frame.SetResizeBounds, frame, MIN_W, MIN_H, MAX_W, MAX_H) then
+    if frame.SetMinResize then pcall(frame.SetMinResize, frame, MIN_W, MIN_H) end
+    if frame.SetMaxResize then pcall(frame.SetMaxResize, frame, MAX_W, MAX_H) end
+end
+
 -- Fuß
 local footLine = Tex(frame, "BORDER", C.line)
 footLine:SetPoint("BOTTOMLEFT", 1, FOOT); footLine:SetPoint("BOTTOMRIGHT", -1, FOOT); footLine:SetHeight(1)
@@ -323,7 +475,7 @@ local moneyText = Text(frame, 12, C.text, FONT_BODY)
 moneyText:SetPoint("BOTTOMLEFT", 12, 8)
 
 local hintText = Text(frame, 11, C.textDim, FONT_BODY)
-hintText:SetPoint("BOTTOMRIGHT", -12, 9)
+hintText:SetPoint("BOTTOMRIGHT", -22, 9) -- rechts daneben sitzt der Ziehgriff
 hintText:SetJustifyH("RIGHT")
 hintText:SetText("Alt+Rechtsklick: anheften")
 
@@ -358,6 +510,8 @@ triageButton:Hide()
 local selected = "all"
 local catButtons = {}
 local RequestUpdate
+-- Blättern: erste sichtbare Reihe, größtmöglicher Wert, sichtbare und gesamte Reihen
+local scrollRow, scrollMax, viewRows, totalRows = 0, 0, 1, 1
 
 for i, cat in ipairs(CATEGORIES) do
     local b = CreateFrame("Button", nil, frame)
@@ -378,6 +532,7 @@ for i, cat in ipairs(CATEGORIES) do
     b.count:SetJustifyH("RIGHT")
     b.key = cat.key
     b:SetScript("OnClick", function(self)
+        if selected ~= self.key then scrollRow = 0 end
         selected = self.key
         RequestUpdate(0)
     end)
@@ -601,10 +756,6 @@ local function ScanButton(b, counts)
     if not (icon or link or itemID) then return d end
 
     local classID = ClassOf(itemID, link)
-    if classID == CL_WEAPON or classID == CL_ARMOR then d.cats.gear = true end
-    if classID == CL_CONSUMABLE then d.cats.consumable = true end
-    if classID == CL_TRADE or classID == CL_REAGENT then d.cats.trade = true end
-
     local isQuestItem, questID, isActive = QuestInfo(bag, slot)
     if questID and not isActive then d.questStarter = true end
     if classID == CL_QUEST or isQuestItem then d.questItem = true end
@@ -612,7 +763,17 @@ local function ScanButton(b, counts)
         local ok, quest = pcall(ns.QuestForItemLink, link)
         if ok and quest then d.questNeeded = true end
     end
-    if d.questStarter or d.questItem or d.questNeeded then d.cats.quest = true end
+
+    -- Was eine Quest braucht, steht nur unter „Quest“ (dazu Alle/Neu/Angeheftet).
+    -- Ist die Quest abgegeben, fällt das Flag beim nächsten Lesen weg und die
+    -- normale Kategorie gilt wieder.
+    if d.questStarter or d.questItem or d.questNeeded then
+        d.cats.quest = true
+    else
+        if classID == CL_WEAPON or classID == CL_ARMOR then d.cats.gear = true end
+        if classID == CL_CONSUMABLE then d.cats.consumable = true end
+        if classID == CL_TRADE or classID == CL_REAGENT then d.cats.trade = true end
+    end
 
     d.isNew = IsNew(bag, slot)
     if d.isNew then d.cats.new = true end
@@ -774,8 +935,30 @@ local function ActiveButtons(fn)
     end
 end
 
-local function Layout()
-    local cols = Columns()
+local function UpdateScrollBar()
+    if totalRows <= viewRows then
+        scrollTrack:Hide()
+        return
+    end
+    local trackH = scrollTrack:GetHeight() or 0
+    if trackH <= 0 then
+        scrollTrack:Hide()
+        return
+    end
+    local thumbH = math.max(16, math.floor(trackH * viewRows / totalRows))
+    local offset = (scrollMax > 0) and (scrollRow / scrollMax * (trackH - thumbH)) or 0
+    scrollThumb:ClearAllPoints()
+    scrollThumb:SetPoint("TOP", scrollTrack, "TOP", 0, -offset)
+    scrollThumb:SetHeight(thumbH)
+    scrollTrack:Show()
+end
+
+local liveCols -- Spalten während des Ziehens
+
+-- live = true: während des Ziehens, Fenstergröße nicht anfassen.
+-- keepTopLeft = true: Größe setzen, ohne vorher an die rechte untere Ecke zu hängen.
+local function Layout(live, keepTopLeft)
+    local cols = (live and liveCols) or Columns()
     local shown = {}
     ActiveButtons(function(b)
         if Matches(data[b], selected) then shown[#shown + 1] = b end
@@ -789,27 +972,45 @@ local function Layout()
             end
         end
     end
+    -- Höhe: beim Ziehen die aktuelle, sonst fest gespeichert oder nach Inhalt (gedeckelt)
+    local rows = math.max(1, math.ceil(#shown / cols))
+    local height
+    if live then
+        height = frame:GetHeight() or MIN_H
+    else
+        height = FixedHeight()
+        if not height then
+            local auto = HEAD + PAD + math.max(GridSize(rows), CAT_TOTAL) + PAD + FOOT
+            height = math.max(MIN_H, math.min(MaxHeight(), auto))
+        end
+    end
+    totalRows = rows
+    viewRows = math.min(rows, RowsForHeight(height))
+    scrollMax = math.max(0, rows - viewRows)
+    if scrollRow > scrollMax then scrollRow = scrollMax end
+    if scrollRow < 0 then scrollRow = 0 end
+
+    -- Nur die sichtbaren Reihen setzen und zeigen, der Rest wird ausgeblendet
     local visible = {}
     for i, b in ipairs(shown) do
-        visible[b] = true
-        local col = (i - 1) % cols
-        local row = math.floor((i - 1) / cols)
-        b:ClearAllPoints()
-        b:SetPoint("TOPLEFT", grid, "TOPLEFT", col * (SLOT + GAP), -row * (SLOT + GAP))
-        b:Show()
+        local row = math.floor((i - 1) / cols) - scrollRow
+        if row >= 0 and row < viewRows then
+            visible[b] = true
+            local col = (i - 1) % cols
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", grid, "TOPLEFT", col * (SLOT + GAP), -row * (SLOT + GAP))
+            b:Show()
+        end
     end
     ActiveButtons(function(b) if not visible[b] then b:Hide() end end)
     emptyText:SetShown(#shown == 0)
 
-    local rows = math.max(1, math.ceil(#shown / cols))
-    local gridW = cols * SLOT + (cols - 1) * GAP
-    local gridH = rows * SLOT + (rows - 1) * GAP
-    grid:SetSize(gridW, gridH)
-    local catH = #CATEGORIES * CAT_H
-    local width = math.max(MIN_W, SIDE_W + PAD * 2 + gridW)
-    local height = HEAD + PAD + math.max(gridH, catH) + PAD + FOOT
-    Reanchor()
-    frame:SetSize(width, height)
+    grid:SetSize(math.max(1, GridSize(cols)), math.max(1, GridSize(viewRows)))
+    if not live then
+        if not keepTopLeft then Reanchor() end
+        frame:SetSize(WidthFor(cols), height)
+    end
+    UpdateScrollBar()
 end
 
 local updatePending = false
@@ -830,7 +1031,7 @@ local function Update()
     local canLayout = CanLayout()
     if canLayout then
         pendingLayout = false
-        Layout()
+        Layout(sizing)
     else
         pendingLayout = true
     end
@@ -864,6 +1065,167 @@ search:SetScript("OnTextChanged", function(self)
     placeholder:SetShown(text == "" and not self:HasFocus())
     searchText = text:lower():gsub("^%s+", ""):gsub("%s+$", "")
     RequestUpdate(0)
+end)
+
+---------------------------------------------------------------------------
+-- Blättern: Mausrad, Scrollbalken ziehen oder in die Spur klicken
+---------------------------------------------------------------------------
+
+local function SetScrollRow(n)
+    n = math.floor((tonumber(n) or 0) + 0.5)
+    if n > scrollMax then n = scrollMax end
+    if n < 0 then n = 0 end
+    if n == scrollRow or not CanLayout() then return end
+    scrollRow = n
+    Layout(sizing)
+end
+
+local function OnWheel(_, delta)
+    if type(delta) ~= "number" then return end
+    SetScrollRow(scrollRow - delta)
+end
+
+frame:EnableMouseWheel(true)
+frame:SetScript("OnMouseWheel", OnWheel)
+scrollTrack:SetScript("OnMouseWheel", OnWheel)
+
+-- Cursor-Höhe in Fensterkoordinaten
+local function CursorY()
+    local _, y = GetCursorPosition()
+    return (y or 0) / (scrollTrack:GetEffectiveScale() or 1)
+end
+
+local function TrackFree()
+    return (scrollTrack:GetHeight() or 0) - (scrollThumb:GetHeight() or 0)
+end
+
+scrollThumb:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" then return end
+    self.dragging = true
+    self.startY = CursorY()
+    self.startRow = scrollRow
+    thumbLine:SetWidth(6)
+    self:SetScript("OnUpdate", function(thumb)
+        local free = TrackFree()
+        if free <= 0 or scrollMax <= 0 then return end
+        local moved = thumb.startY - CursorY()
+        SetScrollRow(thumb.startRow + moved / free * scrollMax)
+    end)
+end)
+scrollThumb:SetScript("OnMouseUp", function(self)
+    self.dragging = false
+    self:SetScript("OnUpdate", nil)
+    if not self:IsMouseOver() then thumbLine:SetWidth(4) end
+end)
+scrollThumb:SetScript("OnHide", function(self)
+    self.dragging = false
+    self:SetScript("OnUpdate", nil)
+    thumbLine:SetWidth(4)
+end)
+
+-- Klick in die Spur: Daumen springt dorthin
+scrollTrack:SetScript("OnMouseDown", function(self, button)
+    if button ~= "LeftButton" then return end
+    local top = self:GetTop()
+    local free = TrackFree()
+    if not top or free <= 0 then return end
+    local pos = top - CursorY() - (scrollThumb:GetHeight() or 0) / 2
+    SetScrollRow(math.max(0, math.min(free, pos)) / free * scrollMax)
+end)
+
+---------------------------------------------------------------------------
+-- Größe ziehen: Breite rastet auf Spalten ein, Höhe frei
+---------------------------------------------------------------------------
+
+local startW, startH, startCols
+
+-- Fenster an die linke obere Ecke hängen, damit nur die rechte untere Ecke wandert
+local function AnchorTopLeft()
+    local left, top = frame:GetLeft(), frame:GetTop()
+    if not (left and top) then return nil end
+    frame:ClearAllPoints()
+    frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+    return left, top
+end
+
+local function OnSizing()
+    local w = frame:GetWidth()
+    if type(w) ~= "number" then return end
+    -- Erst beim Loslassen speichern; kleine Wackler (unter 8 px) ändern die Spalten nicht
+    if math.abs(w - startW) >= 8 then
+        liveCols = ColumnsForWidth(w)
+    else
+        liveCols = startCols
+    end
+    Layout(true)
+end
+
+frame:SetScript("OnSizeChanged", function()
+    if sizing then pcall(OnSizing) end
+end)
+
+local function StopSizing()
+    if not sizing then return end
+    sizing = false
+    frame:StopMovingOrSizing()
+    local w, h = frame:GetSize()
+    if ns.db and type(w) == "number" and type(h) == "number" then
+        if math.abs(w - startW) >= 8 then
+            ns.db.bagColumns = ColumnsForWidth(w)
+            if ns.RefreshConfig then pcall(ns.RefreshConfig) end
+        end
+        -- Nur wer die Höhe wirklich verändert, legt eine feste Höhe fest
+        if math.abs(h - startH) >= 19 then -- etwa eine halbe Reihe; schräges Ziehen an der Breite ändert die Höhe nicht
+            ns.db.bagHeight = math.max(MIN_H, math.min(MaxHeight(), math.floor(h + 0.5)))
+        end
+    end
+    liveCols = nil
+    -- Breite auf ganze Spalten einrasten, linke obere Ecke bleibt stehen
+    local left, top = AnchorTopLeft()
+    Layout(false, true)
+    if left and top then
+        local width, height = frame:GetSize()
+        local right, bottom = left + width, top - height
+        frame:ClearAllPoints()
+        frame:SetPoint("BOTTOMRIGHT", UIParent, "BOTTOMLEFT", right, bottom)
+        SavePosition(right, bottom)
+    else
+        SavePosition()
+    end
+end
+
+grip:SetScript("OnMouseDown", function(_, button)
+    if button ~= "LeftButton" or sizing or not ns.db or not built then return end
+    if not CanLayout() then
+        ns.Print("Größe ändern geht erst nach dem Kampf.")
+        return
+    end
+    GameTooltip:Hide()
+    startW, startH = frame:GetSize()
+    if type(startW) ~= "number" or type(startH) ~= "number" then return end
+    startCols = Columns()
+    liveCols = startCols
+    AnchorTopLeft()
+    if pcall(frame.StartSizing, frame, "BOTTOMRIGHT") then
+        sizing = true
+    else
+        liveCols = nil
+        Reanchor()
+    end
+end)
+grip:SetScript("OnMouseUp", function() StopSizing() end)
+grip:SetScript("OnHide", function() StopSizing() end)
+grip:SetScript("OnEnter", function(self)
+    self:SetAlpha(1)
+    if sizing then return end
+    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+    GameTooltip:SetText("Ziehen: Größe ändern", 1, 1, 1)
+    GameTooltip:AddLine("Breite in ganzen Spalten, Höhe frei. Passt nicht alles hinein, blätterst du mit dem Mausrad.", 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end)
+grip:SetScript("OnLeave", function(self)
+    self:SetAlpha(0.5)
+    GameTooltip:Hide()
 end)
 
 ---------------------------------------------------------------------------
@@ -1029,6 +1391,8 @@ end)
 ---------------------------------------------------------------------------
 
 ns.On("PLAYER_LOGIN", function()
+    local h = tonumber(ns.db.bagHeight)
+    ns.db.bagHeight = (h and h > 0) and math.max(MIN_H, math.min(MAX_H, math.floor(h + 0.5))) or 0
     ns.RestorePosition(frame)
     pcall(InstallHooks)
 end)
@@ -1051,6 +1415,10 @@ ns.On("ITEM_LOCK_CHANGED", function() RequestUpdate(0.05) end)
 ns.On("BAG_UPDATE_COOLDOWN", function() RequestUpdate(0.1) end)
 ns.On("PLAYER_MONEY", function() if frame:IsShown() then UpdateHeader() end end)
 ns.On("QUEST_LOG_UPDATE", function() RequestUpdate(0.5) end)
+-- Quest abgegeben/abgebrochen: questitems.lua baut seine Liste nach 0,2 s neu, danach einordnen
+local function AfterQuestGone() C_Timer.After(0.6, function() RequestUpdate(0) end) end
+ns.On("QUEST_TURNED_IN", AfterQuestGone)
+ns.On("QUEST_REMOVED", AfterQuestGone)
 -- Optionen wie „Questgegenstände markieren“ wirken sofort, wenn das stray-Fenster auf/zu geht
 ns.OnConfig(function() RequestUpdate(0) end)
 
@@ -1072,7 +1440,7 @@ optional:SetScript("OnEvent", function() RequestUpdate(0.1) end)
 ns.AddOption(1, "Taschen", {
     key = "bagWindow",
     label = "Eigenes Taschenfenster",
-    tooltip = "Zeigt alle Taschen in einem Fenster mit Suche und Kategorien (Ausrüstung, Verbrauchbar, Handwerk, Quest, Neu, Angeheftet). B-Taste, Rucksack-Knopf und Händler öffnen dann dieses Fenster statt Blizzards Taschen.\n\nAlt+Rechtsklick auf einen Gegenstand heftet ihn an oder löst ihn. Kopfzeile ziehen verschiebt das Fenster.\n\nAusschalten wirkt sofort; ganz sauber wird es nach Neuladen (/reload).",
+    tooltip = "Zeigt alle Taschen in einem Fenster mit Suche und Kategorien (Ausrüstung, Verbrauchbar, Handwerk, Quest, Neu, Angeheftet). B-Taste, Rucksack-Knopf und Händler öffnen dann dieses Fenster statt Blizzards Taschen.\n\nQuestgegenstände stehen nur unter „Quest“, bis die Quest abgegeben ist.\n\nAlt+Rechtsklick auf einen Gegenstand heftet ihn an oder löst ihn. Kopfzeile ziehen verschiebt das Fenster, der Griff unten rechts ändert die Größe. Passt nicht alles hinein, blätterst du mit dem Mausrad. Der Besen neben der Suche sortiert die Taschen.\n\nAusschalten wirkt sofort; ganz sauber wird es nach Neuladen (/reload).",
     set = function(value)
         ns.db.bagWindow = value
         if value then
@@ -1088,11 +1456,26 @@ ns.AddOption(1, "Taschen", {
     type = "slider",
     label = "Spalten im Taschenfenster",
     min = 6, max = 16, step = 1,
-    tooltip = "Wie viele Plätze nebeneinander im stray-Taschenfenster stehen.",
+    tooltip = "Wie viele Plätze nebeneinander im stray-Taschenfenster stehen. Ziehst du das Fenster unten rechts breiter oder schmaler, ändert sich dieser Wert mit.",
     isEnabled = function() return ns.db and ns.db.bagWindow and true or false end,
-    disabledHint = "Erst „Eigenes Taschenfenster“ einschalten.",
+    disabledHint = "Erst „Eigenes Taschenfenster“ einschalten (weiter oben).",
     set = function(value)
         ns.db.bagColumns = value
         RequestUpdate(0)
+    end,
+})
+
+ns.AddOption(1, "Taschen", {
+    key = "bagHeightReset",
+    type = "button",
+    label = "Höhe des Taschenfensters",
+    buttonText = "Automatisch",
+    tooltip = "Hast du die Höhe unten rechts gezogen, bleibt sie fest. Dieser Knopf stellt wieder auf automatisch: Das Fenster ist dann so hoch wie sein Inhalt (höchstens bildschirmhoch).",
+    isEnabled = function() return ns.db and ns.db.bagWindow and true or false end,
+    disabledHint = "Erst „Eigenes Taschenfenster“ einschalten (weiter oben).",
+    onClick = function()
+        ns.db.bagHeight = 0
+        RequestUpdate(0)
+        ns.Print("Höhe des Taschenfensters ist wieder automatisch.")
     end,
 })

@@ -18,6 +18,9 @@ local _, ns = ...
 
 -- Veralteter Zauberrang (Option im Bereich „Zaubern“), neu ab 0.19.0-alpha
 ns.defaults.abRankCheck = false
+-- Leere Plätze dauerhaft zeigen und deren Deckkraft in Prozent, neu ab 0.21.0-alpha
+ns.defaults.abShowEmpty = false
+ns.defaults.abEmptyAlpha = 40
 
 local IsSecret = ns.IsSecret
 local Public = ns.Public
@@ -313,7 +316,9 @@ local function UpdateState(b)
         checked = Bool("IsCurrentAction", b.action) or Bool("IsAutoRepeatAction", b.action) or false
     end
     b:SetChecked(checked and true or false)
-    local equipped = b.hasAction and Bool("IsEquippedAction", b.action)
+    -- Randfarbe nur bei belegten Plätzen; leere (auch halbtransparente) regelt UpdateVisibility
+    if not b.hasAction then return end
+    local equipped = Bool("IsEquippedAction", b.action)
     local c = equipped and BORDER_EQUIPPED or BORDER_COLOR
     b.border:SetVertexColor(c[1], c[2], c[3], c[4])
 end
@@ -481,14 +486,36 @@ local function UpdateHotkey(b)
     b.hotkey:SetText(text)
 end
 
+-- „Leere Plätze immer zeigen“ an?
+local function ShowEmptyOn()
+    return ns.db and ns.db.abShowEmpty and true or false
+end
+
+-- Deckkraft leerer Plätze 0–1 (Einstellung in Prozent)
+local function EmptyAlpha()
+    return Clamp(DbVal("abEmptyAlpha"), 0, 100, 40) / 100
+end
+
 -- Leere Plätze nur bei offenem stray-Fenster/Bearbeiten-Modus oder beim Ziehen einer Aktion zeigen.
+-- Mit „Leere Plätze immer zeigen“ zusätzlich dauerhaft als schwarze Fläche mit dünnem Rand,
+-- dann aber ohne Maus (Klicks gehen weiter in die Welt).
 -- Nur Texturen ein-/ausblenden (geht auch im Kampf), der sichere Knopf selbst bleibt sichtbar.
 local function UpdateVisibility(b)
     local show = b.hasAction or showGrid or ns.IsConfigOpen()
-    b.border:SetShown(show)
+    -- Dauerhaft gezeigter leerer Platz (nur Optik, keine Maus)
+    local ghost = not show and ShowEmptyOn()
+    if ghost then
+        local a = EmptyAlpha()
+        b.border:SetVertexColor(0, 0, 0, a)
+        b.emptyEdge:SetColor(0, 0, 0, math.min(1, a * 2))
+    elseif not b.hasAction then
+        b.border:SetVertexColor(BORDER_COLOR[1], BORDER_COLOR[2], BORDER_COLOR[3], BORDER_COLOR[4])
+    end
+    b.emptyEdge:SetShown(ghost)
+    b.border:SetShown(show or ghost)
     b.empty:SetShown(show and not b.hasAction)
     b.icon:SetShown(b.hasAction and true or false)
-    b.hotkey:SetShown(show)
+    b.hotkey:SetShown(show or ghost)
     b.count:SetShown(b.hasAction and true or false)
     b.highlight:SetAlpha(show and 1 or 0)
     if not b.hasAction then
@@ -610,6 +637,10 @@ local function CreateButton(bar, l, i)
     b.empty:SetPoint("TOPLEFT", 1, -1)
     b.empty:SetPoint("BOTTOMRIGHT", -1, 1)
     b.empty:SetColorTexture(0.08, 0.09, 0.11, 0.6)
+
+    -- Dünner Rand für dauerhaft gezeigte leere Plätze („Leere Plätze immer zeigen“)
+    b.emptyEdge = MakeEdges(b, "BACKGROUND", 2)
+    b.emptyEdge:SetShown(false)
 
     b.icon = b:CreateTexture(name .. "Icon", "ARTWORK")
     b.icon:SetPoint("TOPLEFT", 1, -1)
@@ -932,6 +963,47 @@ local function HideFrame(frame)
     pcall(frame.SetParent, frame, hiddenParent)
 end
 
+-- Rest-Rahmen unten (Forever/Camelot): Mikromenü und Taschenleiste stehen dort in der untersten Reihe
+-- neben der Hauptleiste und tragen eigene dunkle Leistenkunst (BorderArt, BackgroundArt). Holt die
+-- stray-Taschen- und Menüleiste die Knöpfe heraus, bleibt ein leerer dunkler Rahmen stehen.
+-- Nur diese Texturen unsichtbar machen; die Rahmen selbst bleiben (Knöpfe könnten noch daran hängen),
+-- nichts wird umgehängt oder im Edit Mode verändert.
+local ART_FRAMES = { "MicroMenu", "BagsBar" }
+local ART_KEYS = { "BorderArt", "BackgroundArt" }
+
+local artHidden = {} -- [Textur] = { alpha, shown } vor dem Ausblenden (eigene Tabelle, keine Felder)
+
+local function HideBarArt()
+    for _, name in ipairs(ART_FRAMES) do
+        local f = _G[name]
+        if type(f) == "table" then
+            for _, key in ipairs(ART_KEYS) do
+                local ok, tex = pcall(function() return f[key] end)
+                if ok and type(tex) == "table" and tex.SetAlpha then
+                    if not artHidden[tex] then
+                        local okA, alpha = pcall(tex.GetAlpha, tex)
+                        local okS, shown = pcall(tex.IsShown, tex)
+                        artHidden[tex] = { alpha = okA and alpha or 1, shown = (not okS) or shown }
+                    end
+                    pcall(tex.SetAlpha, tex, 0)
+                    pcall(tex.Hide, tex)
+                end
+            end
+        end
+    end
+end
+
+-- Zurück, wenn „Eigene Aktionsleisten“ aus ist. hud.lua ruft das beim Zurückhängen der
+-- Taschen- und Menüknöpfe auf (außerhalb des Kampfes).
+function ns.ShowBlizzardBarArt()
+    if Enabled() then return end
+    for tex, info in pairs(artHidden) do
+        pcall(tex.SetAlpha, tex, type(info.alpha) == "number" and info.alpha or 1)
+        if info.shown then pcall(tex.Show, tex) end
+        artHidden[tex] = nil
+    end
+end
+
 local function HideBlizzard()
     if InCombatLockdown() then
         hidePending = true
@@ -956,6 +1028,7 @@ local function HideBlizzard()
         local f = _G[name]
         if f and f.GetParent then HideFrame(f) end
     end
+    HideBarArt()
     blizzardHidden = true
     return true
 end
@@ -1094,7 +1167,15 @@ local function Apply()
     end
 end
 
-ns.On("PLAYER_LOGIN", function() Apply() end)
+-- Taschen- und Menüleiste (hud.lua) folgt „Eigene Aktionsleisten“
+local function UpdateBottomBar()
+    if ns.HudUpdateBottomBar then pcall(ns.HudUpdateBottomBar) end
+end
+
+ns.On("PLAYER_LOGIN", function()
+    Apply()
+    UpdateBottomBar()
+end)
 
 ns.On("PLAYER_REGEN_ENABLED", function()
     if not ns.db then return end
@@ -1136,7 +1217,7 @@ end
 
 local function IsOn() return Enabled() end
 
-local DISABLED_HINT = "Erst „Eigene Aktionsleisten“ einschalten."
+local DISABLED_HINT = "Erst „Eigene Aktionsleisten“ einschalten (oben auf dieser Seite)."
 
 -- Veralteter Zauberrang: Option im Bereich „Zaubern“ (der Bereich „Aktionsleisten“ ist voll)
 ns.AddOption(2, "Zaubern", {
@@ -1144,7 +1225,7 @@ ns.AddOption(2, "Zaubern", {
     label = "Veralteten Zauberrang zeigen",
     tooltip = "Markiert auf den stray-Aktionsleisten Zauber, von denen du schon einen höheren Rang kennst: kleiner grüner Pfeil oben links und im Tooltip die Zeile „stray: höherer Rang bekannt“ mit der Rangnummer.\n\nstray tauscht nichts aus – zieh den neuen Rang selbst aus dem Zauberbuch auf den Platz. Wer absichtlich einen niedrigen Rang nutzt (z. B. zum Manasparen), kann die Markierung einfach ignorieren.",
     isEnabled = function() return RANK_API and Enabled() end,
-    disabledHint = RANK_API and DISABLED_HINT or "Diese Spielversion liefert die nötigen Zauberbuch-Daten nicht.",
+    disabledHint = RANK_API and "Erst „Eigene Aktionsleisten“ einschalten (Aktionsleisten → Aktionsleisten)." or "Diese Spielversion liefert die nötigen Zauberbuch-Daten nicht.",
     set = function(value)
         ns.db.abRankCheck = value
         QueueRankScan()
@@ -1158,13 +1239,14 @@ local selectedBar = 1
 ns.AddOption(2, "Aktionsleisten", {
     key = "abEnabled",
     label = "Eigene Aktionsleisten",
-    tooltip = "Ersetzt Blizzards Aktionsleisten durch bis zu 5 schlichte stray-Leisten à 12 Knöpfe. Deine Belegung und deine Tasten bleiben: Leiste 1 ist die Hauptleiste (mit Seitenwechsel bei Haltung, Gestalt, Verstohlenheit und Umschalt+Mausrad), Leiste 2 die untere linke, Leiste 3 die untere rechte, Leiste 4 die rechte und Leiste 5 die Leiste „Rechts 2“. Haltungs- und Begleiterleiste bleiben von Blizzard.\n\nUnter „Leiste bearbeiten“ wählst du eine Leiste und stellst ein, ob sie angezeigt wird, wie groß ihre Knöpfe sind und wie viele in einer Reihe stehen. Standard: Leisten 1–4 an, 5 aus.\n\nVerschieben über „Anzeigen verschieben“ (Bearbeiten-Modus); dort und bei offenem stray-Fenster siehst du auch die leeren Plätze. Änderungen wirken nur außerhalb des Kampfes.\n\nMit Blizzards Hauptleiste verschwinden auch die Blizzard-EP-Leiste und – falls sie daran hängen – Taschen- und Menüknöpfe: Schalte unter „Leisten & Minimap“ die stray-EP-Leiste und die Taschen- und Menüleiste ein.\n\nAusschalten erfordert Neuladen.",
+    tooltip = "Ersetzt Blizzards Aktionsleisten durch bis zu 5 schlichte stray-Leisten à 12 Knöpfe. Deine Belegung und deine Tasten bleiben: Leiste 1 ist die Hauptleiste (mit Seitenwechsel bei Haltung, Gestalt, Verstohlenheit und Umschalt+Mausrad), Leiste 2 die untere linke, Leiste 3 die untere rechte, Leiste 4 die rechte und Leiste 5 die Leiste „Rechts 2“. Haltungs- und Begleiterleiste bleiben von Blizzard. Bringt unten rechts eine schlanke Taschenleiste mit (Menüknöpfe dort optional).\n\nUnter „Leiste bearbeiten“ wählst du eine Leiste und stellst ein, ob sie angezeigt wird, wie groß ihre Knöpfe sind und wie viele in einer Reihe stehen. Standard: Leisten 1–4 an, 5 aus.\n\nVerschieben über „Anzeigen verschieben“ (Bearbeiten-Modus); dort und bei offenem stray-Fenster siehst du auch die leeren Plätze. Änderungen wirken nur außerhalb des Kampfes.\n\nMit Blizzards Hauptleiste verschwindet auch die Blizzard-EP-Leiste: Schalte unter „Leisten & Minimap“ die stray-EP-Leiste ein.\n\nAusschalten erfordert Neuladen für Blizzards Aktionsleisten; Blizzards Taschenleiste und Menüknöpfe kommen sofort zurück.",
     set = function(value)
         ns.db.abEnabled = value
         CombatNote()
         Apply()
+        UpdateBottomBar()
         if not value and blizzardHidden then
-            ns.Print("Blizzards Aktionsleisten kommen nach /reload zurück.")
+            ns.Print("Blizzards Aktionsleisten kommen nach /reload zurück. Blizzards Taschenleiste und Menüknöpfe sind gleich wieder da (im Kampf erst danach).")
             StaticPopup_Show("STRAY_AB_RELOAD")
         end
     end,
@@ -1194,6 +1276,32 @@ ns.AddOption(2, "Aktionsleisten", {
         ns.db.abSpacing = v
         CombatNote()
         Layout()
+    end,
+})
+
+ns.AddOption(2, "Aktionsleisten", {
+    key = "abShowEmpty",
+    label = "Leere Plätze immer zeigen",
+    tooltip = "Zeigt leere Aktionsplätze dauerhaft als schwarze Fläche mit dünnem Rand, nicht nur bei offenem stray-Fenster. Die Deckkraft stellst du darunter ein.\n\nLeere Plätze fangen trotzdem keine Klicks ab. Ziehst du einen Zauber oder Gegenstand auf die Leiste, nehmen sie ihn wie gewohnt an (nicht im Kampf).",
+    isEnabled = IsOn,
+    disabledHint = DISABLED_HINT,
+    set = function(value)
+        ns.db.abShowEmpty = value
+        ForEach(UpdateVisibility)
+    end,
+})
+
+ns.AddOption(2, "Aktionsleisten", {
+    key = "abEmptyAlpha",
+    type = "slider",
+    label = "Deckkraft leerer Plätze",
+    min = 0, max = 100, step = 5,
+    tooltip = "Wie deckend die schwarze Fläche leerer Plätze ist, in Prozent (0 = unsichtbar). Der Rand wird mit abgestuft.",
+    isEnabled = function() return Enabled() and ShowEmptyOn() end,
+    disabledHint = "Erst ‚Leere Plätze immer zeigen‘ einschalten (direkt darüber).",
+    set = function(v)
+        ns.db.abEmptyAlpha = Clamp(v, 0, 100, 40)
+        ForEach(UpdateVisibility)
     end,
 })
 

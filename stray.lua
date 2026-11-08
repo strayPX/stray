@@ -43,7 +43,6 @@ ns.defaults = {
     hudMinimapColumn = false,
     hudClock = false,
     hudXPBar = false,
-    hudMicroBar = false,
     -- Aktionsleisten (actionbars.lua)
     abEnabled = false,
     abSize = 36,

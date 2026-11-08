@@ -1233,7 +1233,7 @@ ns.AddOption(3, "Gruppenrahmen", {
     label = "Blizzards Gruppenrahmen ausblenden",
     tooltip = "Blendet Blizzards eigene Gruppenrahmen aus, solange die stray-Gruppenrahmen an sind. So siehst du jedes Mitglied nur einmal.\n\nWieder einblenden: Option ausschalten und /reload eingeben (Neuladen nötig).",
     isEnabled = function() return ns.db and ns.db.partyFrames and true or false end,
-    disabledHint = "Erst „Gruppenrahmen anzeigen“ einschalten.",
+    disabledHint = "Erst „Gruppenrahmen anzeigen“ einschalten (oben auf dieser Seite).",
     set = function(value)
         ns.db.partyHideBlizzard = value
         CombatNote()

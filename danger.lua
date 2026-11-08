@@ -297,7 +297,7 @@ ns.AddOption(2, "Kampfhilfen", {
     label = "Warnen ab Stufen darüber",
     tooltip = "Ab wie vielen Stufen über deiner eigenen ein Gegner als gefährlich gilt. Elite-Gegner und „??“ zählen immer.",
     isEnabled = function() return ns.db and ns.db.dangerWarn and true or false end,
-    disabledHint = "Erst „Gefährliche Gegner warnen“ einschalten.",
+    disabledHint = "Erst „Gefährliche Gegner warnen“ einschalten (direkt darüber).",
     set = function(value)
         ns.db.dangerLevels = value
         pcall(RefreshAll)

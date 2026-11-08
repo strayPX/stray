@@ -50,15 +50,18 @@ ns.AddOption(3, "Kamera & Karte", {
 -- Minimap
 ---------------------------------------------------------------------------
 
-local zoomButtons = { MinimapZoomIn, MinimapZoomOut }
+-- Forever: Minimap.ZoomIn/ZoomOut (ältere Clients: MinimapZoomIn/Out)
+local ZoomInButton = (Minimap and Minimap.ZoomIn) or MinimapZoomIn
+local ZoomOutButton = (Minimap and Minimap.ZoomOut) or MinimapZoomOut
+local zoomButtons = { ZoomInButton, ZoomOutButton }
 
 -- Hat der Client schon selbst einen Mausrad-Zoom, nicht doppelt zoomen
 local nativeWheel = Minimap:GetScript("OnMouseWheel") ~= nil
 
 local function SyncButtons()
     local zoom, top = Minimap:GetZoom(), Minimap:GetZoomLevels() - 1
-    if MinimapZoomIn then MinimapZoomIn:SetEnabled(zoom < top) end
-    if MinimapZoomOut then MinimapZoomOut:SetEnabled(zoom > 0) end
+    if ZoomInButton then pcall(ZoomInButton.SetEnabled, ZoomInButton, zoom < top) end
+    if ZoomOutButton then pcall(ZoomOutButton.SetEnabled, ZoomOutButton, zoom > 0) end
 end
 
 local function OnMinimapWheel(self, delta)
@@ -80,10 +83,13 @@ local function ApplyMinimap(toggled)
     elseif not nativeWheel then
         Minimap:EnableMouseWheel(false)
     end
-    for _, button in pairs(zoomButtons) do
-        if on then button:Hide() else button:Show() end
+    -- Aus: nicht selbst einblenden. Blizzard zeigt die Knöpfe beim Überfahren der Karte von allein
+    -- (bei eckiger stray-Karte bleiben sie aus); nur den Zoom-Zustand der Knöpfe angleichen.
+    if on then
+        for _, button in pairs(zoomButtons) do pcall(button.Hide, button) end
+    else
+        pcall(SyncButtons)
     end
-    if not on then SyncButtons() end
 end
 
 if not nativeWheel then
