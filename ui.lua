@@ -190,7 +190,7 @@ local PAGES = {
     } },
     { name = "stray", icon = "settings", tabs = {
         { name = "Profile", sections = { "Profile" } },
-        { name = "Allgemein", keys = { "language", "uiStyle", "updateNotice" }, sections = { "stray-Oberfläche" } },
+        { name = "Allgemein", keys = { "language", "uiStyle", "updateNotice", "disableAll" }, sections = { "stray-Oberfläche" } },
         { name = "Bearbeiten", sections = { "Bearbeiten" } },
     } },
     { name = "Alle Anzeigen", icon = "stack-2", displays = true },
@@ -1696,6 +1696,44 @@ local function SetOptionValue(option, value)
     else
         apply()
     end
+end
+
+-- „Alles deaktivieren“: schaltet alle eingeschalteten Schalter aus (Werte, Auswahlen und Positionen bleiben);
+-- zählt wie jede Änderung: „Übernehmen“ lädt neu, „Verwerfen“ nimmt es zurück
+do
+    local function DisableAll()
+        local n = 0
+        for _, option in ipairs(R.allOptions) do
+            if option.key and not option.type and option.key ~= "updateNotice" and SafeGet(option) == true then
+                SetOptionValue(option, false)
+                n = n + 1
+            end
+        end
+        ns.Print(string.format(L["%d Optionen ausgeschaltet. „Übernehmen“ lädt neu, „Verwerfen“ nimmt es zurück."], n))
+    end
+    StaticPopupDialogs["STRAY_DISABLE_ALL"] = {
+        text = "",
+        button1 = "",
+        button2 = CANCEL,
+        OnAccept = function() DisableAll() end,
+        timeout = 0,
+        whileDead = true,
+        hideOnEscape = true,
+        preferredIndex = 3,
+    }
+    ns.AddOption(3, "Profile", {
+        key = "disableAll",
+        type = "button",
+        label = L["Alles deaktivieren"],
+        buttonText = L["Alles ausschalten"],
+        keywords = { "alles", "deaktivieren", "ausschalten", "zurücksetzen", "alle optionen", "disable all", "turn off", "everything", "reset" },
+        tooltip = L["Schaltet alle eingeschalteten Optionen von stray aus. Einstellungen wie Werte, Auswahlen und Positionen bleiben erhalten. Danach „Übernehmen“ (lädt neu) oder „Verwerfen“."],
+        onClick = function()
+            StaticPopupDialogs["STRAY_DISABLE_ALL"].text = L["Alle Optionen von stray ausschalten?"]
+            StaticPopupDialogs["STRAY_DISABLE_ALL"].button1 = L["Alles ausschalten"]
+            StaticPopup_Show("STRAY_DISABLE_ALL")
+        end,
+    })
 end
 
 local function ConflictText(option)
