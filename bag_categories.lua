@@ -575,6 +575,8 @@ local function ShowMenu(owner, def)
     pcall(EasyMenu, Convert(def), MENU_FRAME, "cursor", 0, 0, "MENU")
 end
 
+Cat.ShowMenu = ShowMenu -- auch für bag_sidebar.lua
+
 local input -- laufende Eingabe: { mode, key, default, itemID }
 
 local function GetEditBox(popup)

@@ -748,6 +748,8 @@ local function Paint(b, rec)
     D.new:SetShown(rec.isNew and true or false)
     D.dim:SetShown(not B.MatchesSearch(rec))
     SetCooldown(D, rec.bag, rec.slot, hasItem)
+    -- Einhängepunkt für bag_sidebar.lua (Schrott-Münze, Schnellaktionen): fn(btn, rec, deco)
+    if B.AfterPaint then pcall(B.AfterPaint, b, rec, D) end
 end
 B.PaintButton = Paint
 
