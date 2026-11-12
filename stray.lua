@@ -66,8 +66,6 @@ local REMOVED_KEYS = { "flightTimer", "flightTimes", "questTracker", "questTrack
     "strayUI", "strayUIMigrated", "bottomBar", "bottomBarSize", "bottomMicroButtons", "hudMicroBar", "hudClock",
     "hudMinimapColumn", "hudTrackingButton", "hudXPBar", "questXPBar", "xpBarWidth", "xpBarHeight", "xpBarFontSize",
     "minimapMiddleMenu", "minimapShowPlayerCoords", "squareMinimap", "squareMinimapSize",
-    -- Taschenfenster (bagwindow.lua)
-    "bagWindow", "bagColumns", "bagHeight", "bagPinned", "bagSlotsBar", "bagSlotsBarAuto",
     -- Gruppenrahmen (party.lua)
     "partyFrames", "partyHideBlizzard", "partyWidth", "partyHeight", "partySpacing", "partyBrightness",
     "partyPets", "partyPetAnchor", "partyPetWidth", "partyPetHeight",
@@ -79,7 +77,7 @@ local REMOVED_KEYS = { "flightTimer", "flightTimes", "questTracker", "questTrack
     "xpTrackerTable" }
 
 -- Positionen und Größen der entfernten Anzeigen (ns.db.positions / ns.db.scales)
-local REMOVED_POSITIONS = { "ab1", "ab2", "ab3", "ab4", "ab5", "bagwindow", "cooldowns", "xpbar", "microbar", "party", "supplies", "swing" }
+local REMOVED_POSITIONS = { "ab1", "ab2", "ab3", "ab4", "ab5", "cooldowns", "xpbar", "microbar", "party", "supplies", "swing" }
 
 ns.GOLD = { 1, 0.82, 0 }
 ns.GOLD_DARK = { 0.79, 0.64, 0.29 }

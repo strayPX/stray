@@ -38,6 +38,12 @@ locale\enUS_28.lua
 locale\enUS_29.lua
 locale\enUS_30.lua
 locale\enUS_31.lua
+locale\enUS_32.lua
+locale\enUS_33.lua
+locale\enUS_34.lua
+locale\enUS_35.lua
+locale\enUS_36.lua
+locale\enUS_37.lua
 stray.lua
 style.lua
 glow.lua
@@ -47,6 +53,13 @@ merchant.lua
 bags.lua
 questitems.lua
 freeslots.lua
+bag_core.lua
+bag_window.lua
+bag_categories.lua
+bag_sidebar.lua
+bag_auto.lua
+bag_bank.lua
+bag_offline.lua
 chat.lua
 quests.lua
 gossip.lua
