@@ -806,8 +806,17 @@ local function MakeHeader()
         self.text:SetTextColor(bc[1], bc[2], bc[3])
         GameTooltip:Hide()
     end)
-    h:SetScript("OnClick", function(self)
+    h:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    h:SetScript("OnClick", function(self, mouse)
         local s = self.section
+        if mouse == "RightButton" then
+            -- Kontextmenü der Ansicht (sec.onContext = fn(section, headerButton))
+            if s and s.onContext then
+                local ok, err = pcall(s.onContext, s, self)
+                if not ok then geterrorhandler()(err) end
+            end
+            return
+        end
         if s and s.collapsible then
             if s.onToggle then pcall(s.onToggle, s) end
             B.RequestRefresh(0, "layout")
@@ -878,13 +887,15 @@ local function MakePlus()
     local hl = p:CreateTexture(nil, "HIGHLIGHT")
     hl:SetAllPoints()
     hl:SetColorTexture(1, 1, 1, 0.08)
-    p:SetScript("OnClick", function(self)
+    local function PlusClick(self)
         local s = self.section
         if s and s.onPlus then
             local ok, err = pcall(s.onPlus, s, self)
             if not ok then geterrorhandler()(err) end
         end
-    end)
+    end
+    p:SetScript("OnClick", PlusClick)
+    p:SetScript("OnReceiveDrag", PlusClick) -- Gegenstand vom Cursor ablegen
     p:SetScript("OnEnter", function(self)
         if self.section and self.section.plusTooltip then Tip(self, L[self.section.plusTooltip]) end
     end)
