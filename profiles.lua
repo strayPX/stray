@@ -104,6 +104,8 @@ local NO_EXPORT_DB = {
     altData = true, playerNoteData = true, mailAltList = true, flightRouteTimes = true,
     accountCVarData = true,
     flightTimer = true, flightTimes = true,
+    -- stray-Tasche: Bestand aller Charaktere (wie altData) und Fensterzustand
+    bagOfflineData = true, bagSidebarCollapsed = true, bagSlotsShown = true,
 }
 
 -- Namensmuster für Verläufe und Messdaten (z. B. EP-Verlauf), die nicht ins Profil gehören

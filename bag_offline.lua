@@ -618,7 +618,10 @@ if B.AddHeaderIcon then
     })
     if ok then iconBtn = btn end
 end
-if iconBtn then iconBtn:Hide() end
+if iconBtn then
+    iconBtn:Hide()
+    if B.LayoutHeaderIcons then B.LayoutHeaderIcons() end
+end
 
 function O.UpdateIcon()
     if not iconBtn then return end
@@ -633,6 +636,30 @@ function O.UpdateIcon()
         end
     end
     iconBtn:SetShown(show)
+    if B.LayoutHeaderIcons then B.LayoutHeaderIcons() end
+end
+
+---------------------------------------------------------------------------
+-- Gold aller Charaktere: Tooltip am Gold-Text des Taschenfensters
+---------------------------------------------------------------------------
+
+if B.moneyFrame then
+    B.moneyFrame:HookScript("OnEnter", function(self)
+        if not On() then return end
+        local ok, err = pcall(function()
+            local gold, sum = O.GoldList()
+            if #gold < 2 then return end
+            GameTooltip:SetOwner(self, "ANCHOR_TOPRIGHT")
+            GameTooltip:SetText(L["Gold aller Charaktere"], 1, 1, 1)
+            for _, g in ipairs(gold) do
+                GameTooltip:AddDoubleLine(Colored(g.name, g.class), Money(g.money), 1, 1, 1, 1, 1, 1)
+            end
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine(L("Summe: %s", Money(sum)), 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end)
+        if not ok then geterrorhandler()(err) end
+    end)
 end
 
 ---------------------------------------------------------------------------

@@ -548,6 +548,7 @@ local function StyleButton(b)
         pcall(count.SetParent, count, holder)
         count:SetDrawLayer("OVERLAY", 6)
     end
+    Dc.count = count
     Dc.holder = holder
 end
 
@@ -565,8 +566,8 @@ local function CreateButton(bag, slot, parent)
         end
         return nil
     end
+    -- Die Taschen-ID kommt aus dem Elternrahmen (kein SetBagID: taint, siehe bag_core.lua)
     b:SetID(slot)
-    if b.SetBagID then pcall(b.SetBagID, b, bag) end
     P.state[b] = { bag = bag, slot = slot }
     b:Hide()
     pcall(StyleButton, b)
@@ -949,29 +950,20 @@ local function Paint(b, rec)
     local Dc = W.deco[b]
     if not Dc or not rec then return end
     local hasItem = rec.hasItem
-    if SetItemButtonTexture then
-        pcall(SetItemButtonTexture, b, rec.icon)
-    elseif Dc.icon then
+    -- Direkt an Symbol und Zahl (siehe bag_window.lua): kein SetItemButtonTexture/-Count
+    if Dc.icon then
         Dc.icon:SetTexture(rec.icon)
+        Dc.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        Dc.icon:SetShown(rec.icon ~= nil)
     end
-    if Dc.icon then Dc.icon:SetShown(rec.icon ~= nil) end
     local count = rec.displayCount or rec.count
     count = (type(count) == "number") and count or 0
-    if SetItemButtonCount then
-        pcall(SetItemButtonCount, b, count)
-    else
-        local fs = Region(b, "Count", "Count")
-        if fs then
-            fs:SetText(count > 1 and count or "")
-            fs:SetShown(count > 1)
-        end
+    if Dc.count then
+        Dc.count:SetText(count > 1 and count or "")
+        Dc.count:SetShown(count > 1)
     end
     local locked = rec.locked and true or false
-    if SetItemButtonDesaturated then
-        pcall(SetItemButtonDesaturated, b, locked)
-    elseif Dc.icon then
-        Dc.icon:SetDesaturated(locked)
-    end
+    if Dc.icon then Dc.icon:SetDesaturated(locked) end
     if Dc.icon then
         local v = locked and 0.5 or 1
         Dc.icon:SetVertexColor(v, v, v)
@@ -2076,9 +2068,14 @@ function K.Takeover()
     frame:Show()
     if not frame:IsShown() then return false end
     K.Park()
-    -- Taschenfenster mit öffnen (und beim Schließen der Bank wieder zu, falls wir es geöffnet haben)
-    if B.Enabled() and B.Open and B.IsOpen and not B.IsOpen() then
-        if B.Open() then D.openedBags = true end
+    -- Taschenfenster mit öffnen (und beim Schließen der Bank wieder zu, falls wir es geöffnet haben);
+    -- nur, wenn die Bank es öffnen darf (Schalter „Bei der Bank öffnen“, „Taschen nicht automatisch öffnen“)
+    if B.Enabled() and B.Open and B.IsOpen and not B.IsOpen()
+        and (not B.AutoAllowed or B.AutoAllowed("BankFrame")) then
+        if B.Open() then
+            D.openedBags = true
+            B.openerName = "BankFrame"
+        end
     end
     return true
 end

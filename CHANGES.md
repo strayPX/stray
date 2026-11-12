@@ -1,3 +1,15 @@
+# stray 2.1.0
+
+**Neu: die stray-Tasche (standardmäßig aus, Einstellungen → Tasche).** Ein eigenes Taschenfenster; ausgeschaltet bleibt alles bei Blizzards Taschen.
+- **Fenster:** Inventar mit Platzzahl, Suche, Gold, Schloss gegen Verschieben; Größe ziehen, Spalten und Feldgröße einstellbar. Drei Ansichten: Pro Tasche, Eine Tasche, Kategorien.
+- **Kategorien:** Angeheftet, Zuletzt erhalten, Rüstkammer, Abenteuer-Vorrat, Handwerkswaren, Verschiedenes, Quest-Items, Schrott, Spezialtaschen, Freie Plätze. Eigene Kategorien anlegen, umbenennen, mit Symbol versehen, verschieben; Gegenstände per „+“ zuweisen oder anheften. Gleiche Gegenstände zusammenfassen.
+- **Seitenleiste** mit Kategoriefilter (einklappbar).
+- **Kopf-Symbole:** Taschenplätze (Tasche einsetzen, tauschen, herausziehen), Schrott-Markierer mit „Schrott verkaufen“ beim Händler, Sortieren, Schnellaktionen (zeigt, worauf Entzaubern/Schloss knacken wirkt).
+- **Automatik:** öffnet und schließt mit Händler, Post, Auktionshaus, Bank, Handel; optional mit Berufs- und Charakterfenster.
+- **Bank:** eigenes Bankfenster im gleichen Aufbau mit Sortieren, Einlagern und Banktaschen; Knopf „Blizzard-Bank“ holt Blizzards Fenster zurück.
+- **Twinks:** speichert Taschen und Bank je Charakter, zeigt den Bestand anderer Charaktere, Zeilen im Tooltip und Gold aller Charaktere.
+- **Knopf „Alles deaktivieren“** (stray → Allgemein): schaltet alle eingeschalteten Optionen auf einmal aus.
+
 # stray 2.0.0
 
 **stray ist jetzt ein reines Komfort-Addon.** Alle eigenen Oberflächen-Elemente sind entfernt; Blizzards Oberfläche gilt wieder. Es bleiben DMG-Meter, Bedrohung, EP-Tracker und alle Komfort-Funktionen. Einstellungen der entfernten Teile werden beim ersten Start gelöscht (alle anderen bleiben).

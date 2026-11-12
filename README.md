@@ -26,6 +26,13 @@ Komfort-Addon für **World of Warcraft: Forever**: viele kleine Verbesserungen (
 - **Freie Taschenplätze:** Zahl auf dem Rucksack-Knopf, rot bei vollen Taschen.
 - **Hilfe bei vollen Taschen:** markiert den billigsten Gegenstand als Löschkandidaten, Goldmünze an wertvollerer Beute. Gelöscht wird nichts automatisch.
 
+**Tasche (stray-Tasche)**
+- Eigenes Taschenfenster (standardmäßig aus): Ansichten Pro Tasche, Eine Tasche, Kategorien; Suche, Gold, Schloss, Größe ziehen.
+- Kategorien mit Anheften, Zuletzt erhalten, eigenen Kategorien, Seitenleiste als Filter.
+- Taschenplätze, Schrott-Markierer mit „Schrott verkaufen“, Sortieren, Schnellaktionen.
+- Öffnet mit Händler, Post, Auktionshaus, Bank und Handel.
+- Eigenes Bankfenster; Bestand, Tooltip-Zeilen und Gold aller Charaktere (Twinks).
+
 **Chat**
 - **Links kopierbar:** Webadressen im Chat werden anklickbar und öffnen ein Feld zum Kopieren.
 - **Koordinaten anklickbar:** „45.2, 67.8“ im Chat wird ein Link, ein Klick setzt einen Kartenpin.
@@ -135,6 +142,7 @@ All Rights Reserved – nur zur persönlichen Nutzung, siehe `LICENSE`.
 
 ## Version
 
+- 2.1.0 – stray-Tasche: eigenes Taschenfenster mit Kategorien, Seitenleiste, Taschenplätzen, Schrott-Markierer, Sortieren, Bankfenster und Twink-Bestand (standardmäßig aus); Knopf „Alles deaktivieren“.
 - 2.0.0 – stray wird ein reines Komfort-Addon: eigene Oberfläche (Aktionsleisten, Abklingzeiten, Taschen, Taschenleiste, Minimap, Gruppenrahmen, Menü, EP-Leiste, Vorrat, Schwungtimer) entfernt; neu ca. 50 Optionen (Automation, Chat, Ausblenden, Tooltip, Charakter, Grafik & Ton); Einstellungsfenster neu geordnet
 - 1.1.0 – Oberflächen-Art „Forever UI“ (Bronze-Gold, Schiefer), durchsichtiges DMG-Meter mit Symbol-Kopfzeile, Einstellungsfenster neu geordnet (Übersicht mit Bildschirmkarte, Alle Anzeigen), Taschenfenster und Taschen-/Menüleiste im neuen Stil, Taschenplätze standardmäßig an, Shift+Klick verschiebt ohne Auslösen, weniger Last beim laufenden Rand; stray-Questtracker entfernt
 - 1.0.0 – Erste stabile Version: enthält 0.20 bis 0.23 (neues stray-Fenster, DMG-Meter-Fenster, eigener Questtracker mit Berufsreagenzien, Tasten belegen, Anheft-Leiste, Konflikt-Warnung, Verfolgungs-Knopf an der Minimap, englische Übersetzung, Chat-Hinweis nach Updates: /reload reicht oder WoW neu starten, abschaltbar unter System → Allgemein)

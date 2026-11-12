@@ -302,12 +302,22 @@ icons:SetWidth(1)
 B.header.icons = icons
 local iconList, iconByKey = {}, {}
 
+-- Sichtbare Symbole lückenlos von rechts nach links; versteckte werden übersprungen
 local function PlaceIcons()
-    for i, btn in ipairs(iconList) do
-        btn:ClearAllPoints()
-        btn:SetPoint("RIGHT", icons, "RIGHT", -(i - 1) * 28, 0)
+    local n = 0
+    for _, btn in ipairs(iconList) do
+        if btn:IsShown() then
+            btn:ClearAllPoints()
+            btn:SetPoint("RIGHT", icons, "RIGHT", -n * 28, 0)
+            n = n + 1
+        end
     end
-    icons:SetWidth(math.max(1, #iconList * 28 - 6))
+    icons:SetWidth(math.max(1, n * 28 - 6))
+end
+
+-- Nach jedem Zeigen/Verstecken eines Kopf-Symbols aufrufen (bag_sidebar.lua, bag_offline.lua)
+function B.LayoutHeaderIcons()
+    PlaceIcons()
 end
 
 -- def = { key, icon (Textur), atlas, tooltip (deutscher Schlüssel), onClick = fn(btn, mouse) }
@@ -526,6 +536,14 @@ local moneyText = Text(frame, 12, C.text, FONT_BODY)
 moneyText:SetPoint("RIGHT", lockBtn, "LEFT", -8, 0)
 moneyText:SetJustifyH("RIGHT")
 
+-- Fläche über dem Gold-Text (Tooltip, z. B. Gold aller Charaktere aus bag_offline.lua)
+local moneyFrame = CreateFrame("Frame", nil, frame)
+moneyFrame:SetPoint("TOPLEFT", moneyText, "TOPLEFT", -4, 3)
+moneyFrame:SetPoint("BOTTOMRIGHT", moneyText, "BOTTOMRIGHT", 4, -3)
+moneyFrame:EnableMouse(true)
+moneyFrame:SetScript("OnLeave", function() GameTooltip:Hide() end)
+B.moneyFrame = moneyFrame
+
 local hintText = Text(frame, 11, C.textDim, FONT_BODY) -- Platz für Statusmeldungen (z. B. Umpacken)
 hintText:SetPoint("BOTTOMLEFT", footerLeft, "BOTTOMRIGHT", 6, 1)
 B.hintText = hintText
@@ -617,6 +635,7 @@ local function StyleButton(b)
         pcall(count.SetParent, count, holder)
         count:SetDrawLayer("OVERLAY", 6)
     end
+    D.count = count
     D.holder = holder
 end
 
@@ -689,29 +708,21 @@ local function Paint(b, rec)
     local hasItem = rec.hasItem
     local questNeeded = rec.questNeeded and QuestMarksOn()
     local isTriage = hasItem and rec.bag == triageBag and rec.slot == triageSlot
-    if SetItemButtonTexture then
-        pcall(SetItemButtonTexture, b, rec.icon)
-    elseif D.icon then
+    -- Direkt an Symbol und Zahl statt SetItemButtonTexture/-Count: Blizzards Funktionen setzen den
+    -- Texturausschnitt zurück (unser Zuschnitt ginge verloren) und schreiben `count` in den Blizzard-Knopf.
+    if D.icon then
         D.icon:SetTexture(rec.icon)
+        D.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        D.icon:SetShown(rec.icon ~= nil)
     end
-    if D.icon then D.icon:SetShown(rec.icon ~= nil) end
     local count = rec.displayCount or rec.count
     count = (type(count) == "number") and count or 0
-    if SetItemButtonCount then
-        pcall(SetItemButtonCount, b, count)
-    else
-        local fs = Region(b, "Count", "Count")
-        if fs then
-            fs:SetText(count > 1 and count or "")
-            fs:SetShown(count > 1)
-        end
+    if D.count then
+        D.count:SetText(count > 1 and count or "")
+        D.count:SetShown(count > 1)
     end
     local locked = rec.locked and true or false
-    if SetItemButtonDesaturated then
-        pcall(SetItemButtonDesaturated, b, locked)
-    elseif D.icon then
-        D.icon:SetDesaturated(locked)
-    end
+    if D.icon then D.icon:SetDesaturated(locked) end
     if D.icon then
         local v = locked and 0.5 or 1
         D.icon:SetVertexColor(v, v, v)

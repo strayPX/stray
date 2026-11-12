@@ -541,14 +541,17 @@ local function CreateButton(bag, slot, name, parent)
         end
         return nil
     end
+    -- Die Taschen-ID kommt aus dem Elternrahmen (GetBagID fällt darauf zurück). Bewusst kein SetBagID:
+    -- das schreibt über ein Attribut einen Wert, der von unserem Code stammt, in Blizzards Knopf und
+    -- würde jede Gegenstands-Aktion (Benutzen, Verkaufen) als „tainted“ markieren.
     b:SetID(slot)
-    if b.SetBagID then pcall(b.SetBagID, b, bag) end
     local st = { bag = bag, slot = slot }
     state[b] = st
     -- „Neu“-Markierung: Blizzard entfernt sie beim Daraufzeigen, danach neu zeichnen
     b:HookScript("OnLeave", function(self)
         local s = state[self]
-        if s and B.Enabled() then B.RequestRefresh(0.1, "new") end
+        local rec = s and B.GetRecord(s.bag, s.slot)
+        if rec and rec.isNew and B.Enabled() then B.RequestRefresh(0.1, "new") end
     end)
     b:Hide()
     for _, fn in ipairs(createdFns) do
@@ -577,7 +580,7 @@ function B.AcquireButton(bag, slot, extra)
         local b = extras[extra - 1]
         if not b then
             if InCombatLockdown() then needWarm = true return nil end
-            b = CreateButton(bag, slot, "strayBagExtra" .. (extra - 1), Container(0))
+            b = CreateButton(bag, slot, "strayBagExtra" .. (extra - 1), Container(bag))
             if not b then return nil end
             state[b].extra = extra - 1
             extras[extra - 1] = b
@@ -585,7 +588,9 @@ function B.AcquireButton(bag, slot, extra)
         local st = state[b]
         if st.bag ~= bag or st.slot ~= slot then
             if InCombatLockdown() then return nil end
-            if b.SetBagID then pcall(b.SetBagID, b, bag) end
+            -- Taschen-ID = ID des Elternrahmens (kein SetBagID, siehe CreateButton)
+            local cont = Container(bag)
+            if b:GetParent() ~= cont then pcall(b.SetParent, b, cont) end
             b:SetID(slot)
             st.bag, st.slot = bag, slot
         end

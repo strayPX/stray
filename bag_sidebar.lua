@@ -986,6 +986,7 @@ local function UpdateIcons()
         end
         if show then icons.quick.icon:SetTexture(QuickTexture()) end
     end
+    if B.LayoutHeaderIcons then B.LayoutHeaderIcons() end
     if not db.bagIconJunk then J.End() end
 end
 
@@ -1056,6 +1057,8 @@ sell:SetScript("OnLeave", function() GameTooltip:Hide() end)
 ---------------------------------------------------------------------------
 
 B.OnRefresh(function()
+    -- Bei geschlossenem Fenster nichts zeichnen; beim Öffnen läuft ein Refresh („open“) und holt alles nach
+    if not B.frame:IsShown() then return end
     UpdateIcons()
     SB.Update()
     S.Update()

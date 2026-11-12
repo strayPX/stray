@@ -187,7 +187,7 @@ local PAGES = {
         { name = "Automatik", prefix = "^bagAuto", keys = { "bagAutoMerchant", "bagAutoMail", "bagAutoAuction",
             "bagAutoBank", "bagAutoTrade", "bagAutoCraft", "bagOpenWithCharacter" } },
         { name = "Bank", sections = { "Bank" }, keys = { "bagBank", "bagBankColumns" }, prefix = "^bagBank", master = "bagBank" },
-        { name = "Twinks", prefix = "^bagOffline" },
+        { name = "Twinks", prefix = "^bagOffline", keys = { "bagIconOffline" } },
     } },
     { name = "Kampf", icon = "swords", tabs = {
         { name = "Bedrohung", sections = { "Bedrohung" } },
@@ -1440,6 +1440,10 @@ end
 local DATA_KEYS = {
     point = true, uiSize = true, altData = true, accountCVarData = true, flightRouteTimes = true,
     mailAltList = true, playerNoteData = true, xpHistory = true, recentChanges = true,
+    -- stray-Tasche: Laufdaten des Spielers (angeheftet, eigene Kategorien, Schrott-Markierungen, Einklappzustand,
+    -- Bestand aller Charaktere), keine Einstellungen – zählen nicht als Änderung und werden nicht verworfen
+    bagPins = true, bagCats = true, bagJunkMarks = true, bagCollapsed = true, bagBankCollapsed = true,
+    bagSidebarCollapsed = true, bagSlotsShown = true, bagOfflineData = true,
 }
 local function IsDataKey(key)
     if DATA_KEYS[key] then return true end
