@@ -1,6 +1,7 @@
 -- stray – Hilfe bei vollen Taschen
 -- Ab höchstens einem freien Platz sucht stray den billigsten Gegenstand in den Taschen
--- (Verkaufspreis × Anzahl) und markiert ihn als Löschkandidat: an Blizzards Taschenknöpfen
+-- (Verkaufspreis × Anzahl) und markiert ihn als Löschkandidat: im stray-Taschenfenster (ist es an,
+-- über ns.Bag.SetTriage – das Fenster zeichnet den roten Rand selbst), sonst an Blizzards Taschenknöpfen
 -- (eigene Texturen, keine Felder auf Blizzard-Frames) und im Tooltip.
 -- Beim Plündern bekommt Beute, die mehr wert ist als der Löschkandidat, eine kleine Goldmünze.
 -- stray löscht nie etwas selbst.
@@ -167,6 +168,10 @@ local function ShowMark(button, on)
 end
 
 local function ButtonBagSlot(button)
+    -- Knöpfe des stray-Fensters kennen ihren Platz aus dem eigenen Zustand
+    local B = ns.Bag
+    local st = B and B.ButtonState and B.ButtonState(button)
+    if st and type(st.bag) == "number" and type(st.slot) == "number" then return st.bag, st.slot end
     if not button.GetBagID or not button.GetID then return nil end
     local okBag, bag = pcall(button.GetBagID, button)
     local okSlot, slot = pcall(button.GetID, button)
@@ -260,10 +265,22 @@ end
 -- Neu berechnen (gedrosselt)
 ---------------------------------------------------------------------------
 
+-- stray-Taschenfenster: Löschkandidat melden (nur wenn die stray-Tasche an ist), sonst Markierung aufheben
+local function PaintWindow()
+    local B = ns.Bag
+    if not B or not B.SetTriage then return end
+    if candidate and B.Enabled() then
+        B.SetTriage(candidate.bag, candidate.slot)
+    else
+        B.SetTriage(nil, nil)
+    end
+end
+
 local function Apply()
     local ok, result = pcall(Scan)
     candidate = ok and result or nil
     pcall(PaintBlizzard)
+    pcall(PaintWindow)
     if LootFrame and LootFrame:IsShown() then SafePaintLoot() end
 end
 
@@ -315,6 +332,9 @@ ns.On("PLAYER_LOGIN", function()
     end
 end)
 
+-- stray-Tasche ein-/ausgeschaltet (Einstellungsfenster zu): Markierung im Fenster nachziehen
+ns.OnConfig(function() pcall(PaintWindow) end)
+
 ns.On("PLAYER_ENTERING_WORLD", function() if Enabled() then RequestScan(2) end end)
 ns.On("BAG_UPDATE_DELAYED", function() if Enabled() then RequestScan(0.3) end end)
 ns.On("QUEST_LOG_UPDATE", function() if Enabled() and candidate then RequestScan(1) end end)
@@ -337,7 +357,7 @@ end)
 ns.AddOption(1, "Taschen", {
     key = "bagTriage",
     label = L["Hilfe bei vollen Taschen"],
-    tooltip = L["Ist höchstens noch ein Platz frei, markiert stray den billigsten Gegenstand (Verkaufspreis × Anzahl) rot als Löschkandidat – in Blizzards Taschen und im Tooltip. Beute, die mehr wert ist, bekommt beim Plündern eine Goldmünze.\n\nNie vorgeschlagen werden Questgegenstände, Gegenstände ohne Verkaufswert und alles ab „selten“ (blau).\n\nstray löscht nichts selbst."],
+    tooltip = L["Ist höchstens noch ein Platz frei, markiert stray den billigsten Gegenstand (Verkaufspreis × Anzahl) rot als Löschkandidat – in der stray-Tasche bzw. Blizzards Taschen und im Tooltip. Beute, die mehr wert ist, bekommt beim Plündern eine Goldmünze.\n\nNie vorgeschlagen werden Questgegenstände, Gegenstände ohne Verkaufswert und alles ab „selten“ (blau).\n\nstray löscht nichts selbst."],
     set = function(value)
         ns.db.bagTriage = value
         Apply()

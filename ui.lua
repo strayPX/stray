@@ -154,7 +154,7 @@ end
 -- „Alle Anzeigen“ (displays) sind eigene Seiten ohne Reiter.
 local PAGES = {
     { name = "Übersicht", icon = "home", home = true },
-    { name = "Automation", icon = "backpack", tabs = {
+    { name = "Automation", icon = "adjustments", tabs = {
         { name = "Quests", sections = { "Quests" } },
         { name = "NPCs", sections = { "NPCs" } },
         { name = "Filmsequenzen", sections = { "Filmsequenzen" } },
@@ -175,6 +175,19 @@ local PAGES = {
         { name = "Charakter", sections = { "Charakter" } },
         { name = "Interface", sections = { "Interface" } },
         { name = "Kamera", sections = { "Kamera & Karte" } },
+    } },
+    -- stray-Tasche: Reiter nehmen ausdrückliche Schlüssel zuerst; „Fenster“ fängt den Rest des Bereichs „Tasche“
+    -- auf, „Bank“ den Bereich „Bank“, „Twinks“ alles mit Präfix bagOffline
+    { name = "Tasche", icon = "backpack", master = "bagWindow", tabs = {
+        { name = "Fenster", sections = { "Tasche" }, keys = { "bagWindow", "bagView", "bagColumns", "bagSlotSize",
+            "bagLocked", "bagMerge", "bagShowAllEmpty", "bagSidebar" } },
+        { name = "Abschnitte", keys = { "bagShowPinned", "bagHidePinnedInCategories", "bagShowRecent",
+            "bagArmoryBySlot", "bagHideAddCategory" } },
+        { name = "Symbole", keys = { "bagIconSlots", "bagIconJunk", "bagIconSort", "bagIconQuick", "bagJunkGrey" } },
+        { name = "Automatik", prefix = "^bagAuto", keys = { "bagAutoMerchant", "bagAutoMail", "bagAutoAuction",
+            "bagAutoBank", "bagAutoTrade", "bagAutoCraft", "bagOpenWithCharacter" } },
+        { name = "Bank", sections = { "Bank" }, keys = { "bagBank", "bagBankColumns" }, prefix = "^bagBank", master = "bagBank" },
+        { name = "Twinks", prefix = "^bagOffline" },
     } },
     { name = "Kampf", icon = "swords", tabs = {
         { name = "Bedrohung", sections = { "Bedrohung" } },
@@ -208,10 +221,13 @@ local MOVABLE_TABS = {
     { "EP-Tracker", "Welt", "EP-Tracker" },
     { "Flugzeit", "Welt", "Flugzeit" },
     { "Haltbarkeit", "Interface", "Interface", "durability" },
+    { "Taschenfenster", "Tasche", "Fenster", "bagWindow" },
+    { "Bank", "Tasche", "Bank", "bagBank" },
 }
 
 -- Übersicht: Funktionen mit An/Aus, nach Seiten gruppiert (Überschrift = Seitenname)
 local HOME = {
+    { label = "Tasche", keys = { "bagWindow", "bagBank" } },
     { label = "Automation", keys = { "questAccept", "gossipSkip", "autoLoot", "autoSell", "autoRepair", "bagTriage" } },
     { label = "Sozial & Chat", keys = { "playerNotes", "inviteAcceptFriends", "chatLinks" } },
     { label = "Interface", keys = { "durability", "hideErrors", "cameraMax" } },
@@ -231,7 +247,7 @@ V.LEGACY_PAGES = {
     ["Welt & Quests"] = "Automation",
 }
 V.LEGACY_TABS = {
-    ["Taschenfenster"] = "Taschen", ["Taschenleiste"] = "Taschen", ["Taschen- & Menüleiste"] = "Taschen",
+    ["Taschenfenster"] = "Fenster", ["Taschenleiste"] = "Taschen", ["Taschen- & Menüleiste"] = "Taschen",
     ["Minimap"] = "Kamera", ["Swing"] = "Kampfhilfen", ["EP-Leiste"] = "EP-Tracker",
     ["Vorrat"] = "Taschen", ["Gruppenrahmen"] = "Sozial", ["Begleiter"] = "Sozial",
     ["Aktionsleisten"] = "Interface", ["Leisten"] = "Interface", ["Tastenbelegung"] = "Interface",
@@ -319,6 +335,8 @@ local SECTION_KEYWORDS = {
     ["NPCs"] = { "npc" },
     ["Chat"] = { "chat" },
     ["Taschen"] = { "bags", "bag", "inventar", "inventory" },
+    ["Tasche"] = { "bags", "bag", "inventar", "inventory", "stray-tasche", "rucksack", "backpack" },
+    ["Bank"] = { "bank", "bags", "bag", "inventar", "inventory" },
     ["Quests"] = { "quest", "quests" },
     ["Bedrohung"] = { "aggro", "threat" },
     ["DMG-Meter"] = { "dps", "damage", "meter", "schaden", "heal", "heilung" },
@@ -1435,6 +1453,7 @@ local PER_ENTRY = { positions = true, scales = true }
 -- Bereiche mit Anzeigen/Rahmen: im Kampf erst nach dem Kampf zurücksetzen
 local DEFER_SECTIONS = {
     ["Erfahrung"] = true, ["Kamera & Karte"] = true, ["Zaubern"] = true, ["Taschen"] = true,
+    ["Tasche"] = true, ["Bank"] = true,
 }
 
 local function DeepCopy(value)

@@ -300,10 +300,18 @@ end
 
 local pending = false
 
+-- Das stray-Taschenfenster zeichnet die Quest-Markierung selbst (Rahmen + „!“, Option questItemMarks);
+-- es braucht nur den Anstoß, wenn sich die Liste der Questgegenstände geändert hat.
+local function RefreshBagWindow()
+    local B = ns.Bag
+    if B and B.RequestRefresh then B.RequestRefresh(0.05, "quest") end
+end
+
 local function Refresh()
     pending = false
     pcall(RebuildQuestItems)
     UpdateBags()
+    pcall(RefreshBagWindow)
 end
 
 local function RequestRefresh()
@@ -349,6 +357,7 @@ ns.AddOption(1, "Taschen", {
     set = function(value)
         ns.db.questItemMarks = value
         if value then Refresh() else HideAllMarks() end
+        pcall(RefreshBagWindow)
     end,
 })
 

@@ -57,6 +57,9 @@
 --   B.SetTriage(bag, slot)    Löschkandidat markieren (triage.lua)
 -- ── Übernahme von Blizzards Taschen (hier unten) ────────────────────────────────────────────────
 --   B.ApplyTakeover()           parkt Blizzards Taschenrahmen (Schlüsselring bleibt) bzw. gibt sie frei
+--   B.GamepadActive()           true bei aktiver Gamepad-Oberfläche (InputUtil.IsGamepadUIEnabled): dann bleiben Blizzards Taschen
+--   B.openerName                Name des Rahmens, der das Fenster automatisch geöffnet hat (nil = von Hand)
+--   B.AutoAllowed(name)         (bag_auto.lua) darf der Rahmen `name` das Fenster öffnen? Fragt openBy ab
 
 local _, ns = ...
 local L = ns.L
@@ -221,6 +224,14 @@ end
 
 function B.Enabled()
     return ns.db ~= nil and ns.db.bagWindow == true
+end
+
+-- Gamepad-Oberfläche aktiv? Dann bedient Blizzard die Taschen selbst (stray hält sich raus).
+function B.GamepadActive()
+    local util = InputUtil
+    if type(util) ~= "table" or type(util.IsGamepadUIEnabled) ~= "function" then return false end
+    local ok, on = pcall(util.IsGamepadUIEnabled)
+    return ok and not IsSecret(on) and on == true
 end
 
 ---------------------------------------------------------------------------
@@ -664,7 +675,7 @@ end
 -- Blizzards Rahmen (deren OnHide würde im Taint-Kontext laufen): Blizzards Öffnen/Schließen-Zustand
 -- läuft unsichtbar weiter, das Umschalten entscheidet allein der Zustand des stray-Fensters.
 local function ParkBlizzardBags()
-    if InCombatLockdown() then return end
+    if InCombatLockdown() or B.GamepadActive() then return end
     suppress = true
     ForEachBlizzard(function(f)
         if IsKeyring(f) then UnparkFrame(f) else ParkFrame(f) end
@@ -674,7 +685,7 @@ end
 
 function B.ApplyTakeover()
     if InCombatLockdown() then return end
-    if B.Enabled() and takeover then
+    if B.Enabled() and takeover and not B.GamepadActive() then
         ParkBlizzardBags()
     else
         ForEachBlizzard(UnparkFrame)
@@ -683,7 +694,7 @@ end
 
 -- Kann das stray-Fenster jetzt übernehmen? (Fenster stellt B.CanShow bereit)
 local function Usable()
-    return B.Enabled() and takeover and B.CanShow ~= nil and B.CanShow() and true or false
+    return B.Enabled() and takeover and not B.GamepadActive() and B.CanShow ~= nil and B.CanShow() and true or false
 end
 
 -- Verschachtelte Aufrufe (ToggleAllBags ruft OpenBackpack …): der äußere Hook kommt zuletzt und
@@ -704,7 +715,13 @@ local function Resolve()
     if action == "toggle" then
         action = shown and "hide" or "show"
     elseif action == "openBy" then
-        if not shown and B.Open() then B.openerName = name end
+        -- bag_auto.lua: je Fenster abschaltbar; „Taschen nicht automatisch öffnen“ hat Vorrang
+        local allowed = true
+        if B.AutoAllowed then
+            local ok, result = pcall(B.AutoAllowed, name)
+            allowed = not ok or result ~= false
+        end
+        if not shown and allowed and B.Open() then B.openerName = name end
         return
     elseif action == "closeBy" then
         if shown and name and name == B.openerName then B.Close() end
@@ -807,6 +824,21 @@ ns.On("PLAYER_REGEN_ENABLED", function()
     B.ApplyTakeover()
     B.RequestRefresh(0, "combat")
 end)
+
+-- Gamepad-Oberfläche an/aus: Blizzards Taschen zurückgeben bzw. wieder übernehmen
+do
+    local pad = CreateFrame("Frame")
+    for _, event in ipairs({ "GAME_PAD_ACTIVE_CHANGED", "GAME_PAD_CONNECTED", "GAME_PAD_DISCONNECTED" }) do
+        pcall(pad.RegisterEvent, pad, event)
+    end
+    pad:SetScript("OnEvent", function()
+        C_Timer.After(0.2, function()
+            if not B.Enabled() then return end
+            if B.GamepadActive() and B.IsOpen() then B.Close() end
+            B.ApplyTakeover()
+        end)
+    end)
+end
 
 ns.On("BAG_UPDATE", function() B.RequestRefresh(0.05, "bag") end)
 ns.On("BAG_UPDATE_DELAYED", function() B.RequestRefresh(0.02, "bag") end)

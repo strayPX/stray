@@ -45,7 +45,16 @@ local function OwnerCount(tooltip, itemID)
     local ok, owner = pcall(tooltip.GetOwner, tooltip)
     if not ok or type(owner) ~= "table" then return nil end
 
-    -- Taschenplatz (Blizzard-Taschen, Bank)
+    -- Taschenplatz (Blizzard-Taschen, Bank, stray-Taschenfenster: dessen Knöpfe kennen ihren Platz aus dem Kernzustand)
+    local B = ns.Bag
+    local st = B and B.ButtonState and B.ButtonState(owner)
+    if st and type(st.bag) == "number" and type(st.slot) == "number" and C_Container and C_Container.GetContainerItemInfo then
+        local okInfo, info = pcall(C_Container.GetContainerItemInfo, st.bag, st.slot)
+        if okInfo and type(info) == "table" and Public(info.itemID) == itemID then
+            return Public(info.stackCount)
+        end
+        return nil
+    end
     if owner.GetBagID and owner.GetID and C_Container and C_Container.GetContainerItemInfo then
         local okBag, bag = pcall(owner.GetBagID, owner)
         local okSlot, slot = pcall(owner.GetID, owner)
