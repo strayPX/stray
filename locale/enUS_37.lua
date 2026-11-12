@@ -1,3 +1,32 @@
 -- stray – englische Texte (Teil 37), Schlüssel = deutscher Originaltext
 local _, ns = ...
 local E = ns.LocaleEN
+
+-- Offline-Bestand (bag_offline.lua)
+E["Bestand anderer Charaktere"] = "Other characters' inventory"
+E["Bank (Stand: %s)"] = "Bank (as of %s)"
+E["Bank (noch nicht besucht)"] = "Bank (not visited yet)"
+E["%s – Bank (zuletzt gesehen)"] = "%s – Bank (last seen)"
+E["%s – Bestand"] = "%s – Inventory"
+E["Gold aller Charaktere"] = "Gold of all characters"
+E["Summe: %s"] = "Total: %s"
+E["Bestand ansehen"] = "View inventory"
+E["Bank (zuletzt gesehen)"] = "Bank (last seen)"
+E["Noch kein Bestand gespeichert."] = "No inventory saved yet."
+E["Ansicht schließen"] = "Close view"
+E["Charakter löschen"] = "Delete character"
+E["Gespeicherten Bestand von „%s“ löschen?"] = "Delete the saved inventory of \"%s\"?"
+E["Den gespeicherten Bestand aller Charaktere löschen?"] = "Delete the saved inventory of all characters?"
+E["Taschen %d · Bank %d"] = "Bags %d · Bank %d"
+E["Taschen %d"] = "Bags %d"
+E["Bank %d"] = "Bank %d"
+E["Summe (andere Charaktere): %d"] = "Total (other characters): %d"
+E["Erst „Bestand aller Charaktere speichern“ einschalten (weiter oben)."] = "Turn on \"Save inventory of all characters\" first (further up)."
+E["Bestand aller Charaktere speichern"] = "Save inventory of all characters"
+E["Speichert für jeden Charakter, was in Taschen und Bank liegt, und zeigt es später an: Kopf-Symbol im Taschenfenster (Bestand im Bankfenster ansehen, Gold aller Charaktere) und Zeilen im Gegenstands-Tooltip.\n\nDie Bank wird erfasst, wenn du sie besuchst. Wirkt auch ohne „stray-Tasche“ (mit Blizzards Taschen), das Kopf-Symbol gibt es aber nur im stray-Taschenfenster."] = "Saves what each character has in bags and bank and shows it later: a header icon in the bag window (view the inventory in the bank window, gold of all characters) and lines in item tooltips.\n\nThe bank is recorded when you visit it. Works without \"stray bag\" too (with Blizzard's bags), but the header icon only exists in the stray bag window."
+E["Bestand anderer Charaktere im Tooltip"] = "Other characters' inventory in tooltip"
+E["Hängt an Gegenstands-Tooltips Zeilen „Name: Taschen N · Bank M“ für jeden anderen gespeicherten Charakter an, der den Gegenstand hat (bei mehreren mit Summe)."] = "Adds lines \"Name: Bags N · Bank M\" to item tooltips for every other saved character that has the item (with a total if there are several)."
+E["Symbol „Bestand“ im Taschenfenster"] = "\"Inventory\" icon in the bag window"
+E["Zeigt im Kopf des Taschenfensters ein Symbol mit dem Charakter-Menü (Bestand ansehen, Gold, löschen). Es erscheint, sobald ein anderer Charakter gespeichert ist."] = "Shows an icon in the bag window header with the character menu (view inventory, gold, delete). It appears as soon as another character is saved."
+E["Gespeicherten Bestand löschen"] = "Delete saved inventory"
+E["Löscht den gespeicherten Bestand aller Charaktere (mit Rückfrage). Gold und Twink-Übersicht bleiben unberührt; der eingeloggte Charakter wird sofort neu erfasst."] = "Deletes the saved inventory of all characters (with confirmation). Gold and the alts overview are untouched; the logged-in character is recorded again right away."
